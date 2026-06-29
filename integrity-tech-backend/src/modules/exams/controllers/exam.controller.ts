@@ -1,0 +1,47 @@
+import { Controller, Post, Body, Headers, BadRequestException } from '@nestjs/common';
+import { ExamService } from '../services/exam.service';
+
+@Controller('exams')
+export class ExamController {
+  constructor(private readonly examService: ExamService) {}
+
+  /**
+   * Endpoint para que un docente cree un examen.
+   */
+  @Post()
+  async create(
+    @Headers('authorization') authHeader: string,
+    @Body('title') title: string,
+    @Body('description') description: string,
+  ) {
+    const token = this.extractToken(authHeader);
+    return this.examService.createExam(token, title, description);
+  }
+
+  /**
+   * Endpoint para que un estudiante inicie la toma de un examen.
+   */
+  @Post('attempts')
+  async startAttempt(
+    @Headers('authorization') authHeader: string,
+    @Body('examId') examId: string,
+  ) {
+    const token = this.extractToken(authHeader);
+    if (!examId) throw new BadRequestException('El campo examId es obligatorio.');
+    return this.examService.startExamAttempt(token, examId);
+  }
+
+  /**
+   * Método auxiliar para extraer el Bearer token del header de autorización
+   */
+  private extractToken(authHeader: string): string {
+    if (!authHeader) {
+      throw new BadRequestException('Falta la cabecera de Autorización HTTP.');
+    }
+    const [type, token] = authHeader.split(' ');
+    if (type !== 'Bearer' || !token) {
+      throw new BadRequestException('Formato de autorización inválido. Use "Bearer <token>".');
+    }
+    return token;
+  }
+}

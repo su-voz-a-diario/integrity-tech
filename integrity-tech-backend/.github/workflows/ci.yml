@@ -1,0 +1,118 @@
+name: Integrity-Tech CI (QA Guard)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # Job 1: Calidad de Código y Arquitectura (Lint, Build, Dependencias Circulares)
+  quality:
+    name: Code Quality & Architecture Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Código
+        uses: actions/checkout@v3
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Instalar Dependencias
+        run: npm ci
+
+      - name: Generar Cliente Prisma
+        run: npx prisma generate
+
+      - name: Análisis Estático (Linter)
+        run: npm run lint
+
+      - name: Compilación TypeScript (Build)
+        run: npm run build
+
+      - name: Auditoría de Dependencias Circulares (Madge)
+        run: npx madge --circular src/
+
+  # Job 2: Pruebas de Integración (Base de Datos Real y Colas en Memoria)
+  test-integration:
+    name: Integration Testing Suite
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: localpassword123
+          POSTGRES_DB: integrity_tech_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Código
+        uses: actions/checkout@v3
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Instalar Dependencias
+        run: npm ci
+
+      - name: Generar Cliente Prisma
+        run: npx prisma generate
+
+      - name: Sincronizar Esquema de Base de Datos
+        run: npx prisma db push --skip-generate
+        env:
+          DATABASE_URL: postgresql://postgres:localpassword123@localhost:5432/integrity_tech_db?schema=public
+
+      - name: Ejecutar Pruebas de Integración
+        run: npm run test:integration
+        env:
+          DATABASE_URL: postgresql://postgres:localpassword123@localhost:5432/integrity_tech_db?schema=public
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          JWT_SECRET: superlocaljwtsecretkey12345
+          NODE_ENV: test
+
+  # Job 3: Validación del Dockerfile de Producción
+  docker-build:
+    name: Docker Production Image Build Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Código
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Compilar Imagen Docker (Prueba de Construcción)
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: integrity-tech-backend:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

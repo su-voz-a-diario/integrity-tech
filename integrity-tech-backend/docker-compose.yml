@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  # Base de datos relacional PostgreSQL
+  postgres:
+    image: postgres:15-alpine
+    container_name: integrity-tech-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: localpassword123
+      POSTGRES_DB: integrity_tech_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Base de datos en memoria Redis (Caché & Colas)
+  redis:
+    image: redis:7-alpine
+    container_name: integrity-tech-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Interfaz gráfica para explorar Redis en desarrollo local
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: integrity-tech-redis-commander
+    restart: always
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  # API-Service: Contenedor que maneja las peticiones HTTP REST
+  api-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: integrity-tech-api
+    restart: always
+    command: node dist/main
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:localpassword123@postgres:5432/integrity_tech_db?schema=public
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=superlocaljwtsecretkey12345
+      - NODE_ENV=development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # Worker-Service: Contenedor dedicado a consumir colas BullMQ (calificaciones, logs)
+  worker-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: integrity-tech-worker
+    restart: always
+    command: node dist/main-worker # Sobrescribimos el comando para arrancar en modo Headless
+    environment:
+      - DATABASE_URL=postgresql://postgres:localpassword123@postgres:5432/integrity_tech_db?schema=public
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET=superlocaljwtsecretkey12345
+      - NODE_ENV=development
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local

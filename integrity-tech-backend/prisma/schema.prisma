@@ -1,0 +1,230 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ============================================================================
+// MÓDULO 1: IDENTIDAD, ORGANIZACIONES Y SEGURIDAD (Tenant & Auth Domain)
+// ============================================================================
+
+model Organization {
+  id        String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  name      String   @db.VarChar(255)
+  slug      String   @unique @db.VarChar(255)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  users     User[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  email          String   @db.VarChar(255)
+  passwordHash   String   @map("password_hash") @db.VarChar(255)
+  firstName      String   @map("first_name") @db.VarChar(100)
+  lastName       String   @map("last_name") @db.VarChar(100)
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  userRoles      UserRole[]
+
+  @@unique([organizationId, email], name: "unique_email_per_org")
+  @@map("users")
+}
+
+model Role {
+  id              String           @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  name            String           @unique @db.VarChar(50)
+  description     String?
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  
+  rolePermissions RolePermission[]
+  userRoles       UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id              String           @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  code            String           @unique @db.VarChar(100)
+  description     String?
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @map("role_id") @db.Uuid
+  permissionId String @map("permission_id") @db.Uuid
+
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId String @map("user_id") @db.Uuid
+  roleId String @map("role_id") @db.Uuid
+
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+// ============================================================================
+// MÓDULO 2: BANCO DE PREGUNTAS (Question Bank Domain - Aislado Lógicamente)
+// ============================================================================
+
+model QuestionBank {
+  id             String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid // Referencia Lógica
+  name           String   @db.VarChar(255)
+  description    String?
+  createdBy      String   @map("created_by") @db.Uuid // Referencia Lógica
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  questions      Question[]
+
+  @@map("question_banks")
+}
+
+model Question {
+  id             String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  questionBankId String   @map("question_bank_id") @db.Uuid
+  type           String   @db.VarChar(50)
+  /// Estructura dinámica que soporta reactivos múltiples, verdadero/falso,
+  /// y escalas psicométricas de Likert (e.g. 1 al 5) mediante meta-configuración.
+  contentJsonb   Json     @map("content_jsonb") @db.JsonB
+  defaultPoints  Decimal  @default(1.00) @map("default_points") @db.Decimal(5, 2)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  questionBank   QuestionBank @relation(fields: [questionBankId], references: [id], onDelete: Cascade)
+
+  @@map("questions")
+}
+
+// ============================================================================
+// MÓDULO 3: CONFIGURACIÓN DE EXÁMENES (Exam Domain - Aislado Lógicamente)
+// ============================================================================
+
+model Exam {
+  id              String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid // Referencia Lógica
+  title           String   @db.VarChar(255)
+  description     String?
+  durationMinutes Int?     @map("duration_minutes")
+  startTime       DateTime? @map("start_time") @db.Timestamptz
+  endTime         DateTime? @map("end_time") @db.Timestamptz
+  maxAttempts     Int      @default(1) @map("max_attempts")
+  passingScore    Decimal  @default(0.00) @map("passing_score") @db.Decimal(5, 2)
+  isPublished     Boolean  @default(false) @map("is_published")
+  createdBy       String   @map("created_by") @db.Uuid // Referencia Lógica
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  examQuestions   ExamQuestion[]
+
+  @@map("exams")
+}
+
+model ExamQuestion {
+  id         String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  examId     String   @map("exam_id") @db.Uuid
+  questionId String   @map("question_id") @db.Uuid // Referencia Lógica
+  points     Decimal  @default(1.00) @db.Decimal(5, 2)
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  exam       Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@unique([examId, questionId], name: "unique_question_per_exam")
+  @@map("exam_questions")
+}
+
+// ============================================================================
+// MÓDULO 4: EVALUACIÓN Y EJECUCIÓN (Evaluation Domain - Transaccional)
+// ============================================================================
+
+model ExamAttempt {
+  id          String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  examId      String    @map("exam_id") @db.Uuid // Referencia Lógica
+  userId      String    @map("user_id") @db.Uuid // Referencia Lógica
+  status      String    @default("IN_PROGRESS") @db.VarChar(50)
+  startedAt   DateTime  @default(now()) @map("started_at") @db.Timestamptz
+  submittedAt DateTime? @map("submitted_at") @db.Timestamptz
+  score       Decimal?  @db.Decimal(5, 2)
+  scoreDetails Json?     @map("score_details") @db.JsonB // Perfil detallado por dimensiones psicométricas (JSONB)
+  npsScore     Int?      @map("nps_score") // Puntuación NPS (0-10)
+  feedbackText String?   @map("feedback_text") @db.Text // Comentarios cualitativos
+  ipAddress   String?   @map("ip_address") @db.VarChar(45)
+  userAgent   String?   @map("user_agent")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  submissions AnswerSubmission[]
+  logs        AttemptLog[]
+  ltiMapping  LtiAttemptMapping?
+
+  @@map("exam_attempts")
+}
+
+model AnswerSubmission {
+  id            String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  examAttemptId String   @map("exam_attempt_id") @db.Uuid
+  questionId    String   @map("question_id") @db.Uuid // Referencia Lógica
+  response      Json     @db.JsonB // Respuesta exacta del alumno
+  isCorrect     Boolean? @map("is_correct")
+  pointsEarned  Decimal  @default(0.00) @map("points_earned") @db.Decimal(5, 2)
+  submittedAt   DateTime @default(now()) @map("submitted_at") @db.Timestamptz
+
+  attempt       ExamAttempt @relation(fields: [examAttemptId], references: [id], onDelete: Cascade)
+
+  @@unique([examAttemptId, questionId], name: "unique_response_per_attempt_question")
+  @@map("answer_submissions")
+}
+
+model AttemptLog {
+  id            String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  examAttemptId String   @map("exam_attempt_id") @db.Uuid
+  eventType     String   @map("event_type") @db.VarChar(100)
+  riskLevel     String   @default("INFO") @map("risk_level") @db.VarChar(50) // Nivel de criticidad: INFO, WARNING, CRITICAL
+  timestamp     DateTime @default(now()) @db.Timestamptz
+  metadata      Json?    @db.JsonB
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  attempt       ExamAttempt @relation(fields: [examAttemptId], references: [id], onDelete: Cascade)
+
+  @@map("attempt_logs")
+}
+
+model LtiAttemptMapping {
+  id          String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  attemptId   String   @unique @map("attempt_id") @db.Uuid
+  lmsUserId   String   @map("lms_user_id") @db.VarChar(255)
+  lineitemUrl String   @map("lineitem_url") @db.Text
+  iss         String   @db.VarChar(255)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  attempt     ExamAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@map("lti_attempts_mapping")
+}
+
