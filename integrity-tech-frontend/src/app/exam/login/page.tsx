@@ -118,10 +118,11 @@ function CandidateLoginForm() {
       
       {/* HEADER LOGO */}
       <div className="flex flex-col items-center gap-3">
-        <div className="w-14 h-14 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-3xl shadow-lg shadow-indigo-500/5">
-          🛡️
-        </div>
-        <h1 className="text-2xl font-bold tracking-tight text-white mt-1">Integrity-Tech</h1>
+        <img 
+          src="/integrity-logo.png" 
+          alt="Integrity Tech Logo" 
+          className="w-40 h-auto object-contain mb-1"
+        />
         <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
           Acceso seguro a evaluaciones psicométricas bajo supervisión forense de conducta.
         </p>

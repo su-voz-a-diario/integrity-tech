@@ -10,11 +10,12 @@ export default function WelcomePage() {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6 text-center font-sans gap-8">
       
       {/* HEADER LOGO */}
-      <div className="flex flex-col items-center gap-3">
-        <div className="w-16 h-16 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-4xl shadow-lg shadow-indigo-500/5">
-          🛡️
-        </div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-white mt-2">Integrity-Tech</h1>
+      <div className="flex flex-col items-center gap-4">
+        <img 
+          src="/integrity-logo.png" 
+          alt="Integrity Tech Logo" 
+          className="w-48 md:w-56 h-auto object-contain"
+        />
         <p className="text-sm text-slate-400 max-w-sm mt-1 leading-relaxed">
           Plataforma de evaluación psicométrica resiliente con supervisión forense y LTI.
         </p>
