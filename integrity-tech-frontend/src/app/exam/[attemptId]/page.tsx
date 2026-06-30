@@ -664,7 +664,8 @@ export default function ExamTakingPage({ params }: { params: { attemptId: string
         ) : (
           <>
             {/* Indicador de Navegación de Preguntas */}
-            <div className="flex gap-2 justify-center py-2 border-b border-slate-900">
+            {/* Vista Desktop: Grid numerada con scroll horizontal si es necesario */}
+            <div className="hidden md:flex gap-2 justify-start md:justify-center py-2 border-b border-slate-900 overflow-x-auto whitespace-nowrap scrollbar-thin pb-3">
               {MOCK_QUESTIONS.map((_, index) => {
                 const isAnswered = !!answers[MOCK_QUESTIONS[index].id];
                 const isActive = index === activeQuestionIndex;
@@ -672,7 +673,7 @@ export default function ExamTakingPage({ params }: { params: { attemptId: string
                   <button
                     key={index}
                     onClick={() => setActiveQuestionIndex(index)}
-                    className={`w-10 h-10 rounded-lg text-sm font-semibold transition-all duration-200 cursor-pointer ${
+                    className={`w-10 h-10 rounded-lg text-sm font-semibold transition-all duration-200 cursor-pointer flex-shrink-0 ${
                       isActive 
                         ? 'bg-indigo-600 text-white ring-2 ring-indigo-500/30' 
                         : isAnswered 
@@ -684,6 +685,19 @@ export default function ExamTakingPage({ params }: { params: { attemptId: string
                   </button>
                 );
               })}
+            </div>
+
+            {/* Vista Móvil: Indicador simplificado "Pregunta X de Y" con barra de progreso */}
+            <div className="flex md:hidden items-center justify-between gap-4 py-3 px-4 bg-slate-900 border border-slate-800 rounded-xl shadow-md">
+              <span className="text-xs font-semibold text-slate-300">
+                Pregunta <span className="text-indigo-400 font-bold">{activeQuestionIndex + 1}</span> de <span className="text-slate-500">{MOCK_QUESTIONS.length}</span>
+              </span>
+              <div className="flex-1 max-w-[150px] h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-900">
+                <div 
+                  className="h-full bg-indigo-600 transition-all duration-300"
+                  style={{ width: `${((activeQuestionIndex + 1) / MOCK_QUESTIONS.length) * 100}%` }}
+                />
+              </div>
             </div>
 
             {/* Renderizador de Pregunta Activa */}
