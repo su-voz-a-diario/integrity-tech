@@ -112,9 +112,9 @@ export function ProctoringCamera({ attemptId, activeQuestionIndex }: ProctoringC
   };
 
   return (
-    <div className="fixed top-20 right-4 md:right-6 z-50 flex flex-col items-center gap-2">
-      {/* CONTENEDOR CIRCULAR FLOTANTE */}
-      <div className="relative w-24 h-24 md:w-28 md:h-28 rounded-full border-2 border-indigo-500/30 overflow-hidden bg-slate-950 shadow-2xl shadow-indigo-500/10 flex items-center justify-center group">
+    <div className="flex items-center gap-4 bg-slate-900/30 border border-slate-900/60 p-3 rounded-xl w-full max-w-xl mx-auto my-3 animate-fade-in">
+      {/* CONTENEDOR CIRCULAR INTEGRADO (Pequeño y discreto) */}
+      <div className="relative w-16 h-16 rounded-full border border-indigo-500/30 overflow-hidden bg-slate-950 flex-shrink-0 flex items-center justify-center">
         
         {/* STREAM DE VIDEO EN VIVO */}
         <video
@@ -127,27 +127,28 @@ export function ProctoringCamera({ attemptId, activeQuestionIndex }: ProctoringC
 
         {/* CARGANDO O PERMISO DENEGADO */}
         {hasPermission === null && (
-          <span className="text-3xs text-slate-500 font-semibold animate-pulse">Iniciando...</span>
+          <span className="text-4xs text-slate-500 font-semibold animate-pulse text-center leading-3">Cargando...</span>
         )}
         {hasPermission === false && (
-          <div className="flex flex-col items-center text-center p-2">
-            <span className="text-xs">⚠️</span>
-            <span className="text-3xs text-red-500 font-semibold mt-1">Cámara Bloqueada</span>
-          </div>
-        )}
-
-        {/* LED INDICADOR VERDE DE GRABANDO */}
-        {hasPermission === true && (
-          <div className="absolute top-2 right-2 flex items-center gap-1 bg-slate-950/80 backdrop-blur-sm px-1.5 py-0.5 rounded-full border border-slate-800">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-3xs text-slate-300 font-mono font-medium">LIVE</span>
-          </div>
+          <span className="text-xs text-red-500 font-semibold">⚠️</span>
         )}
       </div>
 
-      {/* RÓTULO DEL MONITOR */}
-      <div className="bg-slate-900/90 backdrop-blur-sm border border-slate-800 px-3 py-1 rounded-full text-3xs font-medium text-slate-400 shadow-md">
-        Identidad Monitoreada
+      {/* RÓTULO DEL MONITOR ALINEADO AL LADO */}
+      <div className="flex flex-col gap-1 text-left">
+        <div className="flex items-center gap-2">
+          {hasPermission === true ? (
+            <>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-2xs font-bold text-slate-200 uppercase tracking-wider">Identidad Monitoreada (LIVE)</span>
+            </>
+          ) : (
+            <span className="text-2xs font-bold text-red-400 uppercase tracking-wider">Cámara Requerida</span>
+          )}
+        </div>
+        <p className="text-3xs text-slate-500 leading-relaxed max-w-sm">
+          Se registran capturas faciales aleatorias con firmas criptográficas para auditoría de integridad conductual.
+        </p>
       </div>
     </div>
   );

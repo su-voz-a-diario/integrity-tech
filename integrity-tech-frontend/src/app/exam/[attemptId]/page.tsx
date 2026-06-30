@@ -212,6 +212,9 @@ export default function ExamTakingPage({ params }: { params: { attemptId: string
               )}
             </div>
 
+            {/* Supervisión Activa por Cámara (Webcam Proctoring) - Ubicación Inline Perfecta */}
+            <ProctoringCamera attemptId={attemptId} activeQuestionIndex={activeQuestionIndex} />
+
             {/* Botones de Navegación del Examen */}
             <div className="flex justify-between items-center pt-4 border-t border-slate-900">
               <button
@@ -244,9 +247,6 @@ export default function ExamTakingPage({ params }: { params: { attemptId: string
 
       {/* Alerta de Auditoría de Proctoring de Alto Riesgo */}
       <ProctoringMonitor />
-
-      {/* Supervisión Activa por Cámara (Webcam Proctoring) */}
-      <ProctoringCamera attemptId={attemptId} activeQuestionIndex={activeQuestionIndex} />
     </div>
   );
 }
