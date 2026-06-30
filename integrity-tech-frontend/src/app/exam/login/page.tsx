@@ -121,7 +121,7 @@ function CandidateLoginForm() {
         <img 
           src="/integrity-logo.png" 
           alt="Integrity Tech Logo" 
-          className="w-56 md:w-64 h-auto object-contain filter drop-shadow-[0_0_20px_rgba(255,255,255,0.22)] mb-2"
+          className="w-40 h-auto object-contain mb-1"
         />
         <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
           Acceso seguro a evaluaciones psicométricas bajo supervisión forense de conducta.

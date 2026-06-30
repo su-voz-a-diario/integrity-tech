@@ -134,7 +134,7 @@ export default function RecruiterDashboard() {
             <img 
               src="/integrity-logo-2.png" 
               alt="Integrity Logo" 
-              className="w-12 h-12 object-contain filter drop-shadow-[0_0_8px_rgba(255,255,255,0.22)] flex-shrink-0"
+              className="w-10 h-10 object-contain rounded-lg flex-shrink-0"
             />
             <div>
               <h1 className="text-2xl font-extrabold tracking-tight text-white text-left">Consola de Selección</h1>

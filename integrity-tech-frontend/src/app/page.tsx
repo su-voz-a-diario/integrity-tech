@@ -14,7 +14,7 @@ export default function WelcomePage() {
         <img 
           src="/integrity-logo.png" 
           alt="Integrity Tech Logo" 
-          className="w-72 md:w-80 h-auto object-contain filter drop-shadow-[0_0_25px_rgba(255,255,255,0.22)] mb-2"
+          className="w-48 md:w-56 h-auto object-contain mb-2"
         />
         <p className="text-sm text-slate-400 max-w-sm mt-1 leading-relaxed">
           Plataforma de evaluación psicométrica resiliente con supervisión forense y LTI.

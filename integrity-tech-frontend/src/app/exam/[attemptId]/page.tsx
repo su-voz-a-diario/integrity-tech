@@ -615,7 +615,7 @@ export default function ExamTakingPage({ params }: { params: { attemptId: string
           <img 
             src="/integrity-logo-2.png" 
             alt="Logo" 
-            className="w-8 h-8 object-contain filter drop-shadow-[0_0_6px_rgba(255,255,255,0.22)] flex-shrink-0"
+            className="w-7 h-7 object-contain rounded-md flex-shrink-0"
           />
           <div>
             <h1 className="text-sm font-bold text-slate-200 tracking-wide text-left">{MOCK_EXAM.title}</h1>
