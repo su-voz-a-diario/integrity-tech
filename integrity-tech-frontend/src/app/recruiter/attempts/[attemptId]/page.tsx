@@ -8,28 +8,36 @@ const MOCK_REPORT_DETAILS: Record<string, any> = {
   'att-1098': {
     candidateName: 'Andrés López',
     email: 'andres.lopez@example.com',
-    assessmentTitle: 'Evaluación de Honestidad y Valores v2',
+    assessmentTitle: 'Batería de Evaluación Psicométrica Integrada (IT²)',
     date: '27 Jun 2026, 16:40',
-    overallScore: '48/100',
+    overallScore: '46/100',
     ipAddress: '190.143.45.22',
     userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
     sessionHmac: 'hmac-84f938d8212e33bc88a8f1ff4f5e7188',
     dimensions: [
       {
-        name: 'INTEGRIDAD',
-        score: 40,
-        description: 'Indica apego a las normas éticas. Un puntaje bajo puede reflejar tendencia a justificar conductas cuestionables.',
+        name: 'INTEGRIDAD Y ÉTICA (IT²-I)',
+        score: 18,
+        description: 'Puntaje crítico inferior al umbral mínimo del 20%. El candidato tiende a justificar conductas irregulares (sobrantes en caja, uso privado de recursos).',
       },
       {
-        name: 'LEALTAD ORGANIZACIONAL',
+        name: 'PERSONALIDAD Y CONDUCTA (IT²-P10)',
         score: 55,
-        description: 'Mide la adhesión a la confidencialidad y políticas de la empresa. Nivel medio: requiere supervisión moderada.',
+        description: 'Nivel promedio. Estilo conductual equilibrado, estable ante el estrés normal, con niveles estándar de responsabilidad.',
       },
       {
-        name: 'TOLERANCIA AL RIESGO',
-        score: 85,
-        description: 'Propensión a asumir riesgos y tomar decisiones drásticas. Nivel alto: compatible con perfiles de alta autonomía, pero requiere alineación ética.',
+        name: 'APTITUD COGNITIVA (IT²-AC10)',
+        score: 70,
+        description: 'Capacidad de aprendizaje y razonamiento abstracto superior a la media. Resuelve problemas numéricos de forma ágil.',
       },
+      {
+        name: 'COMPETENCIAS BLANDAS (IT²-CB10)',
+        score: 45,
+        description: 'Ajuste social moderado. Muestra dificultades para mediar en conflictos interpersonales y prefiere delegar el feedback correctivo.',
+      },
+    ],
+    alerts: [
+      '⚠️ RIESGO ÉTICO CRÍTICO: El percentil de Integridad (18%) se ubica por debajo del umbral mínimo tolerable del 20%.'
     ],
     proctoringLogs: [
       {
@@ -98,29 +106,35 @@ const MOCK_REPORT_DETAILS: Record<string, any> = {
   default: {
     candidateName: 'Sofía Valenzuela',
     email: 'sofia.valenzuela@example.com',
-    assessmentTitle: 'Evaluación de Honestidad y Valores v2',
+    assessmentTitle: 'Batería de Evaluación Psicométrica Integrada (IT²)',
     date: '28 Jun 2026, 08:24',
-    overallScore: '92/100',
+    overallScore: '79/100',
     ipAddress: '186.22.143.50',
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
     sessionHmac: 'hmac-d4e5f72382f1ff4f5e7188d8212e33bc',
     dimensions: [
       {
-        name: 'INTEGRIDAD',
-        score: 95,
-        description: 'Alto apego a las directrices de integridad conductual. Coincidencia idónea para roles de manejo de recursos.',
+        name: 'INTEGRIDAD Y ÉTICA (IT²-I)',
+        score: 78,
+        description: 'Alineación ética óptima. Excelente apego a las normas y políticas organizacionales ante dilemas situacionales reales.',
       },
       {
-        name: 'LEALTAD ORGANIZACIONAL',
-        score: 88,
-        description: 'Muestra alta fiabilidad y alineación con los principios éticos de la empresa.',
+        name: 'PERSONALIDAD Y CONDUCTA (IT²-P10)',
+        score: 85,
+        description: 'Rasgos de responsabilidad y estabilidad emocional altos. Demuestra resiliencia superior bajo entornos de presión moderada.',
       },
       {
-        name: 'TOLERANCIA AL RIESGO',
-        score: 45,
-        description: 'Puntaje equilibrado: decisiones prudentes y bajo comportamiento de riesgo.',
+        name: 'APTITUD COGNITIVA (IT²-AC10)',
+        score: 62,
+        description: 'Razonamiento analítico numérico y verbal promedio. Capacidad adecuada para la asimilación rápida de nuevos procedimientos.',
+      },
+      {
+        name: 'COMPETENCIAS BLANDAS (IT²-CB10)',
+        score: 90,
+        description: 'Liderazgo participativo de excelencia. Muestra asertividad óptima para orientar a clientes y colaborar de forma empática.',
       },
     ],
+    alerts: [],
     proctoringLogs: [
       {
         id: '1',
@@ -181,6 +195,20 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
     );
   }
 
+  const numericScore = parseInt(report?.overallScore || '0') || 0;
+  const isRecommended = numericScore >= 75;
+  const isAcceptable = numericScore >= 50 && numericScore < 75;
+  const statusText = isRecommended 
+    ? 'Ajuste Alto (Recomendado)' 
+    : isAcceptable 
+      ? 'Ajuste Medio (Aceptable)' 
+      : 'Ajuste Bajo (No Recomendado)';
+  const statusColor = isRecommended 
+    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+    : isAcceptable 
+      ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' 
+      : 'bg-red-500/10 border-red-500/20 text-red-400';
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-8">
       <div className="max-w-6xl mx-auto flex flex-col gap-8">
@@ -218,17 +246,34 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
               <div>
                 <h2 className="text-lg font-bold text-white">{report.candidateName}</h2>
                 <p className="text-xs text-slate-400 mt-1">{report.email}</p>
-                <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 bg-slate-950 border border-slate-800 rounded-lg text-xs font-medium text-slate-400">
-                  <span>Prueba:</span>
-                  <span className="text-indigo-400 font-semibold">{report.assessmentTitle}</span>
+                <div className="flex gap-2 items-center mt-2.5">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-950 border border-slate-800 rounded-lg text-xs font-medium text-slate-400">
+                    <span>Prueba:</span>
+                    <span className="text-indigo-400 font-semibold">{report.assessmentTitle}</span>
+                  </div>
+                  <div className={`inline-flex items-center px-2.5 py-1 rounded-lg text-2xs font-semibold border ${statusColor}`}>
+                    {statusText}
+                  </div>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-2xs font-bold text-slate-500 uppercase tracking-widest">Puntaje Global</p>
+                <p className="text-2xs font-bold text-slate-500 uppercase tracking-widest">Índice IGA</p>
                 <h3 className="text-4xl font-bold text-indigo-400 mt-1 tracking-tight">{report.overallScore}</h3>
-                <p className="text-2xs text-slate-500 mt-1">Consolidado por dimensiones</p>
+                <p className="text-2xs text-slate-500 mt-1">Cálculo global ponderado</p>
               </div>
             </div>
+
+            {/* ALERTAS CRÍTICAS DE BAREMACIÓN */}
+            {report.alerts && report.alerts.length > 0 && (
+              <div className="flex flex-col gap-2.5 bg-red-950/20 border border-red-900/40 p-4 rounded-xl text-xs text-red-400 font-medium">
+                {report.alerts.map((alert: string, aIdx: number) => (
+                  <div key={aIdx} className="flex items-start gap-2">
+                    <span>⚠️</span>
+                    <span>{alert}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* DIMENSIONES PSICOMÉTRICAS */}
             <div className="bg-slate-900 border border-slate-900 p-6 rounded-xl flex flex-col gap-6 shadow-md">
