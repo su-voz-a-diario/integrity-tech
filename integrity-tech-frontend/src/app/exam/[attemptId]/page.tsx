@@ -23,30 +23,71 @@ const MOCK_QUESTIONS: QuestionDto[] = [
   {
     id: 'q-1',
     type: 'MULTIPLE_CHOICE',
-    defaultPoints: 2.5,
+    defaultPoints: 2.0,
     content: {
-      text: '¿Cuál es el beneficio principal de un Monolito Modular frente a Microservicios al iniciar un proyecto?',
+      text: 'Al final de su turno, el cuadre de caja muestra un sobrante de $50 que no corresponde a ninguna venta. Usted sabe que ese dinero probablemente pasará desapercibido. ¿Qué hace?',
       options: [
-        { id: 'opt-a', text: 'Menor latencia de red y despliegue unificado sin overhead operativo.' },
-        { id: 'opt-b', text: 'Facilidad de escalabilidad regional automatizada en multi-cloud.' },
-        { id: 'opt-c', text: 'Permite compartir bases de datos relacionales sin límites de dominio.' },
+        { id: 'opt-a', text: 'A) Lo guarda, total es un error del sistema y nadie lo notará.' },
+        { id: 'opt-b', text: 'B) Lo reporta inmediatamente a su supervisor y lo deja registrado en el informe de cierre.' },
+        { id: 'opt-c', text: 'C) Lo deja en la caja sin decir nada; si alguien lo reclama, que lo busque.' },
+        { id: 'opt-d', text: 'D) Se lo queda como compensación por horas extra no pagadas.' },
       ],
     },
   },
   {
     id: 'q-2',
-    type: 'TRUE_FALSE',
-    defaultPoints: 1.5,
+    type: 'MULTIPLE_CHOICE',
+    defaultPoints: 2.0,
     content: {
-      text: 'En NestJS, los proveedores son públicos para todos los módulos de la aplicación por defecto.',
+      text: 'Un compañero muy cercano le pide que marque su tarjeta de asistencia porque llegará 20 minutos tarde, asegurando que “nunca lo revisan”. Usted sabe que el reglamento lo prohíbe. ¿Cómo actúa?',
+      options: [
+        { id: 'opt-a', text: 'A) Accede, es un favor entre colegas y la amistad está primero.' },
+        { id: 'opt-b', text: 'B) Se niega amablemente, explicando que prefiere no violar la norma, y sugiere que él hable con el jefe.' },
+        { id: 'opt-c', text: 'C) Lo hace, pero le advierte que es la última vez.' },
+        { id: 'opt-d', text: 'D) Lo ignora y no marca nada; que él resuelva su problema.' },
+      ],
     },
   },
   {
     id: 'q-3',
-    type: 'SHORT_ANSWER',
+    type: 'MULTIPLE_CHOICE',
     defaultPoints: 2.0,
     content: {
-      text: '¿Qué método atómico de Redis se utiliza habitualmente en procesadores distribuidos para evitar race conditions al decrementar un contador?',
+      text: 'Encuentra en la impresora un informe con datos confidenciales de salarios de varios empleados. Su puesto no le da acceso a esa información. ¿Qué hace?',
+      options: [
+        { id: 'opt-a', text: 'A) Lo lee detenidamente para saber cómo están los demás.' },
+        { id: 'opt-b', text: 'B) Lo recoge y lo entrega de inmediato a Recursos Humanos o a su supervisor directo, sin leerlo.' },
+        { id: 'opt-c', text: 'C) Lo deja donde está, no es asunto suyo.' },
+        { id: 'opt-d', text: 'D) Lo fotocopia “por si acaso” y después lo devuelve discretamente.' },
+      ],
+    },
+  },
+  {
+    id: 'q-4',
+    type: 'MULTIPLE_CHOICE',
+    defaultPoints: 2.0,
+    content: {
+      text: 'Un proveedor con quien su empresa tiene un contrato en licitación le ofrece una tarjeta de regalo de $200 como “agradecimiento por la buena relación”. Las políticas internas prohíben recibir obsequios superiores a $25. Usted:',
+      options: [
+        { id: 'opt-a', text: 'A) La acepta, no cree que eso influya en sus decisiones profesionales.' },
+        { id: 'opt-b', text: 'B) La rechaza cortésmente y notifica el ofrecimiento al área de compras/ética.' },
+        { id: 'opt-c', text: 'C) La acepta pero la declara informalmente a su jefe.' },
+        { id: 'opt-d', text: 'D) La acepta y la comparte con el equipo para que nadie hable.' },
+      ],
+    },
+  },
+  {
+    id: 'q-5',
+    type: 'MULTIPLE_CHOICE',
+    defaultPoints: 2.0,
+    content: {
+      text: 'Su jefe le pide que “ajuste” ligeramente una cifra en un reporte de resultados para que el área quede mejor parada. El cambio no es ilegal pero desvirtúa la realidad. Usted:',
+      options: [
+        { id: 'opt-a', text: 'A) Lo hace, es su jefe y hay que alinearse.' },
+        { id: 'opt-b', text: 'B) Se niega explicando que prefiere mantener la exactitud de los datos y ofrece alternativas para presentar los resultados sin falsearlos.' },
+        { id: 'opt-c', text: 'C) Lo hace, pero deja una nota interna aclaratoria por si acaso.' },
+        { id: 'opt-d', text: 'D) Lo deriva a un colega para no tener que involucrarse directamente.' },
+      ],
     },
   },
 ];
