@@ -125,8 +125,8 @@ export default function RecruiterDashboard() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-8">
-      <div className="max-w-6xl mx-auto flex flex-col gap-8">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4 md:p-8">
+      <div className="max-w-6xl mx-auto flex flex-col gap-6 md:gap-8">
         
         {/* ENCABEZADO - Responsivo para Móvil/Escritorio */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-900 pb-6 gap-4 md:gap-0">
@@ -145,44 +145,45 @@ export default function RecruiterDashboard() {
         </div>
 
         {/* METRICAS RAPIDAS (KPI CARDS) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-slate-900 border border-slate-900 p-6 rounded-xl shadow-md">
-            <p className="text-2xs font-bold text-slate-500 uppercase tracking-widest">Total Evaluados</p>
-            <h3 className="text-3xl font-bold text-slate-100 mt-2">1,248</h3>
-            <p className="text-2xs text-slate-400 mt-2">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+          <div className="bg-slate-900 border border-slate-900 p-5 md:p-6 rounded-xl shadow-md text-left">
+            <p className="text-3xs font-bold text-slate-500 uppercase tracking-widest">Total Evaluados</p>
+            <h3 className="text-2xl md:text-3xl font-bold text-slate-100 mt-2">1,248</h3>
+            <p className="text-3xs text-slate-400 mt-2">
               <span className="text-emerald-500 font-semibold">↑ 12%</span> respecto a la semana anterior
             </p>
           </div>
-          <div className="bg-slate-900 border border-slate-900 p-6 rounded-xl shadow-md">
-            <p className="text-2xs font-bold text-slate-500 uppercase tracking-widest">Índice de Integridad</p>
-            <h3 className="text-3xl font-bold text-slate-100 mt-2">78.4%</h3>
-            <p className="text-2xs text-slate-400 mt-2">
+          <div className="bg-slate-900 border border-slate-900 p-5 md:p-6 rounded-xl shadow-md text-left">
+            <p className="text-3xs font-bold text-slate-500 uppercase tracking-widest">Índice de Integridad</p>
+            <h3 className="text-2xl md:text-3xl font-bold text-slate-100 mt-2">78.4%</h3>
+            <p className="text-3xs text-slate-400 mt-2">
               Promedio de coincidencia con perfiles de confianza
             </p>
           </div>
-          <div className="bg-slate-900 border border-slate-900 p-6 rounded-xl shadow-md border-r-amber-500/20">
-            <p className="text-2xs font-bold text-slate-500 uppercase tracking-widest text-amber-500">Alertas Críticas</p>
-            <h3 className="text-3xl font-bold text-amber-500 mt-2">12</h3>
-            <p className="text-2xs text-slate-400 mt-2">
-              Candidatos sospechosos de manipulación en las últimas 24h
+          <div className="bg-slate-900 border border-slate-900 p-5 md:p-6 rounded-xl shadow-md border-r-amber-500/20 text-left">
+            <p className="text-3xs font-bold text-slate-500 uppercase tracking-widest text-amber-500">Alertas Críticas</p>
+            <h3 className="text-2xl md:text-3xl font-bold text-amber-500 mt-2">12</h3>
+            <p className="text-3xs text-slate-400 mt-2">
+              Candidatos sospechosos de manipulación en 24h
             </p>
           </div>
         </div>
 
         {/* FILTROS Y CONTROLES */}
-        <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-slate-900/40 p-4 border border-slate-900 rounded-xl">
-          <div className="relative w-full md:w-80">
+        <div className="flex flex-col lg:flex-row gap-4 justify-between items-stretch lg:items-center bg-slate-900/40 p-4 border border-slate-900 rounded-xl">
+          <div className="relative w-full lg:w-80">
             <input
               type="text"
               placeholder="Buscar candidato o correo..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2 px-4 text-sm text-slate-300 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 transition-all"
+              className="w-full bg-slate-950 border border-slate-800 rounded-lg py-2.5 px-4 text-sm text-slate-300 placeholder-slate-600 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 transition-all text-left"
             />
           </div>
 
-          <div className="flex flex-wrap md:flex-nowrap gap-3 w-full md:w-auto items-center justify-between md:justify-end">
-            <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto items-stretch sm:items-center justify-between lg:justify-end">
+            {/* Contenedor de filtros con scroll horizontal en móvil */}
+            <div className="flex gap-2 overflow-x-auto whitespace-nowrap scrollbar-none pb-1.5 sm:pb-0 w-full sm:w-auto">
               {(['ALL', 'SAFE', 'WARNING', 'CRITICAL'] as const).map((type) => {
                 const labels: Record<string, string> = {
                   ALL: 'Todos',
@@ -195,7 +196,7 @@ export default function RecruiterDashboard() {
                   <button
                     key={type}
                     onClick={() => setFilter(type)}
-                    className={`px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                    className={`px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer flex-shrink-0 ${
                       isActive
                         ? 'bg-indigo-600 text-white shadow-md'
                         : 'bg-slate-950 text-slate-400 hover:bg-slate-900 border border-slate-900'
@@ -214,15 +215,15 @@ export default function RecruiterDashboard() {
                 setInviteForm({ candidateName: '', email: '', examId: 'mock-exam-id-1111' });
                 setIsInviteModalOpen(true);
               }}
-              className="px-4 py-2 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer transition-all flex items-center gap-1.5 whitespace-nowrap"
+              className="px-4 py-2.5 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer transition-all flex items-center justify-center gap-1.5 whitespace-nowrap w-full sm:w-auto shadow-md shadow-indigo-600/10"
             >
               ✉️ Invitar Candidato
             </button>
           </div>
         </div>
 
-        {/* LISTADO DE CANDIDATOS */}
-        <div className="bg-slate-900/30 border border-slate-900 rounded-xl overflow-hidden shadow-lg">
+        {/* VISTA DESKTOP: LISTADO DE CANDIDATOS (TABLA) */}
+        <div className="hidden md:block bg-slate-900/30 border border-slate-900 rounded-xl overflow-hidden shadow-lg">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-900 text-left">
               <thead className="bg-slate-900/60 text-2xs uppercase tracking-wider font-bold text-slate-500">
@@ -293,6 +294,67 @@ export default function RecruiterDashboard() {
               </tbody>
             </table>
           </div>
+        </div>
+
+        {/* VISTA MÓVIL: TARJETAS DE CANDIDATOS */}
+        <div className="block md:hidden space-y-4">
+          {isLoading ? (
+            <div className="bg-slate-900 border border-slate-900 rounded-xl p-8 text-center text-slate-500 font-medium">
+              Cargando bandeja de selección...
+            </div>
+          ) : filteredAttempts.length === 0 ? (
+            <div className="bg-slate-900 border border-slate-900 rounded-xl p-8 text-center text-slate-500 font-medium">
+              No se encontraron candidatos con los criterios especificados.
+            </div>
+          ) : (
+            filteredAttempts.map((attempt) => (
+              <div 
+                key={attempt.id} 
+                className="bg-slate-900 border border-slate-900 rounded-xl p-5 flex flex-col gap-4 shadow-md text-left"
+              >
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h4 className="font-semibold text-slate-100 text-sm">{attempt.candidateName}</h4>
+                    <p className="text-3xs text-slate-500 mt-0.5">{attempt.email}</p>
+                  </div>
+                  <span className={`inline-flex items-center rounded-md px-2 py-0.5 text-3xs font-semibold ring-1 ring-inset ${
+                    attempt.riskStatus === 'SAFE'
+                      ? 'bg-emerald-500/10 text-emerald-400 ring-emerald-500/20'
+                      : attempt.riskStatus === 'WARNING'
+                        ? 'bg-amber-500/10 text-amber-400 ring-amber-500/20'
+                        : 'bg-red-500/10 text-red-400 ring-red-500/20'
+                  }`}>
+                    {attempt.statusLabel}
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-3 gap-2 bg-slate-950/50 p-3 rounded-lg border border-slate-950/30 text-center text-2xs leading-relaxed">
+                  <div>
+                    <span className="text-4xs font-bold text-slate-500 uppercase tracking-wider block">Calificación</span>
+                    <span className="text-xs font-bold text-indigo-400 font-mono block mt-1">{attempt.overallScore}</span>
+                  </div>
+                  <div>
+                    <span className="text-4xs font-bold text-slate-500 uppercase tracking-wider block">Incidencias</span>
+                    <span className="text-xs text-slate-300 font-mono block mt-1">{attempt.incidentsCount}</span>
+                  </div>
+                  <div>
+                    <span className="text-4xs font-bold text-slate-500 uppercase tracking-wider block">Fecha</span>
+                    <span className="text-3xs text-slate-400 block mt-1 truncate">{attempt.date.split(',')[0]}</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center text-3xs text-slate-500 border-t border-slate-950/40 pt-3">
+                  <span>Prueba: <strong className="text-slate-400">{attempt.assessmentTitle.replace('Batería de Evaluación Psicométrica', 'Batería')}</strong></span>
+                  <Link
+                    href={`/recruiter/attempts/${attempt.id}`}
+                    className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3.5 py-1.5 text-2xs font-bold text-white hover:bg-indigo-500 transition-all cursor-pointer shadow-lg shadow-indigo-600/10"
+                  >
+                    Ver Reporte
+                  </Link>
+                </div>
+              </div>
+            ))
+          )}
         </div>
 
       {/* MODAL DE INVITACIÓN A CANDIDATOS */}
