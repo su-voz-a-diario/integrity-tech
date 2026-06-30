@@ -16,7 +16,7 @@ import { QuestionDto } from '../../../types/exam-contract';
 const MOCK_EXAM = {
   id: 'mock-exam-id-1111',
   title: 'Batería de Evaluación Psicométrica Integrada (IT²)',
-  durationMinutes: 45,
+  durationMinutes: 60,
 };
 
 const MOCK_QUESTIONS: QuestionDto[] = [
@@ -387,6 +387,146 @@ const MOCK_QUESTIONS: QuestionDto[] = [
         { id: 'opt-b', text: 'B) ●●' },
         { id: 'opt-c', text: 'C) ●●●' },
         { id: 'opt-d', text: 'D) ●●●●' },
+      ],
+    },
+  },
+  {
+    id: 'q-26',
+    type: 'MULTIPLE_CHOICE',
+    defaultPoints: 2.0,
+    content: {
+      text: 'Dos miembros de su equipo discuten acaloradamente frente a otros colegas por un desacuerdo sobre la distribución de tareas. La tensión empieza a afectar el ambiente. Usted:',
+      options: [
+        { id: 'opt-a', text: 'A) Les pide que se calmen y resuelvan el asunto en privado, ofreciéndose a mediar si lo necesitan.' },
+        { id: 'opt-b', text: 'B) Les dice en público que ese comportamiento es inaceptable.' },
+        { id: 'opt-c', text: 'C) Ignora la situación, son adultos y deben resolverlo solos.' },
+        { id: 'opt-d', text: 'D) Le pide a su jefe que intervenga para no verse involucrado.' },
+      ],
+    },
+  },
+  {
+    id: 'q-27',
+    type: 'MULTIPLE_CHOICE',
+    defaultPoints: 2.0,
+    content: {
+      text: 'Un cliente importante llama muy alterado porque su pedido llegó con un error. Usted no fue responsable del error, pero es quien atiende la llamada. Usted:',
+      options: [
+        { id: 'opt-a', text: 'A) Escucha con empatía, se disculpa por la experiencia y le explica que investigará y resolverá en menos de 24 horas.' },
+        { id: 'opt-b', text: 'B) Le explica que usted no cometió el error y que lo derivará al departamento correspondiente.' },
+        { id: 'opt-c', text: 'C) Le promete una compensación inmediata aunque no está seguro de que pueda autorizarla.' },
+        { id: 'opt-d', text: 'D) Le pide que envíe un correo detallando el problema para pasarlo a incidencias.' },
+      ],
+    },
+  },
+  {
+    id: 'q-28',
+    type: 'MULTIPLE_CHOICE',
+    defaultPoints: 2.0,
+    content: {
+      text: 'Llega un empleado nuevo a su área y se le asigna como su mentor informal. El primer día está visiblemente perdido y nervioso. Usted:',
+      options: [
+        { id: 'opt-a', text: 'A) Le prepara un plan de orientación con las claves del área y se reúne con él al final del día para resolver dudas.' },
+        { id: 'opt-b', text: 'B) Le dice que no se preocupe, que poco a poco irá aprendiendo.' },
+        { id: 'opt-c', text: 'C) Le presenta a los demás y espera que los compañeros le ayuden.' },
+        { id: 'opt-d', text: 'D) Le asigna tareas sencillas y le dice que pregunte si necesita algo.' },
+      ],
+    },
+  },
+  {
+    id: 'q-29',
+    type: 'MULTIPLE_CHOICE',
+    defaultPoints: 2.0,
+    content: {
+      text: 'Un miembro de su equipo no entregó un informe clave a tiempo. Es la segunda vez en el mes. Usted:',
+      options: [
+        { id: 'opt-a', text: 'A) Habla en privado con él, le expresa su preocupación y juntos buscan una solución para evitar que se repita.' },
+        { id: 'opt-b', text: 'B) Le advierte que si vuelve a ocurrir habrá consecuencias formales.' },
+        { id: 'opt-c', text: 'C) Lo reporta inmediatamente a Recursos Humanos para que quede constancia.' },
+        { id: 'opt-d', text: 'D) Asume usted la tarea para que no vuelva a fallar.' },
+      ],
+    },
+  },
+  {
+    id: 'q-30',
+    type: 'MULTIPLE_CHOICE',
+    defaultPoints: 2.0,
+    content: {
+      text: 'La dirección impone un nuevo procedimiento que su equipo considera ineficiente. Nadie está contento. Usted:',
+      options: [
+        { id: 'opt-a', text: 'A) Escucha las quejas del equipo, canaliza sus sugerencias y las transmite a la dirección con propuestas de mejora.' },
+        { id: 'opt-b', text: 'B) Les dice que es una decisión de arriba y que no hay nada que hacer.' },
+        { id: 'opt-c', text: 'C) Les permite que no lo apliquen mientras no haya supervisión.' },
+        { id: 'opt-d', text: 'D) Aplica el procedimiento sin comentarlo; si protestan, explica que así son las cosas.' },
+      ],
+    },
+  },
+  {
+    id: 'q-31',
+    type: 'MULTIPLE_CHOICE',
+    defaultPoints: 2.0,
+    content: {
+      text: 'En una reunión con clientes, su colega dice un dato incorrecto. Usted sabe que es un error. Usted:',
+      options: [
+        { id: 'opt-a', text: 'A) Espera un momento y, con tacto, corrige el dato explicando la fuente correcta.' },
+        { id: 'opt-b', text: 'B) Lo corrige inmediatamente, es importante que el cliente tenga información exacta.' },
+        { id: 'opt-c', text: 'C) No dice nada para no hacerle quedar mal.' },
+        { id: 'opt-d', text: 'D) Le envía un mensaje por debajo de la mesa para que se corrija él mismo.' },
+      ],
+    },
+  },
+  {
+    id: 'q-32',
+    type: 'MULTIPLE_CHOICE',
+    defaultPoints: 2.0,
+    content: {
+      text: 'Todo el equipo está saturado, pero un cliente interno pide algo urgente para “ayer”. Usted:',
+      options: [
+        { id: 'opt-a', text: 'A) Evalúa con el cliente la urgencia real, negocia un plazo factible y redistribuye prioridades en el equipo.' },
+        { id: 'opt-b', text: 'B) Le dice que no se puede y que espere su turno.' },
+        { id: 'opt-c', text: 'C) Acepta el trabajo sin consultar, total el cliente siempre tiene razón.' },
+        { id: 'opt-d', text: 'D) Le pide a un miembro del equipo que lo haga en horas extra sin consultarle.' },
+      ],
+    },
+  },
+  {
+    id: 'q-33',
+    type: 'MULTIPLE_CHOICE',
+    defaultPoints: 2.0,
+    content: {
+      text: 'Un proyecto fue un éxito y usted sabe que el mérito principal es de una compañera que trabajó silenciosamente horas extra. El jefe le atribuye el éxito a usted en público. Usted:',
+      options: [
+        { id: 'opt-a', text: 'A) Agradece el reconocimiento pero inmediatamente señala la contribución clave de su compañera.' },
+        { id: 'opt-b', text: 'B) Acepta el elogio, usted también trabajó duro.' },
+        { id: 'opt-c', text: 'C) En privado le dice a su compañera que lo siente, pero que no quiso contradecir al jefe.' },
+        { id: 'opt-d', text: 'D) Desvía el tema para no tener que aclarar nada.' },
+      ],
+    },
+  },
+  {
+    id: 'q-34',
+    type: 'MULTIPLE_CHOICE',
+    defaultPoints: 2.0,
+    content: {
+      text: 'Nota que desde hace semanas el equipo está apagado, sin iniciativa y con poca participación en las reuniones. Usted:',
+      options: [
+        { id: 'opt-a', text: 'A) Organiza una reunión informal para escuchar cómo se sienten y qué necesidades tienen, sin presión.' },
+        { id: 'opt-b', text: 'B) Les recuerda los objetivos y la importancia de mantener el ritmo.' },
+        { id: 'opt-c', text: 'C) Lo ignora, son rachas que pasan solas.' },
+        { id: 'opt-d', text: 'D) Les envía un mensaje motivador por correo.' },
+      ],
+    },
+  },
+  {
+    id: 'q-35',
+    type: 'MULTIPLE_CHOICE',
+    defaultPoints: 2.0,
+    content: {
+      text: 'Su jefe tiene un estilo de comunicación que a veces resulta brusco y desmotiva al equipo. Varios compañeros se lo han comentado a usted en confianza. Usted:',
+      options: [
+        { id: 'opt-a', text: 'A) Solicita una reunión con su jefe y, con respeto y datos objetivos, le transmite cómo está afectando al equipo y sugiere ajustes.' },
+        { id: 'opt-b', text: 'B) Le dice a los compañeros que hablen ellos directamente.' },
+        { id: 'opt-c', text: 'C) No hace nada, es el jefe y no le corresponde a usted educarlo.' },
+        { id: 'opt-d', text: 'D) Envía un correo anónimo a Recursos Humanos.' },
       ],
     },
   },
