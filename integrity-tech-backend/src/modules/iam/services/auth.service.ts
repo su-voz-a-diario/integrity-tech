@@ -21,6 +21,16 @@ export class AuthService {
       };
     }
 
+    if (token && token.startsWith('candidate-session-token-')) {
+      const parts = token.split('-');
+      const userId = parts[parts.length - 1] || 'student-id';
+      return {
+        userId,
+        organizationId: 'org-12345',
+        email: 'candidato@evaluacion.com',
+      };
+    }
+
     throw new UnauthorizedException('Token de sesión inválido o expirado.');
   }
 }

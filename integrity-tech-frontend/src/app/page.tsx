@@ -29,16 +29,16 @@ export default function WelcomePage() {
             📝
           </div>
           <div>
-            <h3 className="text-base font-bold text-slate-100">Vista del Alumno</h3>
+            <h3 className="text-base font-bold text-slate-100">Portal del Candidato</h3>
             <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-              Toma del examen con temporizador seguro, proctoring en segundo plano y guardado local offline resiliente.
+              Toma de evaluaciones de integridad mediante clave de acceso única con webcam proctoring y guardado local resiliente.
             </p>
           </div>
           <Link
-            href="/exam/att-1098"
+            href="/exam/login"
             className="mt-2 w-full py-2 text-center rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-500 transition-colors"
           >
-            Iniciar Examen Demo
+            Iniciar Evaluación (Clave)
           </Link>
         </div>
 

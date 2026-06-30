@@ -228,3 +228,18 @@ model LtiAttemptMapping {
   @@map("lti_attempts_mapping")
 }
 
+model CandidateInvitation {
+  id             String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  examId         String    @map("exam_id") @db.Uuid
+  email          String    @db.VarChar(255)
+  candidateName  String    @map("candidate_name") @db.VarChar(255)
+  accessCode     String    @unique @map("access_code") @db.VarChar(50)
+  status         String    @default("PENDING") @db.VarChar(50)
+  expiresAt      DateTime? @map("expires_at") @db.Timestamptz
+  attemptId      String?   @unique @map("attempt_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("candidate_invitations")
+}
+

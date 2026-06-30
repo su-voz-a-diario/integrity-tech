@@ -1,0 +1,246 @@
+'use client';
+
+import React, { useEffect, useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+
+export default function CandidateLoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center font-sans">
+        <span className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
+      </div>
+    }>
+      <CandidateLoginForm />
+    </Suspense>
+  );
+}
+
+function CandidateLoginForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  const [accessCode, setAccessCode] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isClaiming, setIsClaiming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Datos del candidato verificado
+  const [invitationDetails, setInvitationDetails] = useState<{
+    candidateName: string;
+    email: string;
+    examId: string;
+    examTitle: string;
+  } | null>(null);
+
+  // Leer código desde la URL (?code=IT-123456)
+  useEffect(() => {
+    const code = searchParams.get('code');
+    if (code) {
+      setAccessCode(code);
+      handleVerify(code);
+    }
+  }, [searchParams]);
+
+  // Verificar el código ingresado contra el backend
+  const handleVerify = async (codeToVerify?: string) => {
+    const code = codeToVerify || accessCode;
+    if (!code || code.trim() === '') {
+      setError('Por favor, ingresa una clave de acceso válida.');
+      return;
+    }
+
+    setIsVerifying(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/evaluations/invitations/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessCode: code }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al verificar la clave de acceso.');
+      }
+
+      const data = await response.json();
+      setInvitationDetails(data);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'La clave de acceso ingresada es incorrecta o ya fue utilizada.');
+      setInvitationDetails(null);
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  // Reclamar la clave e iniciar el examen
+  const handleClaim = async () => {
+    if (!invitationDetails) return;
+
+    setIsClaiming(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/evaluations/invitations/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          accessCode: searchParams.get('code') || accessCode,
+          candidateName: invitationDetails.candidateName,
+          email: invitationDetails.email,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al inicializar la sesión.');
+      }
+
+      const data = await response.json();
+      
+      // Guardar el Token de Sesión JWT en localStorage para el header
+      localStorage.setItem('auth-token', data.token);
+
+      // Redirigir al examen del alumno
+      router.push(`/exam/${data.attemptId}`);
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Fallo al iniciar el examen. Por favor, reintenta.');
+    } finally {
+      setIsClaiming(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6 text-center font-sans gap-8">
+      
+      {/* HEADER LOGO */}
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-14 h-14 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-3xl shadow-lg shadow-indigo-500/5">
+          🛡️
+        </div>
+        <h1 className="text-2xl font-bold tracking-tight text-white mt-1">Integrity-Tech</h1>
+        <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
+          Acceso seguro a evaluaciones psicométricas bajo supervisión forense de conducta.
+        </p>
+      </div>
+
+      {/* LOGIN CARD */}
+      <div className="bg-slate-900 border border-slate-800 p-8 rounded-2xl max-w-md w-full shadow-2xl flex flex-col gap-6 relative overflow-hidden">
+        
+        {/* EFECTO CRISTAL DETRÁS */}
+        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full filter blur-2xl pointer-events-none" />
+        
+        {!invitationDetails ? (
+          // PASO 1: INGRESAR CÓDIGO
+          <div className="flex flex-col gap-5">
+            <div className="text-left">
+              <h2 className="text-lg font-bold text-white">Puerta de Acceso</h2>
+              <p className="text-xs text-slate-500 mt-1">
+                Ingresa la clave de acceso de 6 dígitos provista por tu reclutador o en tu invitación por correo.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 text-left">
+              <label className="text-2xs font-bold text-slate-500 uppercase tracking-widest">
+                Clave de Acceso
+              </label>
+              <input
+                type="text"
+                placeholder="Ej: IT-123456"
+                value={accessCode}
+                onChange={(e) => setAccessCode(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 px-4 text-base font-semibold tracking-wider text-center text-slate-200 placeholder-slate-700 focus:outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600/20 transition-all uppercase"
+              />
+            </div>
+
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs py-2.5 px-3 rounded-lg text-left leading-relaxed">
+                ⚠️ {error}
+              </div>
+            )}
+
+            <button
+              onClick={() => handleVerify()}
+              disabled={isVerifying}
+              className="w-full py-3 rounded-xl bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-600/10 cursor-pointer flex items-center justify-center gap-2"
+            >
+              {isVerifying ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                  Verificando...
+                </>
+              ) : (
+                'Verificar Acceso'
+              )}
+            </button>
+          </div>
+        ) : (
+          // PASO 2: CONFIRMAR DATOS DEL EXAMEN
+          <div className="flex flex-col gap-6">
+            <div className="text-left border-b border-slate-800/60 pb-4">
+              <h2 className="text-lg font-bold text-white">Evaluación Encontrada</h2>
+              <p className="text-xs text-slate-500 mt-1">
+                Confirma tus datos antes de iniciar la prueba. Al presionar comenzar, se consumirá tu clave de acceso.
+              </p>
+            </div>
+
+            {/* DETALLES DE LA INVITACION */}
+            <div className="flex flex-col gap-3.5 bg-slate-950/60 p-4 border border-slate-950 rounded-xl text-left">
+              <div>
+                <span className="text-4xs font-bold text-slate-500 uppercase tracking-widest block">Evaluado</span>
+                <span className="text-sm font-semibold text-slate-200 block mt-0.5">{invitationDetails.candidateName}</span>
+                <span className="text-xs text-slate-500 block mt-0.5">{invitationDetails.email}</span>
+              </div>
+              <div className="border-t border-slate-900 pt-3">
+                <span className="text-4xs font-bold text-slate-500 uppercase tracking-widest block">Prueba Asignada</span>
+                <span className="text-sm font-bold text-indigo-400 block mt-0.5">{invitationDetails.examTitle}</span>
+              </div>
+            </div>
+
+            {error && (
+              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs py-2.5 px-3 rounded-lg text-left">
+                ⚠️ {error}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setInvitationDetails(null);
+                  setError(null);
+                }}
+                className="flex-1 py-3 rounded-xl border border-slate-800 text-slate-400 text-xs font-semibold hover:bg-slate-900 transition-colors cursor-pointer"
+              >
+                Volver
+              </button>
+              <button
+                onClick={handleClaim}
+                disabled={isClaiming}
+                className="flex-1 py-3 rounded-xl bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-600/10 cursor-pointer flex items-center justify-center gap-2"
+              >
+                {isClaiming ? (
+                  <>
+                    <span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                    Iniciando...
+                  </>
+                ) : (
+                  'Comenzar Examen'
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* METADATOS TÉCNICOS */}
+      <div className="text-4xs text-slate-600 font-mono flex flex-col gap-0.5 leading-relaxed">
+        <div>Servicio de Autenticación mediante Claves Criptográficas de Un Solo Uso (OTP)</div>
+        <div>Session Binding: IP e Identidad en Proctoring Forense</div>
+      </div>
+
+    </div>
+  );
+}

@@ -57,6 +57,47 @@ export default function RecruiterDashboard() {
   const [attempts, setAttempts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Estados para Modal de Invitaciones
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [inviteForm, setInviteForm] = useState({
+    candidateName: '',
+    email: '',
+    examId: 'mock-exam-id-1111',
+  });
+  const [generatedInvite, setGeneratedInvite] = useState<{
+    accessCode: string;
+    directLink: string;
+  } | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [isInviting, setIsInviting] = useState(false);
+
+  const handleSendInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteForm.candidateName || !inviteForm.email) {
+      setInviteError('Por favor complete todos los campos.');
+      return;
+    }
+    
+    setIsInviting(true);
+    setInviteError(null);
+    
+    try {
+      const res = await fetch('/api/evaluations/invitations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(inviteForm),
+      });
+      
+      if (!res.ok) throw new Error('Error al generar la invitación');
+      const data = await res.json();
+      setGeneratedInvite(data);
+    } catch (err: any) {
+      setInviteError(err.message || 'Error al conectar con la API.');
+    } finally {
+      setIsInviting(false);
+    }
+  };
+
   // Carga asíncrona de datos desde la API
   useEffect(() => {
     fetch('/api/evaluations/attempts')
@@ -140,29 +181,43 @@ export default function RecruiterDashboard() {
             />
           </div>
 
-          <div className="flex gap-2 w-full md:w-auto overflow-x-auto">
-            {(['ALL', 'SAFE', 'WARNING', 'CRITICAL'] as const).map((type) => {
-              const labels: Record<string, string> = {
-                ALL: 'Todos',
-                SAFE: 'Sin Alertas',
-                WARNING: 'Sospechosos',
-                CRITICAL: 'Fraude Probable',
-              };
-              const isActive = filter === type;
-              return (
-                <button
-                  key={type}
-                  onClick={() => setFilter(type)}
-                  className={`px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
-                    isActive
-                      ? 'bg-indigo-600 text-white shadow-md'
-                      : 'bg-slate-950 text-slate-400 hover:bg-slate-900 border border-slate-900'
-                  }`}
-                >
-                  {labels[type]}
-                </button>
-              );
-            })}
+          <div className="flex flex-wrap md:flex-nowrap gap-3 w-full md:w-auto items-center justify-between md:justify-end">
+            <div className="flex gap-2">
+              {(['ALL', 'SAFE', 'WARNING', 'CRITICAL'] as const).map((type) => {
+                const labels: Record<string, string> = {
+                  ALL: 'Todos',
+                  SAFE: 'Sin Alertas',
+                  WARNING: 'Sospechosos',
+                  CRITICAL: 'Fraude Probable',
+                };
+                const isActive = filter === type;
+                return (
+                  <button
+                    key={type}
+                    onClick={() => setFilter(type)}
+                    className={`px-4 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-indigo-600 text-white shadow-md'
+                        : 'bg-slate-950 text-slate-400 hover:bg-slate-900 border border-slate-900'
+                    }`}
+                  >
+                    {labels[type]}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={() => {
+                setGeneratedInvite(null);
+                setInviteError(null);
+                setInviteForm({ candidateName: '', email: '', examId: 'mock-exam-id-1111' });
+                setIsInviteModalOpen(true);
+              }}
+              className="px-4 py-2 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer transition-all flex items-center gap-1.5 whitespace-nowrap"
+            >
+              ✉️ Invitar Candidato
+            </button>
           </div>
         </div>
 
@@ -240,6 +295,144 @@ export default function RecruiterDashboard() {
           </div>
         </div>
 
+      {/* MODAL DE INVITACIÓN A CANDIDATOS */}
+      {isInviteModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl w-full max-w-md shadow-2xl relative animate-fade-in flex flex-col gap-5">
+            <button
+              onClick={() => setIsInviteModalOpen(false)}
+              className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 text-sm cursor-pointer"
+            >
+              ✕
+            </button>
+            
+            {!generatedInvite ? (
+              <form onSubmit={handleSendInvite} className="flex flex-col gap-4 text-left">
+                <div>
+                  <h3 className="text-base font-bold text-white">Invitar Nuevo Candidato</h3>
+                  <p className="text-2xs text-slate-500 mt-0.5">
+                    Genera una clave de acceso única para evaluar la integridad y habilidades.
+                  </p>
+                </div>
+                
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-3xs font-bold text-slate-500 uppercase tracking-widest">
+                    Nombre del Candidato
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej: Sofía Valenzuela"
+                    value={inviteForm.candidateName}
+                    onChange={(e) => setInviteForm({ ...inviteForm, candidateName: e.target.value })}
+                    className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-300 focus:outline-none focus:border-indigo-600"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-3xs font-bold text-slate-500 uppercase tracking-widest">
+                    Correo Electrónico
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    placeholder="sofia.valenzuela@example.com"
+                    value={inviteForm.email}
+                    onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
+                    className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-300 focus:outline-none focus:border-indigo-600"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-3xs font-bold text-slate-500 uppercase tracking-widest">
+                    Evaluación Asignada
+                  </label>
+                  <select
+                    value={inviteForm.examId}
+                    onChange={(e) => setInviteForm({ ...inviteForm, examId: e.target.value })}
+                    className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-300 focus:outline-none focus:border-indigo-600"
+                  >
+                    <option value="mock-exam-id-1111">Evaluación de Ingeniería de Software II</option>
+                  </select>
+                </div>
+
+                {inviteError && (
+                  <p className="text-2xs text-red-400 bg-red-500/10 border border-red-500/20 p-2 rounded">
+                    ⚠️ {inviteError}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isInviting}
+                  className="w-full mt-2 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  {isInviting ? 'Generando...' : 'Generar Clave de Acceso'}
+                </button>
+              </form>
+            ) : (
+              <div className="flex flex-col gap-4 text-left">
+                <div>
+                  <span className="text-xl">✅</span>
+                  <h3 className="text-base font-bold text-white mt-2">Clave de Acceso Generada</h3>
+                  <p className="text-2xs text-slate-500 mt-0.5">
+                    Proporciona estas credenciales al candidato para que inicie su examen.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-3 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                  <div>
+                    <span className="text-4xs font-bold text-slate-500 uppercase tracking-widest block">Candidato</span>
+                    <span className="text-xs font-semibold text-slate-200 block">{inviteForm.candidateName}</span>
+                  </div>
+                  
+                  <div className="border-t border-slate-900 pt-2.5">
+                    <span className="text-4xs font-bold text-slate-500 uppercase tracking-widest block">Clave de Acceso (OTP)</span>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-sm font-mono font-bold text-indigo-400">{generatedInvite.accessCode}</span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(generatedInvite.accessCode);
+                          alert('¡Código copiado al portapapeles!');
+                        }}
+                        className="text-4xs text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer underline animate-pulse"
+                      >
+                        Copiar
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-slate-900 pt-2.5">
+                    <span className="text-4xs font-bold text-slate-500 uppercase tracking-widest block">Enlace de Acceso Directo</span>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className="text-3xs font-mono text-slate-400 overflow-hidden text-ellipsis whitespace-nowrap max-w-[220px]">
+                        {window.location.origin + generatedInvite.directLink}
+                      </span>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(window.location.origin + generatedInvite.directLink);
+                          alert('¡Enlace de acceso directo copiado!');
+                        }}
+                        className="text-4xs text-indigo-400 hover:text-indigo-300 font-semibold cursor-pointer underline flex-shrink-0"
+                      >
+                        Copiar Enlace
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setIsInviteModalOpen(false)}
+                  className="w-full py-2.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs cursor-pointer"
+                >
+                  Entendido / Cerrar
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      
       </div>
     </div>
   );
