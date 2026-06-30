@@ -87,17 +87,17 @@ export default function RecruiterDashboard() {
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-8">
       <div className="max-w-6xl mx-auto flex flex-col gap-8">
         
-        {/* ENCABEZADO */}
-        <div className="flex justify-between items-start border-b border-slate-900 pb-6">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-white">Consola de Selección</h1>
-            <p className="text-sm text-slate-400 mt-1">
+        {/* ENCABEZADO - Responsivo para Móvil/Escritorio */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-900 pb-6 gap-4 md:gap-0">
+          <div className="w-full md:w-auto">
+            <h1 className="text-2xl font-extrabold tracking-tight text-white text-left">Consola de Selección</h1>
+            <p className="text-xs md:text-sm text-slate-400 mt-1 leading-relaxed text-left">
               Monitoreo de perfiles psicométricos y auditoría de integridad conductual (Proctoring).
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-xs text-slate-500 font-medium">Empresa:</span>
-            <span className="px-3 py-1 bg-slate-900 border border-slate-800 text-xs font-semibold rounded-lg text-indigo-400">
+          <div className="flex items-center justify-between md:justify-end gap-2 bg-slate-900/30 border border-slate-800 py-1.5 px-3 rounded-lg w-full md:w-auto">
+            <span className="text-3xs text-slate-500 font-semibold uppercase tracking-wider">Empresa Cliente:</span>
+            <span className="text-xs font-bold text-indigo-400">
               Integrity-Tech Corp
             </span>
           </div>
