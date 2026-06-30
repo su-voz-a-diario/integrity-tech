@@ -242,24 +242,30 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
           <div className="lg:col-span-2 flex flex-col gap-6">
             
             {/* CARD PRINCIPAL CANDIDATO */}
-            <div className="bg-slate-900 border border-slate-900 p-6 rounded-xl flex justify-between items-center shadow-md">
-              <div>
-                <h2 className="text-lg font-bold text-white">{report.candidateName}</h2>
-                <p className="text-xs text-slate-400 mt-1">{report.email}</p>
-                <div className="flex gap-2 items-center mt-2.5">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-950 border border-slate-800 rounded-lg text-xs font-medium text-slate-400">
+            <div className="bg-slate-900 border border-slate-900 p-5 md:p-6 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-5 md:gap-0 shadow-md">
+              <div className="flex flex-col gap-2.5 w-full md:w-auto text-left">
+                <div>
+                  <h2 className="text-lg font-bold text-white leading-tight">{report.candidateName}</h2>
+                  <p className="text-xs text-slate-400 mt-0.5">{report.email}</p>
+                </div>
+                
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-1">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-950 border border-slate-800 rounded-lg text-2xs font-medium text-slate-400 w-fit">
                     <span>Prueba:</span>
                     <span className="text-indigo-400 font-semibold">{report.assessmentTitle}</span>
                   </div>
-                  <div className={`inline-flex items-center px-2.5 py-1 rounded-lg text-2xs font-semibold border ${statusColor}`}>
+                  <div className={`inline-flex items-center px-2.5 py-1 rounded-lg text-3xs font-bold border w-fit ${statusColor}`}>
                     {statusText}
                   </div>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="text-2xs font-bold text-slate-500 uppercase tracking-widest">Índice IGA</p>
-                <h3 className="text-4xl font-bold text-indigo-400 mt-1 tracking-tight">{report.overallScore}</h3>
-                <p className="text-2xs text-slate-500 mt-1">Cálculo global ponderado</p>
+              
+              <div className="text-left md:text-right border-t border-slate-800/60 md:border-none pt-4 md:pt-0 flex flex-row md:flex-col justify-between md:justify-center items-center md:items-end gap-2 w-full md:w-auto">
+                <div className="flex flex-col text-left md:text-right">
+                  <p className="text-3xs font-bold text-slate-500 uppercase tracking-widest">Índice IGA</p>
+                  <p className="text-3xs text-slate-500 mt-0.5">Cálculo global ponderado</p>
+                </div>
+                <h3 className="text-3xl md:text-4xl font-bold text-indigo-400 tracking-tight font-mono">{report.overallScore}</h3>
               </div>
             </div>
 
