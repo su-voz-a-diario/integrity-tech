@@ -150,7 +150,7 @@ export class EvaluationController {
       candidateName: invitation.candidateName,
       email: invitation.email,
       examId: invitation.examId,
-      examTitle: 'Evaluación Integrada de Conducta y Personalidad (IT²)',
+      examTitle: 'Batería de Evaluación Psicométrica Integrada (IT²)',
     };
   }
 

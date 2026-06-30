@@ -15,8 +15,8 @@ import { QuestionDto } from '../../../types/exam-contract';
 // Simulación de carga de datos desde el backend en tiempo de carga de página (mock)
 const MOCK_EXAM = {
   id: 'mock-exam-id-1111',
-  title: 'Evaluación Integrada de Conducta y Personalidad (IT²)',
-  durationMinutes: 30,
+  title: 'Batería de Evaluación Psicométrica Integrada (IT²)',
+  durationMinutes: 45,
 };
 
 const MOCK_QUESTIONS: QuestionDto[] = [
@@ -248,6 +248,146 @@ const MOCK_QUESTIONS: QuestionDto[] = [
           '5': 'Totalmente de acuerdo',
         },
       },
+    },
+  },
+  {
+    id: 'q-16',
+    type: 'MULTIPLE_CHOICE',
+    defaultPoints: 1.0,
+    content: {
+      text: 'Lea el siguiente argumento: “Se ha comprobado que los empleados que participan en programas de capacitación mejoran su productividad. Carlos participó en un programa de capacitación. Por tanto, Carlos mejorará su productividad.” ¿Qué tan sólida es esta conclusión?',
+      options: [
+        { id: 'opt-a', text: 'A) Verdadera, porque la capacitación siempre mejora la productividad.' },
+        { id: 'opt-b', text: 'B) Probablemente verdadera, si no hay otros factores que lo impidan.' },
+        { id: 'opt-c', text: 'C) Falsa, porque no todos los que se capacitan mejoran.' },
+        { id: 'opt-d', text: 'D) No se puede determinar en absoluto.' },
+      ],
+    },
+  },
+  {
+    id: 'q-17',
+    type: 'MULTIPLE_CHOICE',
+    defaultPoints: 1.0,
+    content: {
+      text: 'Considere el siguiente razonamiento: “Todas las empresas exitosas invierten en innovación. La empresa XYZ invierte en innovación. Por lo tanto, la empresa XYZ es exitosa.” Este razonamiento es…',
+      options: [
+        { id: 'opt-a', text: 'A) Válido y verdadero.' },
+        { id: 'opt-b', text: 'B) Inválido, porque la premisa no garantiza la conclusión.' },
+        { id: 'opt-c', text: 'C) Válido, pero falso.' },
+        { id: 'opt-d', text: 'D) Inválido y falso.' },
+      ],
+    },
+  },
+  {
+    id: 'q-18',
+    type: 'MULTIPLE_CHOICE',
+    defaultPoints: 1.0,
+    content: {
+      text: 'Seleccione la opción que complete la analogía de la misma manera que el primer par: Cirujano es a bisturí como escritor es a…',
+      options: [
+        { id: 'opt-a', text: 'A) Pluma' },
+        { id: 'opt-b', text: 'B) Libro' },
+        { id: 'opt-c', text: 'C) Biblioteca' },
+        { id: 'opt-d', text: 'D) Lector' },
+      ],
+    },
+  },
+  {
+    id: 'q-19',
+    type: 'MULTIPLE_CHOICE',
+    defaultPoints: 1.0,
+    content: {
+      text: '¿Qué número completa la siguiente serie? 2, 6, 12, 20, 30, ___',
+      options: [
+        { id: 'opt-a', text: 'A) 38' },
+        { id: 'opt-b', text: 'B) 40' },
+        { id: 'opt-c', text: 'C) 42' },
+        { id: 'opt-d', text: 'D) 48' },
+      ],
+    },
+  },
+  {
+    id: 'q-20',
+    type: 'MULTIPLE_CHOICE',
+    defaultPoints: 1.0,
+    content: {
+      text: 'Un artículo tiene un precio de $150 y se le aplica un descuento del 20%. ¿Cuál es el precio final?',
+      options: [
+        { id: 'opt-a', text: 'A) $120' },
+        { id: 'opt-b', text: 'B) $130' },
+        { id: 'opt-c', text: 'C) $100' },
+        { id: 'opt-d', text: 'D) $125' },
+      ],
+    },
+  },
+  {
+    id: 'q-21',
+    type: 'MULTIPLE_CHOICE',
+    defaultPoints: 1.0,
+    content: {
+      text: 'Un grifo llena un tanque en 6 horas. Otro grifo más potente lo llena en 4 horas. Si se abren ambos a la vez, ¿en cuánto tiempo se llenará el tanque?',
+      options: [
+        { id: 'opt-a', text: 'A) 2 horas' },
+        { id: 'opt-b', text: 'B) 2 horas y 24 minutos' },
+        { id: 'opt-c', text: 'C) 2 horas y 30 minutos' },
+        { id: 'opt-d', text: 'D) 10 horas' },
+      ],
+    },
+  },
+  {
+    id: 'q-22',
+    type: 'MULTIPLE_CHOICE',
+    defaultPoints: 1.0,
+    content: {
+      text: 'Observe la secuencia de figuras:\n• Figura 1: ● (círculo, 1 lado curvo)\n• Figura 2: ▲ (triángulo, 3 lados)\n• Figura 3: ■ (cuadrado, 4 lados)\n¿Cuál debe ir en el lugar de la interrogación (?)?',
+      options: [
+        { id: 'opt-a', text: 'A) Pentágono (5 lados)' },
+        { id: 'opt-b', text: 'B) Hexágono (6 lados)' },
+        { id: 'opt-c', text: 'C) Círculo' },
+        { id: 'opt-d', text: 'D) Rombo' },
+      ],
+    },
+  },
+  {
+    id: 'q-23',
+    type: 'MULTIPLE_CHOICE',
+    defaultPoints: 1.0,
+    content: {
+      text: 'Seleccione la opción que completa lógicamente esta matriz 2×2:\n• Arriba izquierda: flecha hacia arriba (↑)\n• Arriba derecha: flecha hacia la derecha (→)\n• Abajo izquierda: flecha hacia abajo (↓)\n• Abajo derecha: ?',
+      options: [
+        { id: 'opt-a', text: 'A) Flecha hacia arriba (↑)' },
+        { id: 'opt-b', text: 'B) Flecha hacia la derecha (→)' },
+        { id: 'opt-c', text: 'C) Flecha hacia abajo (↓)' },
+        { id: 'opt-d', text: 'D) Flecha hacia la izquierda (←)' },
+      ],
+    },
+  },
+  {
+    id: 'q-24',
+    type: 'MULTIPLE_CHOICE',
+    defaultPoints: 1.0,
+    content: {
+      text: 'Observe la secuencia de posiciones de un triángulo que gira:\n• Posición 1: apunta hacia arriba (▲)\n• Posición 2: apunta hacia la derecha (►)\n• Posición 3: apunta hacia abajo (▼)\n¿Cuál es la Posición 4?',
+      options: [
+        { id: 'opt-a', text: 'A) Apunta hacia arriba (▲)' },
+        { id: 'opt-b', text: 'B) Apunta hacia la derecha (►)' },
+        { id: 'opt-c', text: 'C) Apunta hacia abajo (▼)' },
+        { id: 'opt-d', text: 'D) Apunta hacia la izquierda (◄)' },
+      ],
+    },
+  },
+  {
+    id: 'q-25',
+    type: 'MULTIPLE_CHOICE',
+    defaultPoints: 1.0,
+    content: {
+      text: '¿Cuál es la figura que sigue en esta secuencia?\n• Figura 1: un punto (●)\n• Figura 2: dos puntos (●●)\n• Figura 3: tres puntos (●●●)\n¿Qué sigue en la Figura 4?',
+      options: [
+        { id: 'opt-a', text: 'A) ●' },
+        { id: 'opt-b', text: 'B) ●●' },
+        { id: 'opt-c', text: 'C) ●●●' },
+        { id: 'opt-d', text: 'D) ●●●●' },
+      ],
     },
   },
 ];

@@ -1,6 +1,6 @@
 // Contratos de datos compartidos entre Next.js (Frontend) y NestJS (Backend)
 
-export type QuestionType = 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'SHORT_ANSWER';
+export type QuestionType = 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'SHORT_ANSWER' | 'LIKERT';
 
 export interface QuestionOption {
   id: string;
@@ -10,6 +10,11 @@ export interface QuestionOption {
 export interface QuestionContent {
   text: string;
   options?: QuestionOption[];
+  scale?: {
+    min: number;
+    max: number;
+    labels: Record<string, string>;
+  };
 }
 
 export interface QuestionDto {
