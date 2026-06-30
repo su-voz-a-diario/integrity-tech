@@ -382,8 +382,8 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
                         <span className={`absolute -left-6.5 top-1.5 flex h-2.5 w-2.5 items-center justify-center rounded-full ${dotColorClass} ring-4`} />
                         
                         <div className="flex flex-col gap-1">
-                          <div className="flex items-center justify-between text-2xs">
-                            <span className={`font-semibold tracking-wide ${
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-[10px] sm:text-2xs gap-0.5 sm:gap-2 text-left w-full">
+                            <span className={`font-semibold tracking-wide block ${
                               isCritical 
                                 ? 'text-red-400' 
                                 : isWarning 
@@ -392,7 +392,7 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
                             }`}>
                               {log.eventType.toUpperCase()}
                             </span>
-                            <span className="text-slate-500 font-mono">{log.timestamp}</span>
+                            <span className="text-slate-500 font-mono block sm:inline">{log.timestamp}</span>
                           </div>
                           
                           <p className="text-xs text-slate-300 font-light leading-relaxed">
