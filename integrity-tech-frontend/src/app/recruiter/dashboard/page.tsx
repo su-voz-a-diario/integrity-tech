@@ -352,7 +352,7 @@ export default function RecruiterDashboard() {
                     onChange={(e) => setInviteForm({ ...inviteForm, examId: e.target.value })}
                     className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-300 focus:outline-none focus:border-indigo-600"
                   >
-                    <option value="mock-exam-id-1111">Evaluación de Ingeniería de Software II</option>
+                    <option value="mock-exam-id-1111">Evaluación Integrada de Conducta y Personalidad (IT²)</option>
                   </select>
                 </div>
 

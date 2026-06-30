@@ -150,7 +150,7 @@ export class EvaluationController {
       candidateName: invitation.candidateName,
       email: invitation.email,
       examId: invitation.examId,
-      examTitle: 'Evaluación de Ingeniería de Software II',
+      examTitle: 'Evaluación Integrada de Conducta y Personalidad (IT²)',
     };
   }
 

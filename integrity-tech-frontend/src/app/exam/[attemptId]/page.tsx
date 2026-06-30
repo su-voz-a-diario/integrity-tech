@@ -15,8 +15,8 @@ import { QuestionDto } from '../../../types/exam-contract';
 // Simulación de carga de datos desde el backend en tiempo de carga de página (mock)
 const MOCK_EXAM = {
   id: 'mock-exam-id-1111',
-  title: 'Evaluación de Ingeniería de Software II',
-  durationMinutes: 60,
+  title: 'Evaluación Integrada de Conducta y Personalidad (IT²)',
+  durationMinutes: 30,
 };
 
 const MOCK_QUESTIONS: QuestionDto[] = [
@@ -88,6 +88,166 @@ const MOCK_QUESTIONS: QuestionDto[] = [
         { id: 'opt-c', text: 'C) Lo hace, pero deja una nota interna aclaratoria por si acaso.' },
         { id: 'opt-d', text: 'D) Lo deriva a un colega para no tener que involucrarse directamente.' },
       ],
+    },
+  },
+  {
+    id: 'q-6',
+    type: 'LIKERT',
+    defaultPoints: 1.0,
+    content: {
+      text: 'Soy una persona habladora, me gusta iniciar conversaciones.',
+      scale: {
+        min: 1,
+        max: 5,
+        labels: {
+          '1': 'Totalmente en desacuerdo',
+          '5': 'Totalmente de acuerdo',
+        },
+      },
+    },
+  },
+  {
+    id: 'q-7',
+    type: 'LIKERT',
+    defaultPoints: 1.0,
+    content: {
+      text: 'Prefiero mantenerme en un segundo plano, soy más bien reservado/a.',
+      scale: {
+        min: 1,
+        max: 5,
+        labels: {
+          '1': 'Totalmente en desacuerdo',
+          '5': 'Totalmente de acuerdo',
+        },
+      },
+    },
+  },
+  {
+    id: 'q-8',
+    type: 'LIKERT',
+    defaultPoints: 1.0,
+    content: {
+      text: 'Tiendo a encontrar defectos en los demás fácilmente.',
+      scale: {
+        min: 1,
+        max: 5,
+        labels: {
+          '1': 'Totalmente en desacuerdo',
+          '5': 'Totalmente de acuerdo',
+        },
+      },
+    },
+  },
+  {
+    id: 'q-9',
+    type: 'LIKERT',
+    defaultPoints: 1.0,
+    content: {
+      text: 'Soy comprensivo/a y amable con casi todo el mundo.',
+      scale: {
+        min: 1,
+        max: 5,
+        labels: {
+          '1': 'Totalmente en desacuerdo',
+          '5': 'Totalmente de acuerdo',
+        },
+      },
+    },
+  },
+  {
+    id: 'q-10',
+    type: 'LIKERT',
+    defaultPoints: 1.0,
+    content: {
+      text: 'Hago las cosas con cuidado, me esfuerzo para que queden bien hechas.',
+      scale: {
+        min: 1,
+        max: 5,
+        labels: {
+          '1': 'Totalmente en desacuerdo',
+          '5': 'Totalmente de acuerdo',
+        },
+      },
+    },
+  },
+  {
+    id: 'q-11',
+    type: 'LIKERT',
+    defaultPoints: 1.0,
+    content: {
+      text: 'A veces soy un poco descuidado/a o desordenado/a.',
+      scale: {
+        min: 1,
+        max: 5,
+        labels: {
+          '1': 'Totalmente en desacuerdo',
+          '5': 'Totalmente de acuerdo',
+        },
+      },
+    },
+  },
+  {
+    id: 'q-12',
+    type: 'LIKERT',
+    defaultPoints: 1.0,
+    content: {
+      text: 'Con frecuencia me siento tenso/a o preocupado/a.',
+      scale: {
+        min: 1,
+        max: 5,
+        labels: {
+          '1': 'Totalmente en desacuerdo',
+          '5': 'Totalmente de acuerdo',
+        },
+      },
+    },
+  },
+  {
+    id: 'q-13',
+    type: 'LIKERT',
+    defaultPoints: 1.0,
+    content: {
+      text: 'En general soy una persona relajada y difícil de estresar.',
+      scale: {
+        min: 1,
+        max: 5,
+        labels: {
+          '1': 'Totalmente en desacuerdo',
+          '5': 'Totalmente de acuerdo',
+        },
+      },
+    },
+  },
+  {
+    id: 'q-14',
+    type: 'LIKERT',
+    defaultPoints: 1.0,
+    content: {
+      text: 'Me gustan las experiencias nuevas, la variedad y probar cosas distintas.',
+      scale: {
+        min: 1,
+        max: 5,
+        labels: {
+          '1': 'Totalmente en desacuerdo',
+          '5': 'Totalmente de acuerdo',
+        },
+      },
+    },
+  },
+  {
+    id: 'q-15',
+    type: 'LIKERT',
+    defaultPoints: 1.0,
+    content: {
+      text: 'Prefiero seguir rutinas conocidas, no soy muy imaginativo/a.',
+      scale: {
+        min: 1,
+        max: 5,
+        labels: {
+          '1': 'Totalmente en desacuerdo',
+          '5': 'Totalmente de acuerdo',
+        },
+      },
     },
   },
 ];
