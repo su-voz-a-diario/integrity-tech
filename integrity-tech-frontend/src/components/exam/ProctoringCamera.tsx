@@ -29,6 +29,9 @@ export function ProctoringCamera({ attemptId, activeQuestionIndex }: ProctoringC
         streamRef.current = stream;
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
+          videoRef.current.onloadedmetadata = () => {
+            videoRef.current?.play().catch(e => console.warn('[Webcam] Fallo en reproducción automática en móvil:', e));
+          };
         }
         setHasPermission(true);
         
