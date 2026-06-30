@@ -343,11 +343,13 @@ export default function RecruiterDashboard() {
                   </div>
                 </div>
 
-                <div className="flex justify-between items-center text-3xs text-slate-500 border-t border-slate-950/40 pt-3">
-                  <span>Prueba: <strong className="text-slate-400">{attempt.assessmentTitle.replace('Batería de Evaluación Psicométrica', 'Batería')}</strong></span>
+                <div className="flex justify-between items-center text-[10px] text-slate-500 border-t border-slate-950/40 pt-3 gap-3">
+                  <span className="truncate max-w-[130px] min-[375px]:max-w-[175px] min-[410px]:max-w-[210px] sm:max-w-none block text-left">
+                    Prueba: <strong className="text-slate-400 font-medium">{attempt.assessmentTitle.replace('Batería de Evaluación Psicométrica', 'Batería')}</strong>
+                  </span>
                   <Link
                     href={`/recruiter/attempts/${attempt.id}`}
-                    className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3.5 py-1.5 text-2xs font-bold text-white hover:bg-indigo-500 transition-all cursor-pointer shadow-lg shadow-indigo-600/10"
+                    className="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-3.5 py-1.5 text-2xs font-bold text-white hover:bg-indigo-500 transition-all cursor-pointer shadow-lg shadow-indigo-600/10 flex-shrink-0"
                   >
                     Ver Reporte
                   </Link>
