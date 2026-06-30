@@ -112,20 +112,18 @@ export function ProctoringCamera({ attemptId, activeQuestionIndex }: ProctoringC
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-center gap-2">
+    <div className="fixed top-20 right-4 md:right-6 z-50 flex flex-col items-center gap-2">
       {/* CONTENEDOR CIRCULAR FLOTANTE */}
-      <div className="relative w-28 h-28 rounded-full border-2 border-indigo-500/30 overflow-hidden bg-slate-950 shadow-2xl shadow-indigo-500/10 flex items-center justify-center group">
+      <div className="relative w-24 h-24 md:w-28 md:h-28 rounded-full border-2 border-indigo-500/30 overflow-hidden bg-slate-950 shadow-2xl shadow-indigo-500/10 flex items-center justify-center group">
         
         {/* STREAM DE VIDEO EN VIVO */}
-        {hasPermission === true && (
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-full object-cover scale-x-[-1]" // Espejo natural
-          />
-        )}
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className={`w-full h-full object-cover scale-x-[-1] ${hasPermission === true ? 'block' : 'hidden'}`}
+        />
 
         {/* CARGANDO O PERMISO DENEGADO */}
         {hasPermission === null && (
