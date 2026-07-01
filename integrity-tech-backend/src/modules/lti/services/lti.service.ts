@@ -62,12 +62,26 @@ export class LtiService {
 
     if (!user) {
       this.logger.log(`Usuario no encontrado. Creando nuevo registro JIT para: ${claims.name}`);
+      let org = await this.prisma.organization.findFirst();
+      if (!org) {
+        org = await this.prisma.organization.create({
+          data: {
+            name: 'Organización LTI Demo',
+            slug: 'lti-demo',
+          }
+        });
+      }
+
+      const nameParts = (claims.name || 'Estudiante LTI').split(' ');
+      const firstName = nameParts[0] || 'Estudiante';
+      const lastName = nameParts.slice(1).join(' ') || 'LTI';
+
       user = await this.prisma.user.create({
         data: {
+          organizationId: org.id,
           email: claims.email,
-          name: claims.name,
-          role: 'STUDENT',
-          // Se omite password ya que es inicio de sesión federado
+          firstName,
+          lastName,
           passwordHash: 'LTI_FEDERATED_AUTHENTICATION_NO_PASSWORD',
         }
       });
@@ -90,7 +104,7 @@ export class LtiService {
       const org = await this.prisma.organization.create({
         data: {
           name: 'Organización LTI Demo',
-          domain: 'ltidemo.com'
+          slug: 'lti-demo-' + Date.now()
         }
       });
 
@@ -99,6 +113,7 @@ export class LtiService {
           title: 'Evaluación Psicométrica Likert LTI',
           organizationId: org.id,
           durationMinutes: 45,
+          createdBy: '00000000-0000-0000-0000-000000000000'
         }
       });
     }

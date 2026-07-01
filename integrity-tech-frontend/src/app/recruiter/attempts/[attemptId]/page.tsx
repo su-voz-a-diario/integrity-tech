@@ -167,47 +167,116 @@ const MOCK_REPORT_DETAILS: Record<string, any> = {
 export default function CandidateAttemptReport({ params }: { params: { attemptId: string } }) {
   const attemptId = params.attemptId;
   const [report, setReport] = useState<any>(null);
+  const [perfiles, setPerfiles] = useState<any[]>([]);
+  const [selectedPerfilId, setSelectedPerfilId] = useState<string>('');
+  const [igaData, setIgaData] = useState<any>(null);
+  const [isRecalculating, setIsRecalculating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Consulta dinámica del intento
+  // Consulta dinámica del intento y perfiles
   useEffect(() => {
-    fetch(`/api/evaluations/attempts/${attemptId}`)
+    const fetchReport = fetch(`/api/evaluations/attempts/${attemptId}`)
       .then((res) => {
         if (!res.ok) throw new Error('Not Found');
         return res.json();
       })
-      .then((data) => {
-        setReport(data);
-        setIsLoading(false);
-      })
       .catch((err) => {
         console.warn(`[Reporte] Fallback a mocks locales para el attemptId: ${attemptId}`, err);
-        setReport(MOCK_REPORT_DETAILS[attemptId] || MOCK_REPORT_DETAILS.default);
-        setIsLoading(false);
+        return MOCK_REPORT_DETAILS[attemptId] || MOCK_REPORT_DETAILS.default;
       });
+
+    const fetchPerfiles = fetch('/api/evaluations/perfiles')
+      .then((res) => (res.ok ? res.json() : []))
+      .catch(() => []);
+
+    const fetchIga = fetch(`/api/evaluations/attempts/${attemptId}/resultados`)
+      .then((res) => (res.ok ? res.json() : null))
+      .catch(() => null);
+
+    Promise.all([fetchReport, fetchPerfiles, fetchIga]).then(([reportData, perfilesData, igaRes]) => {
+      setReport(reportData);
+      
+      const finalPerfiles = perfilesData.length > 0 ? perfilesData : [
+        { id: 'p1', nombre: 'Gerente Comercial' },
+        { id: 'p2', nombre: 'Desarrollador de Software' },
+        { id: 'p3', nombre: 'Tesorero / Cajero' },
+        { id: 'p4', nombre: 'Director de Recursos Humanos' },
+      ];
+      setPerfiles(finalPerfiles);
+
+      if (igaRes && igaRes.iga) {
+        setIgaData(igaRes);
+        const matchingProfile = finalPerfiles.find((p: any) => p.nombre === igaRes.perfil_puesto);
+        if (matchingProfile) {
+          setSelectedPerfilId(matchingProfile.id);
+        } else {
+          setSelectedPerfilId(finalPerfiles[0]?.id || '');
+        }
+      } else {
+        const score = parseInt(reportData.overallScore) || 75;
+        const rec = score >= 75 ? 'Recomendado' : (score >= 50 ? 'Aceptable con observaciones' : 'No recomendado');
+        setIgaData({
+          perfil_puesto: finalPerfiles[0]?.nombre || 'Gerente Comercial',
+          iga: {
+            valor: score,
+            recomendacion: rec,
+            alertas: score < 50 ? ['Riesgo ético elevado'] : [],
+          }
+        });
+        setSelectedPerfilId(finalPerfiles[0]?.id || '');
+      }
+
+      setIsLoading(false);
+    });
   }, [attemptId]);
+
+  const handleRecalcular = async (perfilId: string) => {
+    setSelectedPerfilId(perfilId);
+    setIsRecalculating(true);
+
+    try {
+      const response = await fetch(`/api/evaluations/attempts/${attemptId}/recalcular-iga`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ perfilId }),
+      });
+      if (response.ok) {
+        const newIga = await response.json();
+        setIgaData(newIga);
+      }
+    } catch (err) {
+      console.error('Error recalcular IGA:', err);
+    } finally {
+      setIsRecalculating(false);
+    }
+  };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
         <div className="text-sm text-slate-500 font-medium">Cargando reporte de evaluación...</div>
       </div>
     );
   }
 
-  const numericScore = parseInt(report?.overallScore || '0') || 0;
-  const isRecommended = numericScore >= 75;
-  const isAcceptable = numericScore >= 50 && numericScore < 75;
+  const numericScore = igaData?.iga?.valor ?? (parseInt(report?.overallScore || '0') || 0);
+  const rawRecomendacion = igaData?.iga?.recomendacion || 'Recomendado';
+  const isRecommended = rawRecomendacion === 'Recomendado';
+  const isAcceptable = rawRecomendacion === 'Aceptable con observaciones' || rawRecomendacion === 'Aceptable';
+  
   const statusText = isRecommended 
     ? 'Ajuste Alto (Recomendado)' 
     : isAcceptable 
       ? 'Ajuste Medio (Aceptable)' 
       : 'Ajuste Bajo (No Recomendado)';
+
   const statusColor = isRecommended 
     ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
     : isAcceptable 
       ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' 
       : 'bg-red-500/10 border-red-500/20 text-red-400';
+
+  const allAlerts = [...(report?.alerts || []), ...(igaData?.iga?.alertas || [])];
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-8">
@@ -242,37 +311,59 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
           <div className="lg:col-span-2 flex flex-col gap-6">
             
             {/* CARD PRINCIPAL CANDIDATO */}
-            <div className="bg-slate-900 border border-slate-900 p-5 md:p-6 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-5 md:gap-0 shadow-md">
-              <div className="flex flex-col gap-2.5 w-full md:w-auto text-left">
+            <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl flex flex-col gap-6 shadow-md">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                  <h2 className="text-lg font-bold text-white leading-tight">{report.candidateName}</h2>
-                  <p className="text-xs text-slate-400 mt-0.5">{report.email}</p>
+                  <h2 className="text-xl font-bold text-white leading-tight">{report.candidateName}</h2>
+                  <p className="text-xs text-slate-400 mt-1">{report.email}</p>
                 </div>
-                
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-1">
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-950 border border-slate-800 rounded-lg text-2xs font-medium text-slate-400 w-fit">
-                    <span>Prueba:</span>
-                    <span className="text-indigo-400 font-semibold">{report.assessmentTitle}</span>
-                  </div>
-                  <div className={`inline-flex items-center px-2.5 py-1 rounded-lg text-3xs font-bold border w-fit ${statusColor}`}>
-                    {statusText}
-                  </div>
+
+                {/* Selección de Perfil para Recalcular */}
+                <div className="flex flex-col gap-1 w-full md:w-auto">
+                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Perfil del Cargo</label>
+                  <select
+                    value={selectedPerfilId}
+                    onChange={(e) => handleRecalcular(e.target.value)}
+                    disabled={isRecalculating}
+                    className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                  >
+                    {perfiles.map((p: any) => (
+                      <option key={p.id} value={p.id}>{p.nombre}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
               
-              <div className="text-left md:text-right border-t border-slate-800/60 md:border-none pt-4 md:pt-0 flex flex-row md:flex-col justify-between md:justify-center items-center md:items-end gap-2 w-full md:w-auto">
-                <div className="flex flex-col text-left md:text-right">
-                  <p className="text-3xs font-bold text-slate-500 uppercase tracking-widest">Índice IGA</p>
-                  <p className="text-3xs text-slate-500 mt-0.5">Cálculo global ponderado</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-slate-800/60 pt-5">
+                {/* Panel 1: Info del Examen */}
+                <div className="bg-slate-950 border border-slate-850 p-4 rounded-xl flex flex-col justify-center">
+                  <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Batería Asignada</p>
+                  <p className="text-xs font-semibold text-indigo-400 mt-1.5">{report.assessmentTitle}</p>
                 </div>
-                <h3 className="text-3xl md:text-4xl font-bold text-indigo-400 tracking-tight font-mono">{report.overallScore}</h3>
+
+                {/* Panel 2: Semáforo / Adecuación */}
+                <div className={`border p-4 rounded-xl flex flex-col justify-center ${statusColor}`}>
+                  <p className="text-[10px] font-bold uppercase tracking-widest opacity-80">Adecuación al Puesto</p>
+                  <p className="text-xs font-bold mt-1.5">{statusText}</p>
+                </div>
+
+                {/* Panel 3: Índice IGA Global */}
+                <div className="bg-indigo-950/20 border border-indigo-900/40 p-4 rounded-xl flex flex-col justify-center relative overflow-hidden">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Índice IGA</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">Puntaje ponderado</p>
+                    </div>
+                    <span className="text-2xl font-extrabold text-indigo-400 tracking-tight font-mono">{numericScore}/100</span>
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* ALERTAS CRÍTICAS DE BAREMACIÓN */}
-            {report.alerts && report.alerts.length > 0 && (
+            {allAlerts.length > 0 && (
               <div className="flex flex-col gap-2.5 bg-red-950/20 border border-red-900/40 p-4 rounded-xl text-xs text-red-400 font-medium">
-                {report.alerts.map((alert: string, aIdx: number) => (
+                {allAlerts.map((alert: string, aIdx: number) => (
                   <div key={aIdx} className="flex items-start gap-2">
                     <span>⚠️</span>
                     <span>{alert}</span>

@@ -17,10 +17,16 @@ import { AttemptOwnerGuard } from '../guards/attempt-owner.guard';
 import { SubmitAnswerBodyDto } from '../dto/submit-answer.dto';
 import { SubmitFeedbackDto } from '../dto/submit-feedback.dto';
 import { EvaluationQueueProducer } from '../services/evaluation-queue.producer';
+import { IgaCalculatorService } from '../services/iga-calculator.service';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import * as fs from 'fs';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
+
+export class RecalcularIgaDto {
+  @ApiProperty({ description: 'ID del perfil de puesto a asignar (UUID)', example: 'a1b2c3d4-5e6f-7a8b-9c0d-1e2f3a4b5c6d', required: false })
+  perfilId?: string;
+}
 
 export class SubmitSnapshotDto {
   @ApiProperty({ description: 'Imagen capturada de la webcam codificada en Base64', example: 'data:image/jpeg;base64,...' })
@@ -63,6 +69,7 @@ export class EvaluationController {
   constructor(
     private readonly queueProducer: EvaluationQueueProducer,
     private readonly prisma: PrismaService,
+    private readonly igaCalculator: IgaCalculatorService,
   ) {}
 
   private static invitationsMemory: any[] = [];
@@ -320,7 +327,7 @@ export class EvaluationController {
     for (const att of attempts) {
       const user = await this.prisma.user.findUnique({
         where: { id: att.userId },
-        select: { name: true, email: true }
+        select: { firstName: true, lastName: true, email: true }
       });
 
       const exam = await this.prisma.exam.findUnique({
@@ -336,7 +343,7 @@ export class EvaluationController {
 
       result.push({
         id: att.id,
-        candidateName: user?.name || 'Candidato Externo',
+        candidateName: user ? `${user.firstName} ${user.lastName}`.trim() : 'Candidato Externo',
         email: user?.email || 'unknown@example.com',
         assessmentTitle: exam?.title || 'Evaluación Psicométrica',
         date: att.submittedAt ? att.submittedAt.toLocaleString() : att.startedAt.toLocaleString(),
@@ -381,7 +388,7 @@ export class EvaluationController {
 
     const user = await this.prisma.user.findUnique({
       where: { id: att.userId },
-      select: { name: true, email: true }
+      select: { firstName: true, lastName: true, email: true }
     });
 
     const exam = await this.prisma.exam.findUnique({
@@ -418,7 +425,7 @@ export class EvaluationController {
     }));
 
     return {
-      candidateName: user?.name || 'Candidato Externo',
+      candidateName: user ? `${user.firstName} ${user.lastName}`.trim() : 'Candidato Externo',
       email: user?.email || 'unknown@example.com',
       assessmentTitle: exam?.title || 'Evaluación Psicométrica',
       date: att.submittedAt ? att.submittedAt.toLocaleString() : att.startedAt.toLocaleString(),
@@ -498,14 +505,14 @@ export class EvaluationController {
 
       // 4. Registrar en la bitácora de auditoría (logs de proctoring)
       const lastLog = await this.prisma.attemptLog.findFirst({
-        where: { attemptId },
+        where: { examAttemptId: attemptId },
         orderBy: { timestamp: 'desc' },
       });
       const sequence = lastLog && lastLog.metadata ? ((lastLog.metadata as any).sequence || 0) + 1 : 1;
 
       await this.prisma.attemptLog.create({
         data: {
-          attemptId,
+          examAttemptId: attemptId,
           eventType: 'identity_snapshot',
           riskLevel: 'INFO',
           metadata: {
@@ -524,5 +531,141 @@ export class EvaluationController {
       this.logger.error(`Error al procesar la foto de supervisión: ${err.message}`, err.stack);
       throw new BadRequestException(`Fallo al almacenar la imagen en el servidor: ${err.message}`);
     }
+  }
+
+  /**
+   * Obtener resultados de la sesión, incluyendo IGA.
+   * GET /evaluations/attempts/:attemptId/resultados
+   */
+  @ApiOperation({ summary: 'Obtener resultados globales detallados e Índice IGA de un intento' })
+  @ApiParam({ name: 'attemptId', description: 'ID único del intento de evaluación (UUIDv7)', type: String })
+  @ApiResponse({ status: 200, description: 'Resultados e IGA calculados devueltos con éxito.' })
+  @Get('attempts/:attemptId/resultados')
+  async getAttemptResultados(@Param('attemptId', ParseUUIDPipe) attemptId: string) {
+    this.logger.log(`Obteniendo resultados e IGA para el intento: ${attemptId}`);
+
+    const attempt = await this.prisma.examAttempt.findUnique({
+      where: { id: attemptId },
+      include: {
+        resultadosTest: true,
+        resultadoGlobal: {
+          include: {
+            perfil: true,
+          },
+        },
+      },
+    });
+
+    if (!attempt) {
+      throw new BadRequestException('Intento de examen no encontrado.');
+    }
+
+    // Calcular IGA si no existe en la caché
+    let igaResult = null;
+    if (!attempt.resultadoGlobal) {
+      try {
+        igaResult = await this.igaCalculator.calcularIga(attemptId);
+      } catch (err) {
+        this.logger.warn(`Fallo al calcular IGA de forma automática: ${err.message}`);
+      }
+    } else {
+      igaResult = {
+        iga: Number(attempt.resultadoGlobal.iga),
+        recomendacion: attempt.resultadoGlobal.recomendacion,
+        alertas: attempt.resultadoGlobal.alertas as string[],
+      };
+    }
+
+    const testResults: Record<string, any> = {};
+    const dbTestResults = attempt.resultadosTest.length > 0
+      ? attempt.resultadosTest
+      : (await this.prisma.resultadoTest.findMany({ where: { examAttemptId: attemptId } }));
+
+    for (const r of dbTestResults) {
+      let categoria = 'Desconocido';
+      if (r.theta !== null && r.theta !== undefined) {
+        const thetaVal = Number(r.theta);
+        const cut = await this.prisma.cutScore.findFirst({
+          where: {
+            testId: r.testId,
+            thetaMin: { lte: thetaVal },
+            OR: [
+              { thetaMax: null },
+              { thetaMax: { gt: thetaVal } }
+            ]
+          }
+        });
+        if (cut) {
+          categoria = cut.categoria;
+        } else {
+          if (thetaVal < -1.5) categoria = 'Básico';
+          else if (thetaVal < 0.5) categoria = 'En desarrollo';
+          else if (thetaVal < 1.5) categoria = 'Competente';
+          else categoria = 'Sobresaliente';
+        }
+      } else if (r.percentil !== null && r.percentil !== undefined) {
+        const pctVal = Number(r.percentil);
+        if (pctVal < 25) categoria = 'Básico';
+        else if (pctVal < 75) categoria = 'En desarrollo';
+        else if (pctVal < 90) categoria = 'Competente';
+        else categoria = 'Sobresaliente';
+      }
+
+      testResults[r.testId] = {
+        puntaje_bruto: Number(r.puntajeBruto),
+        percentil: r.percentil !== null ? Number(r.percentil) : null,
+        theta: r.theta !== null ? Number(r.theta) : null,
+        theta_error: r.thetaError !== null ? Number(r.thetaError) : null,
+        theta_t: r.thetaT !== null ? Number(r.thetaT) : null,
+        theta_ci: r.thetaCi !== null ? Number(r.thetaCi) : null,
+        irt_calculated: r.irtCalculated,
+        categoria,
+      };
+    }
+
+    return {
+      sesion_id: attemptId,
+      perfil_puesto: attempt.resultadoGlobal?.perfil?.nombre || 'Gerente General (Default)',
+      estado: attempt.status,
+      resultados_por_test: testResults,
+      iga: igaResult ? {
+        valor: igaResult.iga,
+        recomendacion: igaResult.recomendacion,
+        alertas: igaResult.alertas,
+      } : null,
+    };
+  }
+
+  /**
+   * Forzar recálculo del IGA (útil si se cambió el perfil de puesto).
+   * POST /evaluations/attempts/:attemptId/recalcular-iga
+   */
+  @ApiOperation({ summary: 'Forzar recálculo del Índice IGA asignando un perfil de puesto' })
+  @ApiParam({ name: 'attemptId', description: 'ID único del intento de evaluación (UUIDv7)', type: String })
+  @ApiResponse({ status: 200, description: 'IGA recalculado con éxito.' })
+  @Post('attempts/:attemptId/recalcular-iga')
+  @HttpCode(HttpStatus.OK)
+  async recalcularIga(
+    @Param('attemptId', ParseUUIDPipe) attemptId: string,
+    @Body() body: RecalcularIgaDto,
+  ) {
+    this.logger.log(`Petición de recálculo de IGA para intento: ${attemptId} con perfil: ${body.perfilId}`);
+
+    const igaResult = await this.igaCalculator.calcularIga(attemptId, body.perfilId);
+
+    return this.getAttemptResultados(attemptId);
+  }
+
+  /**
+   * Obtener la lista de perfiles de puesto.
+   * GET /evaluations/perfiles
+   */
+  @ApiOperation({ summary: 'Obtener la lista de todos los perfiles de puesto configurados' })
+  @ApiResponse({ status: 200, description: 'Lista de perfiles devuelta con éxito.' })
+  @Get('perfiles')
+  async getPerfiles() {
+    return this.prisma.perfilPuesto.findMany({
+      orderBy: { nombre: 'asc' },
+    });
   }
 }

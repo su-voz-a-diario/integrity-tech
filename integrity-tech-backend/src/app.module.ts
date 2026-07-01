@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
 import { DatabaseModule } from './shared/database/database.module';
 import { IamModule } from './modules/iam';
 import { ExamsModule } from './modules/exams/exams.module';
@@ -10,6 +11,9 @@ import { LtiModule } from './modules/lti/lti.module';
 
 @Module({
   imports: [
+    // 0. Habilitar tareas programadas (Schedule)
+    ScheduleModule.forRoot(),
+
     // 1. Configuración global de la conexión a Redis para las colas BullMQ
     BullModule.forRoot({
       redis: {

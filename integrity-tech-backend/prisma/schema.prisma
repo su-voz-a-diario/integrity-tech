@@ -32,6 +32,10 @@ model User {
   firstName      String   @map("first_name") @db.VarChar(100)
   lastName       String   @map("last_name") @db.VarChar(100)
   isActive       Boolean  @default(true) @map("is_active")
+  pais           String?  @db.VarChar(100)
+  sector         String?  @db.VarChar(100)
+  nivelEducativo String?  @map("nivel_educativo") @db.VarChar(100)
+  tipoPuesto     String?  @map("tipo_puesto") @db.VarChar(100)
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -182,6 +186,8 @@ model ExamAttempt {
   submissions AnswerSubmission[]
   logs        AttemptLog[]
   ltiMapping  LtiAttemptMapping?
+  resultadosTest  ResultadoTest[]
+  resultadoGlobal ResultadoGlobal?
 
   @@map("exam_attempts")
 }
@@ -241,5 +247,162 @@ model CandidateInvitation {
   updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   @@map("candidate_invitations")
+}
+
+model PerfilPuesto {
+  id             String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  nombre         String   @db.VarChar(100)
+  wIntegridad    Decimal  @map("w_integridad") @db.Decimal(5, 4)
+  wPersonalidad  Decimal  @map("w_personalidad") @db.Decimal(5, 4)
+  wCognitivo     Decimal  @map("w_cognitivo") @db.Decimal(5, 4)
+  wCompetencias  Decimal  @map("w_competencias") @db.Decimal(5, 4)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  resultadosGlobales ResultadoGlobal[]
+
+  @@map("perfiles_puesto")
+}
+
+model ResultadoTest {
+  id            String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  examAttemptId String   @map("exam_attempt_id") @db.Uuid
+  testId        String   @map("test_id") @db.VarChar(50) // 'IT2_I', 'IT2_P10', 'IT2_AC10', 'IT2_CB10'
+  puntajeBruto  Decimal  @map("puntaje_bruto") @db.Decimal(10, 2)
+  percentil     Decimal? @db.Decimal(5, 2)
+  theta         Float?
+  thetaError    Float?   @map("theta_error")
+  thetaT        Float?   @map("theta_t")
+  thetaCi       Float?   @map("theta_ci")
+  irtCalculated Boolean  @default(false) @map("irt_calculated")
+  fechaCalculo  DateTime @default(now()) @map("fecha_calculo") @db.Timestamptz
+
+  attempt       ExamAttempt @relation(fields: [examAttemptId], references: [id], onDelete: Cascade)
+
+  @@unique([examAttemptId, testId])
+  @@map("resultados_test")
+}
+
+model Baremo {
+  id                 String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  testId             String   @map("test_id") @db.VarChar(50)
+  percentil          Decimal  @db.Decimal(5, 2)
+  puntajeRawMin      Decimal  @map("puntaje_raw_min") @db.Decimal(10, 2)
+  puntajeRawMax      Decimal  @map("puntaje_raw_max") @db.Decimal(10, 2)
+  fechaActualizacion DateTime @default(now()) @map("fecha_actualizacion") @db.Timestamptz
+
+  @@unique([testId, percentil])
+  @@map("baremos")
+}
+
+model ResultadoGlobal {
+  examAttemptId String   @id @map("exam_attempt_id") @db.Uuid
+  perfilId      String   @map("perfil_id") @db.Uuid
+  iga           Decimal  @db.Decimal(5, 2)
+  recomendacion String   @db.VarChar(50)
+  alertas       Json     @db.JsonB
+  fechaCalculo  DateTime @default(now()) @map("fecha_calculo") @db.Timestamptz
+
+  attempt       ExamAttempt  @relation(fields: [examAttemptId], references: [id], onDelete: Cascade)
+  perfil        PerfilPuesto @relation(fields: [perfilId], references: [id], onDelete: Cascade)
+
+  @@map("resultados_globales")
+}
+
+model ParametrosItems {
+  id               Int      @id @default(autoincrement())
+  testId           String   @map("test_id") @db.VarChar(50) // ej: 'IT2_AC10'
+  itemId           String   @map("item_id") @db.VarChar(50)
+  modelo           String   @db.VarChar(10) // '2PL' o 'GRM'
+  parametroA       Float    @map("parametro_a")
+  parametroB       Float?   @map("parametro_b") // Para 2PL; para GRM es null
+  parametroC1      Float?   @map("parametro_c1") // Umbral 1 (GRM)
+  parametroC2      Float?   @map("parametro_c2")
+  parametroC3      Float?   @map("parametro_c3")
+  parametroC4      Float?   @map("parametro_c4")
+  errorEstandar    Float?   @map("error_estandar")
+  fechaCalibracion DateTime @default(now()) @map("fecha_calibracion") @db.Timestamptz
+  flagDif          Boolean  @default(false) @map("flag_dif")
+  pValueAjuste     Float?   @map("p_value_ajuste")
+  rmseaItem        Float?   @map("rmsea_item")
+  activo           Boolean  @default(true) @map("activo")
+
+  @@unique([testId, itemId])
+  @@map("parametros_items")
+}
+
+model BaremosDinamicos {
+  id             Int      @id @default(autoincrement())
+  testId         String   @map("test_id") @db.VarChar(50)
+  pais           String?  @db.VarChar(100)
+  sector         String?  @db.VarChar(100)
+  nivelEducativo String?  @map("nivel_educativo") @db.VarChar(100)
+  tipoPuesto     String?  @map("tipo_puesto") @db.VarChar(100)
+  thetaMin       Float    @map("theta_min")
+  thetaMax       Float    @map("theta_max")
+  percentil      Int
+  nMuestra       Int      @map("n_muestra")
+  fechaCreacion  DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+
+  @@index([testId, pais, sector, nivelEducativo, tipoPuesto])
+  @@map("baremos_dinamicos")
+}
+
+model DifFlags {
+  id      Int      @id @default(autoincrement())
+  testId  String   @map("test_id") @db.VarChar(50)
+  itemId  String   @map("item_id") @db.VarChar(50)
+  variable String   @db.VarChar(100)
+  metodo   String   @db.VarChar(100)
+  pValue   Float    @map("p_value")
+  flag     Boolean
+  fecha    DateTime @default(now()) @map("fecha") @db.Timestamptz
+
+  @@map("dif_flags")
+}
+
+model PsychometricQualityLog {
+  id                  Int      @id @default(autoincrement())
+  testId              String   @map("test_id") @db.VarChar(50)
+  fecha               DateTime @default(now()) @map("fecha") @db.Timestamptz
+  nAttempts           Int      @map("n_attempts")
+  meanTheta           Float    @map("mean_theta")
+  sdTheta             Float    @map("sd_theta")
+  driftAlert          Boolean  @default(false) @map("drift_alert")
+  marginalReliability Float    @default(0.80) @map("marginal_reliability")
+
+  @@map("psychometric_quality_logs")
+}
+
+model CutScore {
+  id        Int     @id @default(autoincrement())
+  testId    String  @map("test_id") @db.VarChar(50)
+  categoria String  @db.VarChar(100)
+  thetaMin  Float   @map("theta_min")
+  thetaMax  Float?  @map("theta_max")
+  orden     Int
+
+  @@map("cut_scores")
+}
+
+model ParametrosItemsHistorial {
+  id               Int      @id @default(autoincrement())
+  testId           String   @map("test_id") @db.VarChar(50)
+  itemId           String   @map("item_id") @db.VarChar(50)
+  modelo           String   @db.VarChar(10)
+  parametroA       Float    @map("parametro_a")
+  parametroB       Float?   @map("parametro_b")
+  parametroC1      Float?   @map("parametro_c1")
+  parametroC2      Float?   @map("parametro_c2")
+  parametroC3      Float?   @map("parametro_c3")
+  parametroC4      Float?   @map("parametro_c4")
+  errorEstandar    Float?   @map("error_estandar")
+  pValueAjuste     Float?   @map("p_value_ajuste")
+  rmseaItem        Float?   @map("rmsea_item")
+  flagDif          Boolean  @map("flag_dif")
+  fechaCalibracion DateTime @map("fecha_calibracion") @db.Timestamptz
+  fechaArchivado   DateTime @default(now()) @map("fecha_archivado") @db.Timestamptz
+
+  @@map("parametros_items_historial")
 }
 

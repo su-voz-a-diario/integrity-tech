@@ -2,9 +2,13 @@ import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bull';
 import { IamModule } from '../iam';
 import { EvaluationController } from './controllers/evaluation.controller';
+import { PsicometriaController } from './controllers/psicometria.controller';
 import { EvaluationQueueProducer } from './services/evaluation-queue.producer';
 import { AnswersQueueProcessor } from './services/answers-queue.processor';
 import { ProctoringQueueProcessor } from './services/proctoring-queue.processor';
+import { IgaCalculatorService } from './services/iga-calculator.service';
+import { ThetaCalculatorService } from './services/theta-calculator.service';
+import { CronCalibrationService } from './services/cron-calibration.service';
 
 @Module({
   imports: [
@@ -20,14 +24,21 @@ import { ProctoringQueueProcessor } from './services/proctoring-queue.processor'
   ],
   controllers: [
     EvaluationController, // Registramos el controlador HTTP REST
+    PsicometriaController,
   ],
   providers: [
     EvaluationQueueProducer,
     AnswersQueueProcessor,
     ProctoringQueueProcessor,
+    IgaCalculatorService,
+    ThetaCalculatorService,
+    CronCalibrationService,
   ],
   exports: [
     EvaluationQueueProducer,
+    IgaCalculatorService,
+    ThetaCalculatorService,
+    CronCalibrationService,
   ],
 })
 export class EvaluationsModule {}

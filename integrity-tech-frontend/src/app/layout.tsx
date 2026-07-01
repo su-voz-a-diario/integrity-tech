@@ -2,8 +2,11 @@ import './globals.css';
 import React from 'react';
 
 export const metadata = {
-  title: 'Integrity-Tech',
+  title: 'Integrity Tech',
   description: 'Plataforma resiliente de evaluaciones con auditoría forense',
+  icons: {
+    icon: '/integrity-logo-2.png',
+  },
 };
 
 export default function RootLayout({
