@@ -10,23 +10,19 @@ export default function WelcomePage() {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6 text-center font-sans gap-8">
       
       {/* HEADER LOGO */}
-      <div className="flex flex-col items-center gap-4">
+      <div className="flex flex-col items-center gap-6">
         <img 
           src="/integrity-logo-2.png" 
           alt="Integrity Tech Logo" 
-          className="w-40 md:w-48 h-auto object-contain hover:scale-105 transition-all duration-350"
+          className="w-72 md:w-80 h-auto object-contain hover:scale-105 transition-all duration-300"
         />
         <div className="flex flex-col items-center select-none">
-          <h1 className="text-3xl md:text-4xl font-extrabold tracking-wider bg-gradient-to-r from-amber-200 via-yellow-400 to-amber-500 bg-clip-text text-transparent uppercase font-serif">
+          <h1 className="text-4xl md:text-5xl font-light tracking-[0.2em] bg-gradient-to-r from-amber-100 via-yellow-300 to-amber-500 bg-clip-text text-transparent uppercase font-sans">
             Integrity
           </h1>
-          <h2 className="text-2xl md:text-3xl font-bold tracking-widest text-slate-100 uppercase font-serif mt-0.5">
-            Test
+          <h2 className="text-lg md:text-xl font-light tracking-[0.3em] text-slate-300 uppercase font-sans mt-2">
+            - Test -
           </h2>
-          <div className="h-[2px] w-20 bg-gradient-to-r from-transparent via-amber-400 to-transparent my-2" />
-          <p className="text-3xs uppercase tracking-widest text-amber-400/80 font-bold font-sans">
-            Integrity Tech Suite
-          </p>
         </div>
         <p className="text-xs text-slate-400 max-w-sm leading-relaxed mt-1">
           Plataforma de evaluación psicométrica resiliente con supervisión forense y LTI.
