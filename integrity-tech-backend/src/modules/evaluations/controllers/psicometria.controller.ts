@@ -1,5 +1,10 @@
 import { Controller, Get, Post, Param, Query, HttpCode, HttpStatus, Logger, NotFoundException, ConflictException, Body } from '@nestjs/common';
 import { ThetaCalculatorService } from '../services/theta-calculator.service';
+import { PersonFitService } from '../services/person-fit.service';
+import { CatService } from '../services/cat.service';
+import { ReportGeneratorService } from '../services/report-generator.service';
+import { AdverseImpactService } from '../services/adverse-impact.service';
+import { RoiService } from '../services/roi.service';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 
@@ -10,6 +15,11 @@ export class PsicometriaController {
 
   constructor(
     private readonly thetaService: ThetaCalculatorService,
+    private readonly personFitService: PersonFitService,
+    private readonly catService: CatService,
+    private readonly reportService: ReportGeneratorService,
+    private readonly adverseImpactService: AdverseImpactService,
+    private readonly roiService: RoiService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -275,6 +285,7 @@ export class PsicometriaController {
 
       if (patterns.length > 0) {
         const { theta, error, thetaT, thetaCi } = await this.thetaService.calcularTheta(testId, patterns);
+        const { lz, aberrante } = await this.personFitService.calculatePersonFit(testId, patterns, theta);
 
         const attempt = await this.prisma.examAttempt.findUnique({
           where: { id: r.examAttemptId },
@@ -314,6 +325,8 @@ export class PsicometriaController {
             thetaError: error,
             thetaT,
             thetaCi,
+            personFitLz: lz,
+            aberrante,
             percentil: percentilFinal,
           },
         });
@@ -393,5 +406,40 @@ export class PsicometriaController {
         }
       });
     });
+  }
+
+  @ApiOperation({ summary: 'Generar reporte narrativo (NLG) para un intento de examen' })
+  @ApiParam({ name: 'attempt_id', description: 'ID del intento (ej. UUID v7)' })
+  @Get('api/v1/psicometria/reporte/:attempt_id/narrativo')
+  async getReporteNarrativo(@Param('attempt_id') attemptId: string) {
+    const content = await this.reportService.generateNarrativeReport(attemptId);
+    return {
+      status: 'success',
+      reporteMarkdown: content,
+    };
+  }
+
+  @ApiOperation({ summary: 'Calcular el Impacto Adverso por demografías de grupo (Regla del 80%)' })
+  @ApiParam({ name: 'test_id', description: 'ID del test (ej. IT2_AC10)' })
+  @Get('api/v1/psicometria/impacto-adverso/:test_id')
+  async getImpactoAdverso(@Param('test_id') testId: string) {
+    return this.adverseImpactService.calculateAdverseImpact(testId);
+  }
+
+  @ApiOperation({ summary: 'Calcular el ROI del talento mediante modelo BCG (Brogden-Cronbach-Gleser)' })
+  @Post('api/v1/psicometria/roi/calcular')
+  async getRoiCalcular(@Body() body: any) {
+    return this.roiService.calculateROI(body);
+  }
+
+  @ApiOperation({ summary: 'Seleccionar siguiente reactivo adaptativo CAT utilizando MII' })
+  @Post('api/v1/psicometria/cat/siguiente')
+  async selectCatItem(@Body() body: { testId: string; answeredItemIds: string[]; currentTheta: number; provisionalSe: number }) {
+    return this.catService.selectNextItem(
+      body.testId,
+      body.answeredItemIds,
+      body.currentTheta,
+      body.provisionalSe
+    );
   }
 }

@@ -274,6 +274,8 @@ model ResultadoTest {
   thetaError    Float?   @map("theta_error")
   thetaT        Float?   @map("theta_t")
   thetaCi       Float?   @map("theta_ci")
+  personFitLz   Float?   @map("person_fit_lz")
+  aberrante     Boolean  @default(false) @map("aberrante")
   irtCalculated Boolean  @default(false) @map("irt_calculated")
   fechaCalculo  DateTime @default(now()) @map("fecha_calculo") @db.Timestamptz
 

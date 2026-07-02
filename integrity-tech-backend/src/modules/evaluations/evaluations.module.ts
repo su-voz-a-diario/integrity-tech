@@ -9,6 +9,11 @@ import { ProctoringQueueProcessor } from './services/proctoring-queue.processor'
 import { IgaCalculatorService } from './services/iga-calculator.service';
 import { ThetaCalculatorService } from './services/theta-calculator.service';
 import { CronCalibrationService } from './services/cron-calibration.service';
+import { PersonFitService } from './services/person-fit.service';
+import { CatService } from './services/cat.service';
+import { ReportGeneratorService } from './services/report-generator.service';
+import { AdverseImpactService } from './services/adverse-impact.service';
+import { RoiService } from './services/roi.service';
 
 @Module({
   imports: [
@@ -33,12 +38,22 @@ import { CronCalibrationService } from './services/cron-calibration.service';
     IgaCalculatorService,
     ThetaCalculatorService,
     CronCalibrationService,
+    PersonFitService,
+    CatService,
+    ReportGeneratorService,
+    AdverseImpactService,
+    RoiService,
   ],
   exports: [
     EvaluationQueueProducer,
     IgaCalculatorService,
     ThetaCalculatorService,
     CronCalibrationService,
+    PersonFitService,
+    CatService,
+    ReportGeneratorService,
+    AdverseImpactService,
+    RoiService,
   ],
 })
 export class EvaluationsModule {}

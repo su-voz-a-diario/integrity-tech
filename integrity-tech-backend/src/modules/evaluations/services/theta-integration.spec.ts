@@ -1,17 +1,28 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ThetaCalculatorService } from './theta-calculator.service';
 import { IgaCalculatorService } from './iga-calculator.service';
+import { PersonFitService } from './person-fit.service';
+import { CatService } from './cat.service';
+import { ReportGeneratorService } from './report-generator.service';
+import { AdverseImpactService } from './adverse-impact.service';
+import { RoiService } from './roi.service';
 import { PrismaService } from '../../../shared/database/prisma.service';
 
 describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)', () => {
   let thetaService: ThetaCalculatorService;
   let igaService: IgaCalculatorService;
+  let personFitService: PersonFitService;
+  let catService: CatService;
+  let reportService: ReportGeneratorService;
+  let adverseService: AdverseImpactService;
+  let roiService: RoiService;
   let prisma: PrismaService;
 
   // Mock de la base de datos completo para simular tablas y relaciones
   const dbMocks = {
     parametrosItems: {
       findMany: jest.fn(),
+      count: jest.fn(),
     },
     examAttempt: {
       findUnique: jest.fn(),
@@ -19,6 +30,7 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
     },
     user: {
       findUnique: jest.fn(),
+      findMany: jest.fn(),
     },
     perfilPuesto: {
       findUnique: jest.fn(),
@@ -41,6 +53,11 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
       providers: [
         ThetaCalculatorService,
         IgaCalculatorService,
+        PersonFitService,
+        CatService,
+        ReportGeneratorService,
+        AdverseImpactService,
+        RoiService,
         {
           provide: PrismaService,
           useValue: dbMocks,
@@ -50,6 +67,11 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
 
     thetaService = module.get<ThetaCalculatorService>(ThetaCalculatorService);
     igaService = module.get<IgaCalculatorService>(IgaCalculatorService);
+    personFitService = module.get<PersonFitService>(PersonFitService);
+    catService = module.get<CatService>(CatService);
+    reportService = module.get<ReportGeneratorService>(ReportGeneratorService);
+    adverseService = module.get<AdverseImpactService>(AdverseImpactService);
+    roiService = module.get<RoiService>(RoiService);
     prisma = module.get<PrismaService>(PrismaService);
     
     jest.clearAllMocks();
@@ -158,5 +180,77 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
       expect(r.thetaT).toBeDefined();
       expect(r.thetaCi).toBeDefined();
     }
+  });
+
+  it('Debe validar todos los módulos avanzados (Person-Fit, CAT, Adverse Impact, NLG, ROI)', async () => {
+    // 1. Person-Fit
+    dbMocks.parametrosItems.findMany.mockResolvedValue([
+      { itemId: 'Q1', modelo: '2PL', parametroA: 1.5, parametroB: -0.5, activo: true },
+      { itemId: 'Q2', modelo: '2PL', parametroA: 1.2, parametroB: 0.5, activo: true },
+    ]);
+    const lzResult = await personFitService.calculatePersonFit('IT2_AC10', [
+      { itemId: 'Q1', response: 1 },
+      { itemId: 'Q2', response: 0 },
+    ], 0.5);
+    expect(lzResult.lz).toBeDefined();
+    expect(lzResult.aberrante).toBe(false);
+
+    // 2. CAT
+    const catResult = await catService.selectNextItem('IT2_AC10', ['Q1'], 0.5, 0.4);
+    expect(catResult.nextItemId).toBe('Q2');
+    expect(catResult.shouldStop).toBe(false);
+
+    // 3. NLG Report
+    dbMocks.examAttempt.findUnique.mockResolvedValue({
+      id: 'attempt-uuid',
+      userId: 'user-uuid',
+      createdAt: new Date(),
+      score: 85.0,
+      resultadosTest: [
+        { testId: 'IT2_AC10', theta: 0.5, percentil: 75.0, thetaT: 55.0, thetaCi: 107.5, aberrante: false, personFitLz: -0.2 }
+      ]
+    });
+    dbMocks.user.findUnique.mockResolvedValue({
+      id: 'user-uuid',
+      firstName: 'Ricardo',
+      lastName: 'Garcia',
+      email: 'ricardo@test.com'
+    });
+    const nlgReport = await reportService.generateNarrativeReport('attempt-uuid');
+    expect(nlgReport).toContain('Reporte Psicométrico');
+    expect(nlgReport).toContain('Ricardo');
+
+    // 4. Adverse Impact (80% Rule)
+    dbMocks.resultadoTest.findMany.mockResolvedValue([
+      {
+        theta: 0.5,
+        irtCalculated: true,
+        attempt: { userId: 'user-1' }
+      },
+      {
+        theta: -0.2,
+        irtCalculated: true,
+        attempt: { userId: 'user-2' }
+      }
+    ]);
+    dbMocks.user.findMany.mockResolvedValue([
+      { id: 'user-1', pais: 'Colombia' },
+      { id: 'user-2', pais: 'México' }
+    ]);
+    const adverseResult = await adverseService.calculateAdverseImpact('IT2_AC10');
+    expect(adverseResult.testId).toBe('IT2_AC10');
+
+    // 5. Talent ROI (BCG Model)
+    const roiResult = roiService.calculateROI({
+      contratacionesAnuales: 10,
+      permanenciaMediaAnos: 2,
+      coeficienteValidez: 0.35,
+      salarioMedioAnual: 30000,
+      tasaSeleccion: 0.20,
+      costoPorCandidato: 10,
+      totalCandidatosEvaluados: 100
+    });
+    expect(roiResult.utilidadNetaAcumulada).toBeGreaterThan(0);
+    expect(roiResult.retornoInversionPorcentaje).toBeGreaterThan(0);
   });
 });

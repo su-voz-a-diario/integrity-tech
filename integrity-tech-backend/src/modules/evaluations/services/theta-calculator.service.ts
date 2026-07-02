@@ -257,7 +257,7 @@ export class ThetaCalculatorService implements OnModuleInit {
   /**
    * Evalúa la probabilidad de respuesta para un ítem en un theta específico con una categoría dada.
    */
-  private evaluarProbabilidadItemAtTheta(item: any, theta: number, response: number): number {
+  public evaluarProbabilidadItemAtTheta(item: any, theta: number, response: number): number {
     const tempItem = {
       ...item,
       a: item.parametroA,
@@ -373,5 +373,21 @@ export class ThetaCalculatorService implements OnModuleInit {
     const avgErrorVar = den > 0.0 ? (expectedErrorVar / den) : 1.0;
     const rel = varTheta / (varTheta + avgErrorVar);
     return Math.round(Math.max(0.0, Math.min(0.999, rel)) * 1000) / 1000;
+  }
+
+  /**
+   * Obtiene los parámetros de ítems para un test_id cargados en caché.
+   */
+  async getCachedParameters(testId: string): Promise<any[]> {
+    let params = this.parameterCache.get(testId);
+    if (!params || params.length === 0) {
+      params = await this.prisma.parametrosItems.findMany({
+        where: { testId, activo: true },
+      });
+      if (params.length > 0) {
+        this.parameterCache.set(testId, params);
+      }
+    }
+    return params || [];
   }
 }

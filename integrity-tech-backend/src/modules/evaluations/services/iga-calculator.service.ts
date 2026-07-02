@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { ThetaCalculatorService } from './theta-calculator.service';
+import { PersonFitService } from './person-fit.service';
 
 export interface IgaCalculationResult {
   iga: number;
@@ -24,6 +25,7 @@ export class IgaCalculatorService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly thetaCalculator: ThetaCalculatorService,
+    private readonly personFitService: PersonFitService,
   ) {}
 
   /**
@@ -188,6 +190,7 @@ export class IgaCalculatorService {
 
           if (paramsCount > 0) {
             const { theta, error, thetaT, thetaCi } = await this.thetaCalculator.calcularTheta(testId, patterns);
+            const { lz, aberrante } = await this.personFitService.calculatePersonFit(testId, patterns, theta);
             
             let percentilFinal = 50.0;
             try {
@@ -217,6 +220,8 @@ export class IgaCalculatorService {
                 thetaError: error,
                 thetaT,
                 thetaCi,
+                personFitLz: lz,
+                aberrante,
                 irtCalculated: true,
               },
             });

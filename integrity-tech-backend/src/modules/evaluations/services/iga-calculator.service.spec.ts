@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { IgaCalculatorService } from './iga-calculator.service';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { ThetaCalculatorService } from './theta-calculator.service';
+import { PersonFitService } from './person-fit.service';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 
 describe('IgaCalculatorService (Unit Tests)', () => {
@@ -36,6 +37,10 @@ describe('IgaCalculatorService (Unit Tests)', () => {
     calcularTheta: jest.fn(),
   };
 
+  const mockPersonFitService = {
+    calculatePersonFit: jest.fn().mockResolvedValue({ lz: 0.0, aberrante: false }),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -47,6 +52,10 @@ describe('IgaCalculatorService (Unit Tests)', () => {
         {
           provide: ThetaCalculatorService,
           useValue: mockThetaService,
+        },
+        {
+          provide: PersonFitService,
+          useValue: mockPersonFitService,
         },
       ],
     }).compile();
