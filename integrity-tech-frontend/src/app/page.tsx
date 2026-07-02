@@ -10,13 +10,19 @@ export default function WelcomePage() {
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6 text-center font-sans gap-8">
       
       {/* HEADER LOGO */}
-      <div className="flex flex-col items-center gap-6">
-        <div className="relative w-72 sm:w-80 md:w-[26rem] lg:w-[30rem] h-auto flex items-center justify-center">
-          <img 
-            src="/integrity-logo-2.png" 
-            alt="Integrity Test Logo" 
-            className="w-full h-auto object-contain hover:scale-[1.03] transition-transform duration-300 ease-out"
-          />
+      <div className="flex flex-col items-center gap-4">
+        <img 
+          src="/integrity-logo-2.png" 
+          alt="Integrity Test Logo" 
+          className="w-32 sm:w-36 md:w-44 h-auto object-contain hover:scale-105 transition-all duration-300"
+        />
+        <div className="flex flex-col items-center select-none mt-2">
+          <h1 className="text-4xl md:text-5xl font-light tracking-[0.2em] bg-gradient-to-r from-amber-100 via-yellow-300 to-amber-500 bg-clip-text text-transparent uppercase font-sans">
+            Integrity
+          </h1>
+          <h2 className="text-lg md:text-xl font-light tracking-[0.3em] text-slate-300 uppercase font-sans mt-2">
+            - Test -
+          </h2>
         </div>
         <p className="text-xs md:text-sm text-slate-400 max-w-sm leading-relaxed mt-2 px-4">
           Plataforma de evaluación psicométrica resiliente con supervisión forense y LTI.

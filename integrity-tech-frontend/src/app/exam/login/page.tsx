@@ -121,9 +121,17 @@ function CandidateLoginForm() {
         <img 
           src="/integrity-logo-2.png" 
           alt="Integrity Test Logo" 
-          className="w-40 sm:w-48 h-auto object-contain hover:scale-105 transition-all duration-300"
+          className="w-24 sm:w-28 h-auto object-contain hover:scale-105 transition-all duration-300"
         />
-        <p className="text-2xs text-slate-400 max-w-xs leading-relaxed mt-2">
+        <div className="flex flex-col items-center select-none mt-1">
+          <h1 className="text-2xl font-light tracking-[0.2em] bg-gradient-to-r from-amber-100 via-yellow-300 to-amber-500 bg-clip-text text-transparent uppercase font-sans">
+            Integrity
+          </h1>
+          <h2 className="text-sm font-light tracking-[0.3em] text-slate-300 uppercase font-sans mt-1">
+            - Test -
+          </h2>
+        </div>
+        <p className="text-2xs text-slate-400 max-w-xs leading-relaxed mt-1">
           Acceso seguro a evaluaciones psicométricas bajo supervisión forense de conducta.
         </p>
       </div>
