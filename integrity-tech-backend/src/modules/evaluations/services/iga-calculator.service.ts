@@ -189,7 +189,7 @@ export class IgaCalculatorService {
           });
 
           if (paramsCount > 0) {
-            const { theta, error, thetaT, thetaCi } = await this.thetaCalculator.calcularTheta(testId, patterns);
+            const { theta, error, thetaT, thetaCi, engagement } = await this.thetaCalculator.calcularTheta(testId, patterns);
             const { lz, aberrante } = await this.personFitService.calculatePersonFit(testId, patterns, theta);
             
             let percentilFinal = 50.0;
@@ -221,7 +221,8 @@ export class IgaCalculatorService {
                 thetaT,
                 thetaCi,
                 personFitLz: lz,
-                aberrante,
+                aberrante: aberrante || (engagement < 0.7),
+                engagement,
                 irtCalculated: true,
               },
             });

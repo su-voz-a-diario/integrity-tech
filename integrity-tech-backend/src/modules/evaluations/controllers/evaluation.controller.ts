@@ -256,6 +256,7 @@ export class EvaluationController {
       attemptId,
       questionId: body.questionId,
       response: body.response,
+      tiempoMs: body.tiempoMs,
     });
 
     return {

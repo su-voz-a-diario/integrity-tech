@@ -15,6 +15,7 @@ import { ReportGeneratorService } from './services/report-generator.service';
 import { AdverseImpactService } from './services/adverse-impact.service';
 import { RoiService } from './services/roi.service';
 import { ContinuousNormingService } from './services/continuous-norming.service';
+import { RapidGuessingService } from './services/rapid-guessing.service';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { ContinuousNormingService } from './services/continuous-norming.service'
     AdverseImpactService,
     RoiService,
     ContinuousNormingService,
+    RapidGuessingService,
   ],
   exports: [
     EvaluationQueueProducer,
@@ -57,6 +59,7 @@ import { ContinuousNormingService } from './services/continuous-norming.service'
     AdverseImpactService,
     RoiService,
     ContinuousNormingService,
+    RapidGuessingService,
   ],
 })
 export class EvaluationsModule {}

@@ -24,14 +24,23 @@ export const QuestionRenderer: React.FC<QuestionProps> = ({ question }) => {
   const setAnswerStore = useExamStore((state) => state.setAnswer);
   const attemptId = useExamStore((state) => state.attemptId);
 
+  const startTimeRef = React.useRef(Date.now());
+
+  React.useEffect(() => {
+    startTimeRef.current = Date.now();
+  }, [question.id]);
+
   const handleResponseChange = async (responseValue: any) => {
     // 1. Actualizar el estado en memoria de Zustand de forma inmediata (reactividad fluida)
     setAnswerStore(question.id, responseValue);
 
+    // Calcular el tiempo transcurrido en ms
+    const elapsedMs = Date.now() - startTimeRef.current;
+
     // 2. Encolar asíncronamente en IndexedDB para la sincronización resiliente con el servidor
     if (attemptId && syncEngine) {
       try {
-        await syncEngine.queueAnswer(attemptId, question.id, responseValue);
+        await syncEngine.queueAnswer(attemptId, question.id, responseValue, elapsedMs);
       } catch (error) {
         console.error('Error al guardar la respuesta en cola local IndexedDB:', error);
       }

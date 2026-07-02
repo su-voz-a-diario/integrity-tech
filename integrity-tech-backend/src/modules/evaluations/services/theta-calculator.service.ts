@@ -1,10 +1,12 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../../shared/database/prisma.service';
+import { RapidGuessingService } from './rapid-guessing.service';
 
 export interface ItemResponsePattern {
   itemId: string;
   response: number; // 0 o 1 para 2PL; 0, 1, 2, 3, 4 para GRM (Likert 5 puntos)
+  tiempoMs?: number;
 }
 
 @Injectable()
@@ -60,7 +62,10 @@ export class ThetaCalculatorService implements OnModuleInit {
     { x: 8.21300090, w: 9.387994849202574e-30 },
   ];
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly rapidGuessing: RapidGuessingService,
+  ) {}
 
   async onModuleInit() {
     await this.loadAllParameters();
@@ -105,11 +110,11 @@ export class ThetaCalculatorService implements OnModuleInit {
    * Estima el nivel de habilidad latente (theta) de un candidato
    * utilizando la estimación de Esperanza A Posteriori (EAP).
    */
-  async calcularTheta(testId: string, respuestas: ItemResponsePattern[]): Promise<{ theta: number; error: number; thetaT: number; thetaCi: number }> {
+  async calcularTheta(testId: string, respuestas: ItemResponsePattern[]): Promise<{ theta: number; error: number; thetaT: number; thetaCi: number; engagement: number }> {
     const start = Date.now();
     
     if (respuestas.length === 0) {
-      return { theta: 0.0, error: 1.0, thetaT: 50.0, thetaCi: 100.0 };
+      return { theta: 0.0, error: 1.0, thetaT: 50.0, thetaCi: 100.0, engagement: 1.0 };
     }
 
     // 1. Obtener los parámetros de los ítems (desde caché o base de datos)
@@ -127,11 +132,29 @@ export class ThetaCalculatorService implements OnModuleInit {
       paramsMap.set(p.itemId, p);
     }
 
-    // 2. Filtrar respuestas válidas y omitir valores perdidos (null/undefined)
+    // Consultar el tipo de pregunta para el filtrado de tiempos
+    const questionIds = respuestas.map(r => r.itemId);
+    const questions = await this.prisma.question.findMany({
+      where: { id: { in: questionIds } },
+      select: { id: true, type: true },
+    });
+    const questionTypeMap = new Map(questions.map(q => [q.id, q.type]));
+
+    // 2. Filtrar respuestas válidas y clasificar rapid guessing
+    let effortItemsCount = 0;
     const itemsValidos = respuestas
       .filter(r => paramsMap.has(r.itemId) && r.response !== null && r.response !== undefined)
       .map(r => {
         const p = paramsMap.get(r.itemId);
+        const qType = questionTypeMap.get(r.itemId) || 'Global';
+        
+        // Clasificar
+        const classification = this.rapidGuessing.classify(testId, qType, r.tiempoMs ?? null);
+        const isSolution = classification === 'solution';
+        if (isSolution) {
+          effortItemsCount++;
+        }
+
         const thresholds: number[] = [];
         if (p.modelo === 'GRM') {
           if (p.parametroC1 !== null) thresholds.push(p.parametroC1);
@@ -146,14 +169,18 @@ export class ThetaCalculatorService implements OnModuleInit {
           b: p.parametroB ?? 0.0,
           thresholds,
           response: r.response,
+          isSolution,
         };
       });
 
     // Si no hay parámetros calibrados, retornar fallback
     if (itemsValidos.length === 0) {
       this.logger.warn(`No se encontraron parámetros calibrados para el test ${testId}. Retornando fallback theta=0.0`);
-      return { theta: 0.0, error: 1.0, thetaT: 50.0, thetaCi: 100.0 };
+      return { theta: 0.0, error: 1.0, thetaT: 50.0, thetaCi: 100.0, engagement: 1.0 };
     }
+
+    const totalItems = itemsValidos.length;
+    const engagement = totalItems > 0 ? (effortItemsCount / totalItems) : 1.0;
 
     // 3. Ejecutar cuadratura numérica Gauss-Hermite
     const logLikelihoods = new Array(this.QUADRATURE_POINTS.length).fill(0);
@@ -166,8 +193,11 @@ export class ThetaCalculatorService implements OnModuleInit {
 
       let logL = 0.0;
       for (const item of itemsValidos) {
+        if (!item.isSolution) {
+          // Wise & DeMars (2006) effort-moderated: ignoramos respuestas de rapid guessing
+          continue;
+        }
         const prob = this.evaluarProbabilidadItem(item, theta);
-        // Evitar log(0)
         logL += Math.log(Math.max(prob, 1e-12));
       }
       logLikelihoods[j] = logL;
@@ -213,13 +243,14 @@ export class ThetaCalculatorService implements OnModuleInit {
     const thetaT = Math.round((50.0 + 10.0 * thetaFinal) * 1000) / 1000;
     const thetaCi = Math.round((100.0 + 15.0 * thetaFinal) * 1000) / 1000;
 
-    this.logger.log(`Theta calculado: ${thetaFinal} (T: ${thetaT}, CI: ${thetaCi}) | Error: ${errorFinal} | Items: ${itemsValidos.length} | Tiempo: ${duration}ms`);
+    this.logger.log(`Theta calculado (effort-moderated): ${thetaFinal} (T: ${thetaT}, CI: ${thetaCi}) | Error: ${errorFinal} | Engagement: ${(engagement * 100).toFixed(0)}% | Items: ${itemsValidos.length} | Tiempo: ${duration}ms`);
 
     return {
       theta: thetaFinal,
       error: errorFinal,
       thetaT,
       thetaCi,
+      engagement: Math.round(engagement * 10000) / 10000,
     };
   }
 

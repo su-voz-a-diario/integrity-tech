@@ -1,4 +1,4 @@
-import { IsUUID, IsNotEmpty, IsObject } from 'class-validator';
+import { IsUUID, IsNotEmpty, IsObject, IsNumber, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 /**
@@ -17,6 +17,11 @@ export class SubmitAnswerBodyDto {
   @IsObject()
   @IsNotEmpty()
   response: Record<string, any>; // Estructura JSON dinámica de la respuesta
+
+  @ApiProperty({ description: 'Tiempo de respuesta del candidato en milisegundos', required: false, example: 3500 })
+  @IsNumber()
+  @IsOptional()
+  tiempoMs?: number;
 }
 
 /**
@@ -34,6 +39,10 @@ export class SubmitAnswerDto {
   @IsObject()
   @IsNotEmpty()
   response: Record<string, any>;
+
+  @IsNumber()
+  @IsOptional()
+  tiempoMs?: number;
 }
 
 export class SubmitProctoringLogDto {

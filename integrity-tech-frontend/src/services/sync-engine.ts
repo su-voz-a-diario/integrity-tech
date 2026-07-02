@@ -7,6 +7,7 @@ export interface QueuedAnswer {
   response: any;
   timestamp: number;
   attempts: number;
+  tiempoMs?: number;
   nextRetryTimestamp?: number;
 }
 
@@ -83,7 +84,7 @@ export class SyncEngine {
   /**
    * Encola una respuesta en IndexedDB.
    */
-  async queueAnswer(attemptId: string, questionId: string, response: any): Promise<void> {
+  async queueAnswer(attemptId: string, questionId: string, response: any, tiempoMs?: number): Promise<void> {
     if (!this.db) await this.initDatabase();
 
     const queuedItem: QueuedAnswer = {
@@ -91,6 +92,7 @@ export class SyncEngine {
       attemptId,
       questionId,
       response,
+      tiempoMs,
       timestamp: Date.now(),
       attempts: 0,
     };
@@ -235,6 +237,7 @@ export class SyncEngine {
         body: JSON.stringify({
           questionId: item.questionId,
           response: item.response,
+          tiempoMs: item.tiempoMs,
         }),
       });
 

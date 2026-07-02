@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ThetaCalculatorService } from './theta-calculator.service';
 import { PrismaService } from '../../../shared/database/prisma.service';
+import { RapidGuessingService } from './rapid-guessing.service';
 
 describe('ThetaCalculatorService (Unit Tests)', () => {
   let service: ThetaCalculatorService;
@@ -10,12 +11,16 @@ describe('ThetaCalculatorService (Unit Tests)', () => {
     parametrosItems: {
       findMany: jest.fn(),
     },
+    question: {
+      findMany: jest.fn(),
+    },
   };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ThetaCalculatorService,
+        RapidGuessingService,
         {
           provide: PrismaService,
           useValue: mockPrismaService,
@@ -26,6 +31,11 @@ describe('ThetaCalculatorService (Unit Tests)', () => {
     service = module.get<ThetaCalculatorService>(ThetaCalculatorService);
     prisma = module.get<PrismaService>(PrismaService);
     jest.clearAllMocks();
+    mockPrismaService.question.findMany.mockResolvedValue([
+      { id: 'Q1', type: 'verbal' },
+      { id: 'Q2', type: 'verbal' },
+      { id: 'Q3', type: 'verbal' },
+    ]);
   });
 
   it('Debe estimar theta correctamente para ítems dicotómicos 2PL y calcular escalas T-score/CI', async () => {

@@ -16,9 +16,9 @@ export class AnswersQueueProcessor {
 
   @Process('save-answer')
   async handleSaveAnswer(job: Job<any>) {
-    const { attemptId, questionId, response, submittedAt } = job.data;
+    const { attemptId, questionId, response, tiempoMs, submittedAt } = job.data;
     
-    this.logger.log(`[Worker] Procesando respuesta. Job: ${job.id} | Intento: ${attemptId}`);
+    this.logger.log(`[Worker] Procesando respuesta. Job: ${job.id} | Intento: ${attemptId} | Tiempo de respuesta: ${tiempoMs || 0}ms`);
 
     try {
       // 1. OBTENER INFORMACIÓN DE LA PREGUNTA (Desde DB / Caché)
@@ -52,6 +52,7 @@ export class AnswersQueueProcessor {
           response,
           isCorrect,
           pointsEarned,
+          tiempoMs,
           submittedAt: new Date(submittedAt),
         },
         create: {
@@ -60,6 +61,7 @@ export class AnswersQueueProcessor {
           response,
           isCorrect,
           pointsEarned,
+          tiempoMs,
           submittedAt: new Date(submittedAt),
         },
       });

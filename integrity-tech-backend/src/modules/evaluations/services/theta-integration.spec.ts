@@ -7,6 +7,7 @@ import { ReportGeneratorService } from './report-generator.service';
 import { AdverseImpactService } from './adverse-impact.service';
 import { RoiService } from './roi.service';
 import { ContinuousNormingService } from './continuous-norming.service';
+import { RapidGuessingService } from './rapid-guessing.service';
 import { PrismaService } from '../../../shared/database/prisma.service';
 
 describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)', () => {
@@ -18,6 +19,7 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
   let adverseService: AdverseImpactService;
   let roiService: RoiService;
   let continuousNormingService: ContinuousNormingService;
+  let rapidGuessingService: RapidGuessingService;
   let prisma: PrismaService;
 
   // Mock de la base de datos completo para simular tablas y relaciones
@@ -29,6 +31,9 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
     examAttempt: {
       findUnique: jest.fn(),
       count: jest.fn(),
+    },
+    question: {
+      findMany: jest.fn(),
     },
     user: {
       findUnique: jest.fn(),
@@ -64,6 +69,7 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
         AdverseImpactService,
         RoiService,
         ContinuousNormingService,
+        RapidGuessingService,
         {
           provide: PrismaService,
           useValue: dbMocks,
@@ -79,9 +85,15 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
     adverseService = module.get<AdverseImpactService>(AdverseImpactService);
     roiService = module.get<RoiService>(RoiService);
     continuousNormingService = module.get<ContinuousNormingService>(ContinuousNormingService);
+    rapidGuessingService = module.get<RapidGuessingService>(RapidGuessingService);
     prisma = module.get<PrismaService>(PrismaService);
     
     jest.clearAllMocks();
+    dbMocks.question.findMany.mockResolvedValue([
+      { id: 'Q1', type: 'verbal' },
+      { id: 'Q2', type: 'verbal' },
+      { id: 'Q3', type: 'verbal' },
+    ]);
   });
 
   it('Debe simular estimación de theta ignorando ítems omitidos y calculando IGA dinámico', async () => {
@@ -285,5 +297,22 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
     );
     expect(normPercentile).toBeDefined();
     expect(normPercentile).toBeGreaterThan(50); // Dado que theta = 0.25 > p50 = 0.0, el percentil debe ser > 50
+
+    // 7. Rapid Guessing (Effort-Moderated EAP)
+    dbMocks.parametrosItems.findMany.mockResolvedValue([
+      { itemId: 'Q1', modelo: '2PL', parametroA: 1.5, parametroB: -0.5, activo: true },
+      { itemId: 'Q2', modelo: '2PL', parametroA: 1.2, parametroB: 0.5, activo: true },
+      { itemId: 'Q3', modelo: '2PL', parametroA: 1.8, parametroB: 1.5, activo: true },
+    ]);
+    (thetaService as any).parameterCache.clear();
+
+    const respuestasRapidas = [
+      { itemId: 'Q1', response: 1, tiempoMs: 4000 },  // solución (umbral = 3000ms para verbal)
+      { itemId: 'Q2', response: 0, tiempoMs: 500 },   // guessing (< 2500ms para numerico/verbal)
+      { itemId: 'Q3', response: 1, tiempoMs: 4500 },  // solución
+    ];
+    const estRapida = await thetaService.calcularTheta('IT2_AC10', respuestasRapidas);
+    expect(estRapida.engagement).toBeLessThan(1.0);
+    expect(estRapida.engagement).toBeCloseTo(0.6667, 2); // 2 de 3 son solution -> ~0.67 engagement
   });
 });

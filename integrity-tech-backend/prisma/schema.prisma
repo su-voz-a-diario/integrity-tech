@@ -199,6 +199,7 @@ model AnswerSubmission {
   response      Json     @db.JsonB // Respuesta exacta del alumno
   isCorrect     Boolean? @map("is_correct")
   pointsEarned  Decimal  @default(0.00) @map("points_earned") @db.Decimal(5, 2)
+  tiempoMs      Int?     @map("tiempo_ms")
   submittedAt   DateTime @default(now()) @map("submitted_at") @db.Timestamptz
 
   attempt       ExamAttempt @relation(fields: [examAttemptId], references: [id], onDelete: Cascade)
@@ -276,6 +277,7 @@ model ResultadoTest {
   thetaCi       Float?   @map("theta_ci")
   personFitLz   Float?   @map("person_fit_lz")
   aberrante     Boolean  @default(false) @map("aberrante")
+  engagement    Float?
   irtCalculated Boolean  @default(false) @map("irt_calculated")
   fechaCalculo  DateTime @default(now()) @map("fecha_calculo") @db.Timestamptz
 

@@ -36,6 +36,7 @@ export class EvaluationQueueProducer {
         attemptId: dto.attemptId,
         questionId: dto.questionId,
         response: dto.response,
+        tiempoMs: dto.tiempoMs,
         submittedAt: new Date().toISOString(),
       },
       {

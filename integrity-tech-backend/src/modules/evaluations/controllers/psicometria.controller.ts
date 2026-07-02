@@ -286,7 +286,7 @@ export class PsicometriaController {
       }
 
       if (patterns.length > 0) {
-        const { theta, error, thetaT, thetaCi } = await this.thetaService.calcularTheta(testId, patterns);
+        const { theta, error, thetaT, thetaCi, engagement } = await this.thetaService.calcularTheta(testId, patterns);
         const { lz, aberrante } = await this.personFitService.calculatePersonFit(testId, patterns, theta);
 
         const attempt = await this.prisma.examAttempt.findUnique({
@@ -328,7 +328,8 @@ export class PsicometriaController {
             thetaT,
             thetaCi,
             personFitLz: lz,
-            aberrante,
+            aberrante: aberrante || (engagement < 0.7),
+            engagement,
             percentil: percentilFinal,
           },
         });

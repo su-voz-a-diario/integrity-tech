@@ -50,9 +50,29 @@ export class ReportGeneratorService {
       const worstFit = resultados.find(r => r.aberrante);
       reportMarkdown += `> [!WARNING]
 > **Alerta de Ajuste de Persona (Person-Fit):**
-> Se ha detectado un patrón de respuesta inconsistente en la sección **${this.mapTestId(worstFit.testId)}** (índice lz = ${worstFit.personFitLz.toFixed(2)}). Esto puede indicar falta de atención, fatiga, respuestas aleatorias o un intento extremo de falseamiento de imagen (deseabilidad social). Se recomienda interpretar este reporte con cautela y contrastar con entrevista estructurada.
+> Se ha detectado un patrón de respuesta inconsistente en la sección **${this.mapTestId(worstFit.testId)}** (índice lz = ${worstFit.personFitLz?.toFixed(2) || '0.00'}). Esto puede indicar falta de atención, fatiga, respuestas aleatorias o un intento extremo de falseamiento de imagen (deseabilidad social). Se recomienda interpretar este reporte con cautela y contrastar con entrevista estructurada.
 
 `;
+    }
+
+    // Alertas de Engagement (Response Time modeling)
+    for (const r of resultados) {
+      if (r.engagement !== null && r.engagement !== undefined) {
+        const eng = Number(r.engagement);
+        if (eng < 0.8) {
+          reportMarkdown += `> [!WARNING]
+> **Alerta de Bajo Compromiso (Engagement) en ${this.mapTestId(r.testId)}:**
+> El candidato mostró un bajo nivel de compromiso (${(eng * 100).toFixed(0)}% de los ítems respondidos con esfuerzo). Una proporción significativa de reactivos fue contestada con adivinación rápida (rapid guessing). Los resultados deben interpretarse con suma cautela.
+
+`;
+        } else if (eng >= 0.95) {
+          reportMarkdown += `> [!NOTE]
+> **Nivel de Atención Fiel en ${this.mapTestId(r.testId)}:**
+> El candidato mantuvo un alto nivel de atención y esfuerzo sostenido durante toda la prueba (${(eng * 100).toFixed(0)}% de reactivos respondidos con esfuerzo genuino).
+
+`;
+        }
+      }
     }
 
     reportMarkdown += `## Resumen Ejecutivo de Competencias\n`;
