@@ -120,18 +120,10 @@ function CandidateLoginForm() {
       <div className="flex flex-col items-center gap-3">
         <img 
           src="/integrity-logo-2.png" 
-          alt="Integrity Tech Logo" 
-          className="w-32 h-auto object-contain hover:scale-105 transition-all duration-350"
+          alt="Integrity Test Logo" 
+          className="w-40 sm:w-48 h-auto object-contain hover:scale-105 transition-all duration-300"
         />
-        <div className="flex flex-col items-center select-none mt-1">
-          <h1 className="text-2xl font-extrabold tracking-wider bg-gradient-to-r from-amber-200 via-yellow-400 to-amber-500 bg-clip-text text-transparent uppercase font-serif">
-            Integrity
-          </h1>
-          <h2 className="text-xl font-bold tracking-widest text-slate-100 uppercase font-serif">
-            Test
-          </h2>
-        </div>
-        <p className="text-2xs text-slate-400 max-w-xs leading-relaxed mt-1">
+        <p className="text-2xs text-slate-400 max-w-xs leading-relaxed mt-2">
           Acceso seguro a evaluaciones psicométricas bajo supervisión forense de conducta.
         </p>
       </div>
