@@ -5,6 +5,7 @@ import { CatService } from '../services/cat.service';
 import { ReportGeneratorService } from '../services/report-generator.service';
 import { AdverseImpactService } from '../services/adverse-impact.service';
 import { RoiService } from '../services/roi.service';
+import { ContinuousNormingService } from '../services/continuous-norming.service';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 
@@ -20,6 +21,7 @@ export class PsicometriaController {
     private readonly reportService: ReportGeneratorService,
     private readonly adverseImpactService: AdverseImpactService,
     private readonly roiService: RoiService,
+    private readonly continuousNormingService: ContinuousNormingService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -441,5 +443,35 @@ export class PsicometriaController {
       body.currentTheta,
       body.provisionalSe
     );
+  }
+
+  @ApiOperation({ summary: 'Calibrar normas continuas suavizadas GAMLSS para un test específico' })
+  @ApiParam({ name: 'test_id', description: 'ID del test (ej. IT2_AC10)' })
+  @Post('api/v1/psicometria/baremo-continuo/calibrar/:test_id')
+  async runContinuousNormingCalibration(@Param('test_id') testId: string) {
+    return this.continuousNormingService.runContinuousCalibration(testId);
+  }
+
+  @ApiOperation({ summary: 'Consultar percentil suavizado continuo mediante interpolación lineal' })
+  @Get('api/v1/psicometria/baremo-continuo/percentil')
+  async getPercentileContinuous(
+    @Query('testId') testId: string,
+    @Query('theta') theta: string,
+    @Query('pais') pais?: string,
+    @Query('nivelEducativo') nivelEducativo?: string,
+    @Query('tipoPuesto') tipoPuesto?: string,
+  ) {
+    const p = await this.continuousNormingService.getPercentileContinuous(
+      testId,
+      parseFloat(theta),
+      pais,
+      nivelEducativo,
+      tipoPuesto
+    );
+    return {
+      testId,
+      theta: parseFloat(theta),
+      percentil: p,
+    };
   }
 }

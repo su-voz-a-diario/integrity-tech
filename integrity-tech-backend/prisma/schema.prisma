@@ -408,3 +408,21 @@ model ParametrosItemsHistorial {
   @@map("parametros_items_historial")
 }
 
+model ContinuousNorm {
+  id                 String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  testId             String   @map("test_id") @db.VarChar(50)
+  pais               String?  @db.VarChar(100)
+  nivelEducativo     String?  @map("nivel_educativo") @db.VarChar(100)
+  tipoPuesto         String?  @map("tipo_puesto") @db.VarChar(100)
+  p5                 Decimal  @db.Decimal(8, 4)
+  p10                Decimal  @db.Decimal(8, 4)
+  p25                Decimal  @db.Decimal(8, 4)
+  p50                Decimal  @db.Decimal(8, 4)
+  p75                Decimal  @db.Decimal(8, 4)
+  p90                Decimal  @db.Decimal(8, 4)
+  p95                Decimal  @db.Decimal(8, 4)
+  fechaActualizacion DateTime @default(now()) @map("fecha_actualizacion") @db.Timestamptz
+
+  @@map("continuous_norms")
+}
+

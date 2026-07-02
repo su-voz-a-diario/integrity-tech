@@ -6,6 +6,7 @@ import { CatService } from './cat.service';
 import { ReportGeneratorService } from './report-generator.service';
 import { AdverseImpactService } from './adverse-impact.service';
 import { RoiService } from './roi.service';
+import { ContinuousNormingService } from './continuous-norming.service';
 import { PrismaService } from '../../../shared/database/prisma.service';
 
 describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)', () => {
@@ -16,6 +17,7 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
   let reportService: ReportGeneratorService;
   let adverseService: AdverseImpactService;
   let roiService: RoiService;
+  let continuousNormingService: ContinuousNormingService;
   let prisma: PrismaService;
 
   // Mock de la base de datos completo para simular tablas y relaciones
@@ -42,6 +44,9 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
       create: jest.fn(),
       count: jest.fn(),
     },
+    continuousNorm: {
+      findFirst: jest.fn(),
+    },
     resultadoGlobal: {
       upsert: jest.fn(),
     },
@@ -58,6 +63,7 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
         ReportGeneratorService,
         AdverseImpactService,
         RoiService,
+        ContinuousNormingService,
         {
           provide: PrismaService,
           useValue: dbMocks,
@@ -72,6 +78,7 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
     reportService = module.get<ReportGeneratorService>(ReportGeneratorService);
     adverseService = module.get<AdverseImpactService>(AdverseImpactService);
     roiService = module.get<RoiService>(RoiService);
+    continuousNormingService = module.get<ContinuousNormingService>(ContinuousNormingService);
     prisma = module.get<PrismaService>(PrismaService);
     
     jest.clearAllMocks();
@@ -252,5 +259,31 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
     });
     expect(roiResult.utilidadNetaAcumulada).toBeGreaterThan(0);
     expect(roiResult.retornoInversionPorcentaje).toBeGreaterThan(0);
+
+    // 6. Continuous Norming (GAMLSS)
+    dbMocks.continuousNorm.findFirst.mockResolvedValue({
+      id: 'norm-uuid',
+      testId: 'IT2_AC10',
+      pais: 'Colombia',
+      nivelEducativo: 'Universitario',
+      tipoPuesto: 'Gerente',
+      p5: -1.5,
+      p10: -1.0,
+      p25: -0.5,
+      p50: 0.0,
+      p75: 0.5,
+      p90: 1.0,
+      p95: 1.5
+    });
+
+    const normPercentile = await continuousNormingService.getPercentileContinuous(
+      'IT2_AC10',
+      0.25,
+      'Colombia',
+      'Universitario',
+      'Gerente'
+    );
+    expect(normPercentile).toBeDefined();
+    expect(normPercentile).toBeGreaterThan(50); // Dado que theta = 0.25 > p50 = 0.0, el percentil debe ser > 50
   });
 });

@@ -8,6 +8,7 @@ sys.path.append(os.path.dirname(__file__))
 
 import calibrate
 import analyze_dif
+import continuous_norming
 
 class TestPsychometricScripts(unittest.TestCase):
     def setUp(self):
@@ -112,6 +113,24 @@ class TestPsychometricScripts(unittest.TestCase):
                 os.remove(temp_path)
             if os.path.exists(output_img):
                 os.remove(output_img)
+
+    @patch('psycopg2.connect')
+    def test_continuous_norming_script(self, mock_connect):
+        mock_connect.return_value = self.mock_conn
+        
+        # Simular respuestas en DB (15 candidatos coincidentes)
+        self.mock_cur.fetchall.return_value = [
+            (0.5, 'Colombia', 'Universitario', 'Gerente') for _ in range(15)
+        ]
+        
+        # Ejecutar suavizado continuo
+        continuous_norming.run_continuous_norming('IT2_AC10')
+        
+        # Verificar que se borraron las normas previas y se insertaron las nuevas
+        self.assertTrue(any("DELETE FROM continuous_norms" in call[0][0] 
+                            for call in self.mock_cur.execute.call_args_list))
+        self.assertTrue(any("INSERT INTO continuous_norms" in call[0][0] 
+                            for call in self.mock_cur.executemany.call_args_list))
 
 if __name__ == '__main__':
     unittest.main()
