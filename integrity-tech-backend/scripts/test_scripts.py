@@ -78,5 +78,40 @@ class TestPsychometricScripts(unittest.TestCase):
         self.assertTrue(any("UPDATE parametros_items" in call[0][0] and "SET flag_dif" in call[0][0]
                             for call in self.mock_cur.execute.call_args_list))
 
+    @patch('psycopg2.connect')
+    def test_validity_analysis_script(self, mock_connect):
+        import json
+        mock_connect.return_value = self.mock_conn
+        
+        # Simular respuestas en DB (15 candidatos coincidentes)
+        self.mock_cur.fetchall.return_value = [
+            (f'cand{i}@test.com', 'IT2_I', 0.5, 75.0) for i in range(15)
+        ]
+        
+        # Crear json de desempeño de prueba
+        perf_data = [
+            {'email': f'cand{i}@test.com', 'desempeno': float(5.0 + (i % 5))} for i in range(15)
+        ]
+        
+        temp_path = 'temp_perf_test.json'
+        with open(temp_path, 'w') as f:
+            json.dump(perf_data, f)
+            
+        output_img = 'temp_roc_test.png'
+        
+        try:
+            import analyze_validity
+            # Ejecutar análisis
+            analyze_validity.run_validity_analysis(temp_path, output_img)
+            
+            # Verificar que se consultó la DB
+            self.assertTrue(any("resultados_test" in call[0][0] 
+                                for call in self.mock_cur.execute.call_args_list))
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            if os.path.exists(output_img):
+                os.remove(output_img)
+
 if __name__ == '__main__':
     unittest.main()

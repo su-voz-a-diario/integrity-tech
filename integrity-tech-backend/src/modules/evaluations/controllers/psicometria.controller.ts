@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Query, HttpCode, HttpStatus, Logger, NotFoundException, ConflictException } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, HttpCode, HttpStatus, Logger, NotFoundException, ConflictException, Body } from '@nestjs/common';
 import { ThetaCalculatorService } from '../services/theta-calculator.service';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
@@ -326,5 +326,72 @@ export class PsicometriaController {
       message: `Recálculo completado para el test ${testId}.`,
       registrosActualizados: count,
     };
+  }
+
+  @ApiOperation({ summary: 'Analizar validez predictiva cargando datos de desempeño' })
+  @Post('api/v1/psicometria/validez/analizar')
+  async analyzePredictiveValidity(@Body() body: any[]) {
+    this.logger.log('Iniciando estudio de validez predictiva...');
+    if (!Array.isArray(body) || body.length === 0) {
+      throw new ConflictException('Se requiere una lista de datos de desempeño [{email: string, desempeno: number}]');
+    }
+
+    const fs = require('fs');
+    const path = require('path');
+    const { exec } = require('child_process');
+    
+    const tempDir = path.join(__dirname, '../../../../scratch');
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+    
+    const tempJsonPath = path.join(tempDir, `perf_${Date.now()}.json`);
+    fs.writeFileSync(tempJsonPath, JSON.stringify(body, null, 2));
+
+    const outputImagePath = '/Volumes/Almacenamiento/integrity-tech/integrity-tech-frontend/public/roc_curve.png';
+
+    return new Promise((resolve, reject) => {
+      exec(`python3 scripts/analyze_validity.py "${tempJsonPath}" "${outputImagePath}"`, (error: any, stdout: string, stderr: string) => {
+        try {
+          if (fs.existsSync(tempJsonPath)) {
+            fs.unlinkSync(tempJsonPath);
+          }
+        } catch (fsErr) {
+          this.logger.error(`Error al borrar archivo temporal: ${fsErr.message}`);
+        }
+
+        if (error) {
+          this.logger.error(`Error de ejecución en análisis de validez: ${stderr || error.message}`);
+          reject(new ConflictException(`Fallo al calcular validez predictiva: ${stderr || error.message}`));
+          return;
+        }
+
+        const lines = stdout.split('\n');
+        let jsonStr = '';
+        let capturing = false;
+
+        for (const line of lines) {
+          if (line.trim() === 'RESULT_START') {
+            capturing = true;
+            continue;
+          }
+          if (line.trim() === 'RESULT_END') {
+            capturing = false;
+            break;
+          }
+          if (capturing) {
+            jsonStr += line;
+          }
+        }
+
+        try {
+          const parsed = JSON.parse(jsonStr);
+          resolve(parsed);
+        } catch (jsonErr) {
+          this.logger.error(`Fallo al parsear JSON del script: ${jsonStr || stdout}`);
+          reject(new ConflictException('El script de análisis no devolvió un JSON válido.'));
+        }
+      });
+    });
   }
 }
