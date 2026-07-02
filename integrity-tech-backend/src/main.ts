@@ -23,11 +23,17 @@ async function bootstrap() {
   // Habilitar validaciones estructuradas globales (class-validator)
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 
-  // Habilitar CORS para peticiones cruzadas del frontend
-  app.enableCors();
+  const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  app.enableCors({
+    origin: allowedOrigins,
+    credentials: true,
+  });
 
   // Configuración de la documentación interactiva Swagger / OpenAPI (restringido a dev/staging)
-  const port = process.env.PORT || 3000;
+  const port = process.env.PORT || 3001;
   if (process.env.NODE_ENV !== 'production' || process.env.SHOW_SWAGGER === 'true') {
     const config = new DocumentBuilder()
       .setTitle('Integrity-Tech | Platform API')

@@ -146,6 +146,18 @@ export class SyncEngine {
     this.processProctoringBatch();
   }
 
+  async flushAnswers(timeoutMs = 5000): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      await this.processAnswers();
+      const remaining = await this.getAllItems<QueuedAnswer>(this.answersStore);
+      if (remaining.length === 0) return true;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    const remaining = await this.getAllItems<QueuedAnswer>(this.answersStore);
+    return remaining.length === 0;
+  }
+
   /**
    * Envía las respuestas procesables una por una aplicando Backoff Exponencial.
    */
@@ -242,8 +254,10 @@ export class SyncEngine {
       });
 
       if (response.status === 202 || response.ok) return true;
-      // Descartar errores 400 ya que son malformados y no se corregirán reintentando
-      if (response.status >= 400 && response.status < 500 && response.status !== 429) return true;
+      if ([400, 401, 403, 404, 409, 422, 429].includes(response.status)) {
+        console.warn(`Respuesta no sincronizada; se conserva en IndexedDB. HTTP ${response.status}`);
+        return false;
+      }
     } catch (error) {
       console.warn('Fallo de conexión al enviar respuesta:', error);
     }

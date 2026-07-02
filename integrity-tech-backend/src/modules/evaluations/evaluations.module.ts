@@ -16,6 +16,7 @@ import { AdverseImpactService } from './services/adverse-impact.service';
 import { RoiService } from './services/roi.service';
 import { ContinuousNormingService } from './services/continuous-norming.service';
 import { RapidGuessingService } from './services/rapid-guessing.service';
+import { PsychometricsRoleGuard } from './guards/psychometrics-role.guard';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { RapidGuessingService } from './services/rapid-guessing.service';
     RoiService,
     ContinuousNormingService,
     RapidGuessingService,
+    PsychometricsRoleGuard,
   ],
   exports: [
     EvaluationQueueProducer,

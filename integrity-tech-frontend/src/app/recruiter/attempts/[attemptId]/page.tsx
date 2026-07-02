@@ -175,26 +175,38 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
 
   // Consulta dinámica del intento y perfiles
   useEffect(() => {
-    const fetchReport = fetch(`/api/evaluations/attempts/${attemptId}`)
+    const authHeaders = {
+      'Authorization': `Bearer ${localStorage.getItem('auth-token') || ''}`,
+    };
+
+    const fetchReport = fetch(`/api/evaluations/attempts/${attemptId}`, { headers: authHeaders })
       .then((res) => {
         if (!res.ok) throw new Error('Not Found');
         return res.json();
       })
       .catch((err) => {
-        console.warn(`[Reporte] Fallback a mocks locales para el attemptId: ${attemptId}`, err);
-        return MOCK_REPORT_DETAILS[attemptId] || MOCK_REPORT_DETAILS.default;
+        console.warn(`[Reporte] No se pudo cargar reporte real para el attemptId: ${attemptId}`, err);
+        return process.env.NEXT_PUBLIC_ENABLE_DEMO_MOCKS === 'true'
+          ? (MOCK_REPORT_DETAILS[attemptId] || MOCK_REPORT_DETAILS.default)
+          : null;
       });
 
-    const fetchPerfiles = fetch('/api/evaluations/perfiles')
+    const fetchPerfiles = fetch('/api/evaluations/perfiles', { headers: authHeaders })
       .then((res) => (res.ok ? res.json() : []))
       .catch(() => []);
 
-    const fetchIga = fetch(`/api/evaluations/attempts/${attemptId}/resultados`)
+    const fetchIga = fetch(`/api/evaluations/attempts/${attemptId}/resultados`, { headers: authHeaders })
       .then((res) => (res.ok ? res.json() : null))
       .catch(() => null);
 
     Promise.all([fetchReport, fetchPerfiles, fetchIga]).then(([reportData, perfilesData, igaRes]) => {
       setReport(reportData);
+      if (!reportData) {
+        setPerfiles([]);
+        setIgaData(null);
+        setIsLoading(false);
+        return;
+      }
       
       const finalPerfiles = perfilesData.length > 0 ? perfilesData : [
         { id: 'p1', nombre: 'Gerente Comercial' },
@@ -237,7 +249,10 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
     try {
       const response = await fetch(`/api/evaluations/attempts/${attemptId}/recalcular-iga`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth-token') || ''}`,
+        },
         body: JSON.stringify({ perfilId }),
       });
       if (response.ok) {
@@ -255,6 +270,20 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
         <div className="text-sm text-slate-500 font-medium">Cargando reporte de evaluación...</div>
+      </div>
+    );
+  }
+
+  if (!report) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+        <div className="max-w-md bg-slate-900 border border-slate-800 rounded-xl p-6 text-center">
+          <h1 className="text-lg font-bold text-white">Reporte no disponible</h1>
+          <p className="text-sm text-slate-400 mt-2">No hay datos reales disponibles para este intento o tu sesión no tiene permisos.</p>
+          <Link href="/recruiter/dashboard" className="inline-flex mt-5 px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-semibold">
+            Volver al dashboard
+          </Link>
+        </div>
       </div>
     );
   }
@@ -490,14 +519,9 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
                             {log.message}
                           </p>
 
-                          {/* Renderizar imagen si el evento es una captura de identidad */}
-                          {log.eventType === 'identity_snapshot' && log.metadata?.imageUrl && (
-                            <div className="mt-2 rounded-lg overflow-hidden border border-slate-800 max-w-[200px] shadow-lg hover:scale-105 transition-all">
-                              <img 
-                                src={log.metadata.imageUrl} 
-                                alt="Captura de Identidad del Candidato" 
-                                className="w-full h-auto object-cover bg-slate-950"
-                              />
+                          {log.eventType === 'identity_snapshot' && (
+                            <div className="mt-2 rounded-lg border border-slate-800 bg-slate-950 p-2 text-3xs text-slate-500">
+                              Captura facial no expuesta en reporte. Solo metadata registrada.
                             </div>
                           )}
 

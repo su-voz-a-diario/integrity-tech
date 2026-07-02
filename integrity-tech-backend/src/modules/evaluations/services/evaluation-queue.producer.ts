@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { SubmitAnswerDto, SubmitProctoringLogDto } from '../dto/submit-answer.dto';
+import { PrismaService } from '../../../shared/database/prisma.service';
 
 @Injectable()
 export class EvaluationQueueProducer {
@@ -10,6 +11,7 @@ export class EvaluationQueueProducer {
   constructor(
     @InjectQueue('answers-queue') private readonly answersQueue: Queue,
     @InjectQueue('proctoring-queue') private readonly proctoringQueue: Queue,
+    private readonly prisma: PrismaService,
   ) {}
 
   /**
@@ -89,8 +91,31 @@ export class EvaluationQueueProducer {
    * En producción, esto consulta a Redis Cache o PostgreSQL de forma ultra-rápida.
    */
   private async verifyActiveAttempt(attemptId: string, questionId: string): Promise<boolean> {
-    // MOCK: En producción se valida contra la base de datos o el caché
     this.logger.debug(`Verificando validez del intento ${attemptId} para pregunta ${questionId}`);
-    return true; 
+    const attempt = await this.prisma.examAttempt.findUnique({
+      where: { id: attemptId },
+      select: { examId: true, status: true, submittedAt: true },
+    });
+
+    if (!attempt) return false;
+    if (attempt.status === 'COMPLETED') return this.isWithinLateAnswerWindow(attempt.submittedAt);
+    if (attempt.status === 'SUBMITTED') return this.isWithinLateAnswerWindow(attempt.submittedAt);
+    if (attempt.status !== 'IN_PROGRESS') return false;
+
+    const examQuestion = await this.prisma.examQuestion.findFirst({
+      where: {
+        examId: attempt.examId,
+        questionId,
+      },
+      select: { id: true },
+    });
+
+    return !!examQuestion;
+  }
+
+  private isWithinLateAnswerWindow(submittedAt: Date | null): boolean {
+    if (!submittedAt) return false;
+    const lateWindowMs = Number(process.env.LATE_ANSWER_WINDOW_MS || 5 * 60 * 1000);
+    return lateWindowMs > 0 && Date.now() - submittedAt.getTime() <= lateWindowMs;
   }
 }

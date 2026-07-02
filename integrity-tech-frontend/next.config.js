@@ -1,15 +1,17 @@
 /** @type {import('next').NextConfig} */
+const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
+
 const nextConfig = {
   reactStrictMode: true,
   async rewrites() {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:3000/api/:path*', // Redirigir llamadas de API a NestJS
+        destination: `${backendUrl}/api/:path*`,
       },
       {
         source: '/snapshots/:path*',
-        destination: 'http://localhost:3000/snapshots/:path*', // Redirigir fotos del webcam proctoring a NestJS
+        destination: `${backendUrl}/snapshots/:path*`,
       },
     ];
   },

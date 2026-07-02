@@ -99,9 +99,9 @@ export function ProctoringCamera({ attemptId, activeQuestionIndex }: ProctoringC
 
         if (response.ok) {
           const data = await response.json();
-          console.log('[Proctoring Camera] Snapshot subido con éxito:', data.imageUrl);
+          console.log('[Proctoring Camera] Metadata de snapshot registrada:', data);
         } else {
-          console.warn('[Proctoring Camera] Fallo al subir la foto al servidor.');
+          console.warn('[Proctoring Camera] Fallo al registrar la metadata de la foto.');
         }
       }
     } catch (err) {

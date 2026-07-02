@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Query, HttpCode, HttpStatus, Logger, NotFoundException, ConflictException, Body } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, HttpCode, HttpStatus, Logger, NotFoundException, ConflictException, Body, UseGuards } from '@nestjs/common';
 import { ThetaCalculatorService } from '../services/theta-calculator.service';
 import { PersonFitService } from '../services/person-fit.service';
 import { CatService } from '../services/cat.service';
@@ -8,9 +8,12 @@ import { RoiService } from '../services/roi.service';
 import { ContinuousNormingService } from '../services/continuous-norming.service';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../../../shared/guards/jwt-auth.guard';
+import { PsychometricsRoleGuard } from '../guards/psychometrics-role.guard';
 
 @ApiTags('Psicometría Avanzada (IRT)')
 @Controller()
+@UseGuards(JwtAuthGuard, PsychometricsRoleGuard)
 export class PsicometriaController {
   private readonly logger = new Logger(PsicometriaController.name);
 

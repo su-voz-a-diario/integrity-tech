@@ -3,8 +3,10 @@ import { UserService } from './services/user.service';
 import { AuthService } from './services/auth.service';
 import { IamFacade } from './iam.facade';
 import { IamLocalFacade } from './services/iam-local.facade';
+import { DevAuthController } from './controllers/dev-auth.controller';
 
 @Module({
+  controllers: [DevAuthController],
   providers: [
     UserService, // Privado para el módulo IamModule
     AuthService, // Privado para el módulo IamModule

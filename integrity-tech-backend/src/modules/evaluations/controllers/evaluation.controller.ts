@@ -9,54 +9,70 @@ import {
   HttpStatus, 
   Logger,
   ParseUUIDPipe,
-  BadRequestException
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+  Req
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiProperty } from '@nestjs/swagger';
+import { IsOptional, IsString, IsUUID, Matches } from 'class-validator';
 import { JwtAuthGuard } from '../../../shared/guards/jwt-auth.guard';
 import { AttemptOwnerGuard } from '../guards/attempt-owner.guard';
 import { SubmitAnswerBodyDto } from '../dto/submit-answer.dto';
 import { SubmitFeedbackDto } from '../dto/submit-feedback.dto';
 import { EvaluationQueueProducer } from '../services/evaluation-queue.producer';
 import { IgaCalculatorService } from '../services/iga-calculator.service';
+import { AnswersQueueProcessor } from '../services/answers-queue.processor';
 import { PrismaService } from '../../../shared/database/prisma.service';
-import * as fs from 'fs';
-import * as path from 'path';
-import { randomUUID } from 'crypto';
+import { IamFacade, SessionUser } from '../../iam';
+import { randomInt } from 'crypto';
 
 export class RecalcularIgaDto {
   @ApiProperty({ description: 'ID del perfil de puesto a asignar (UUID)', example: 'a1b2c3d4-5e6f-7a8b-9c0d-1e2f3a4b5c6d', required: false })
+  @IsUUID()
+  @IsOptional()
   perfilId?: string;
 }
 
 export class SubmitSnapshotDto {
   @ApiProperty({ description: 'Imagen capturada de la webcam codificada en Base64', example: 'data:image/jpeg;base64,...' })
+  @IsString()
   image: string;
 }
 
 export class CreateInvitationDto {
   @ApiProperty({ description: 'Nombre completo del candidato', example: 'Sofía Valenzuela' })
+  @IsString()
   candidateName: string;
 
   @ApiProperty({ description: 'Correo electrónico del candidato', example: 'sofia.valenzuela@example.com' })
+  @IsString()
   email: string;
 
   @ApiProperty({ description: 'ID del examen asignado', example: 'mock-exam-id-1111' })
+  @IsString()
   examId: string;
 }
 
 export class VerifyAccessCodeDto {
   @ApiProperty({ description: 'Código o llave de acceso de 6 dígitos', example: 'IT-987654' })
+  @IsString()
+  @Matches(/^IT-\d{6}$/i)
   accessCode: string;
 }
 
 export class ClaimAccessCodeDto {
   @ApiProperty({ description: 'Código o llave de acceso de 6 dígitos', example: 'IT-987654' })
+  @IsString()
+  @Matches(/^IT-\d{6}$/i)
   accessCode: string;
 
   @ApiProperty({ description: 'Nombre del candidato', example: 'Sofía Valenzuela' })
+  @IsString()
   candidateName: string;
 
   @ApiProperty({ description: 'Correo electrónico del candidato', example: 'sofia.valenzuela@example.com' })
+  @IsString()
   email: string;
 }
 
@@ -70,9 +86,9 @@ export class EvaluationController {
     private readonly queueProducer: EvaluationQueueProducer,
     private readonly prisma: PrismaService,
     private readonly igaCalculator: IgaCalculatorService,
+    private readonly iamFacade: IamFacade,
+    private readonly answersProcessor: AnswersQueueProcessor,
   ) {}
-
-  private static invitationsMemory: any[] = [];
 
   /**
    * Generar una clave de acceso única para un candidato.
@@ -81,47 +97,30 @@ export class EvaluationController {
   @ApiOperation({ summary: 'Crear invitación y clave de acceso para un candidato' })
   @ApiResponse({ status: 201, description: 'Invitación creada con éxito.' })
   @Post('invitations')
-  async createInvitation(@Body() body: CreateInvitationDto) {
+  @UseGuards(JwtAuthGuard)
+  async createInvitation(@Req() req: any, @Body() body: CreateInvitationDto) {
+    this.ensureStaffRole(req.user);
     this.logger.log(`Generando clave de acceso para candidato: ${body.candidateName} (${body.email})`);
 
-    const accessCode = 'IT-' + Math.floor(100000 + Math.random() * 900000).toString();
+    const exam = await this.resolveExamForInvitation(body.examId, req.user);
+    const accessCode = await this.generateUniqueAccessCode();
 
-    try {
-      const invitation = await this.prisma.candidateInvitation.create({
-        data: {
-          examId: body.examId,
-          email: body.email,
-          candidateName: body.candidateName,
-          accessCode,
-          status: 'PENDING',
-          expiresAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 días TTL
-        }
-      });
-
-      return {
-        status: 'success',
-        accessCode: invitation.accessCode,
-        directLink: `/exam/login?code=${invitation.accessCode}`,
-      };
-    } catch (err) {
-      this.logger.warn('Fallo al persistir invitación en Prisma. Usando in-memory fallback:', err.message);
-      const mockInvitation = {
-        id: randomUUID(),
-        examId: body.examId,
-        email: body.email,
-        candidateName: body.candidateName,
+    const invitation = await this.prisma.candidateInvitation.create({
+      data: {
+        examId: exam.id,
+        email: body.email.trim().toLowerCase(),
+        candidateName: body.candidateName.trim(),
         accessCode,
         status: 'PENDING',
         expiresAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-      };
-      EvaluationController.invitationsMemory.push(mockInvitation);
+      }
+    });
 
-      return {
-        status: 'success',
-        accessCode,
-        directLink: `/exam/login?code=${accessCode}`,
-      };
-    }
+    return {
+      status: 'success',
+      accessCode: invitation.accessCode,
+      directLink: `/exam/login?code=${invitation.accessCode}`,
+    };
   }
 
   /**
@@ -133,18 +132,16 @@ export class EvaluationController {
   @Post('invitations/verify')
   @HttpCode(HttpStatus.OK)
   async verifyInvitation(@Body() body: VerifyAccessCodeDto) {
-    const code = body.accessCode;
-    let invitation = null;
+    const code = this.normalizeAccessCode(body.accessCode);
 
-    try {
-      invitation = await this.prisma.candidateInvitation.findUnique({
-        where: { accessCode: code }
-      });
-    } catch (err) {
-      invitation = EvaluationController.invitationsMemory.find(i => i.accessCode === code);
+    const invitation = await this.prisma.candidateInvitation.findUnique({
+      where: { accessCode: code }
+    });
+    if (!invitation) {
+      throw new BadRequestException('El código de acceso especificado no es válido o ha expirado.');
     }
 
-    if (!invitation) {
+    if (invitation.expiresAt && invitation.expiresAt.getTime() < Date.now()) {
       throw new BadRequestException('El código de acceso especificado no es válido o ha expirado.');
     }
 
@@ -152,12 +149,17 @@ export class EvaluationController {
       throw new BadRequestException('Este código de acceso ya ha sido reclamado para una sesión de evaluación.');
     }
 
+    const exam = await this.prisma.exam.findUnique({
+      where: { id: invitation.examId },
+      select: { id: true, title: true },
+    });
+
     return {
       status: 'PENDING',
       candidateName: invitation.candidateName,
       email: invitation.email,
       examId: invitation.examId,
-      examTitle: 'Batería de Evaluación Psicométrica Integrada (IT²)',
+      examTitle: exam?.title || 'Evaluación asignada',
     };
   }
 
@@ -170,61 +172,84 @@ export class EvaluationController {
   @Post('invitations/claim')
   @HttpCode(HttpStatus.CREATED)
   async claimInvitation(@Body() body: ClaimAccessCodeDto) {
-    const code = body.accessCode;
-    let invitation = null;
-
-    try {
-      invitation = await this.prisma.candidateInvitation.findUnique({
-        where: { accessCode: code }
-      });
-    } catch (err) {
-      invitation = EvaluationController.invitationsMemory.find(i => i.accessCode === code);
-    }
-
+    const code = this.normalizeAccessCode(body.accessCode);
+    const invitation = await this.prisma.candidateInvitation.findUnique({
+      where: { accessCode: code }
+    });
     if (!invitation) {
       throw new BadRequestException('Código de acceso no válido.');
+    }
+
+    if (invitation.expiresAt && invitation.expiresAt.getTime() < Date.now()) {
+      throw new BadRequestException('El código de acceso ha expirado.');
     }
 
     if (invitation.status !== 'PENDING') {
       throw new BadRequestException('El código ya ha sido reclamado.');
     }
 
-    const attemptId = randomUUID();
-    const candidateUserId = randomUUID();
+    const exam = await this.prisma.exam.findUnique({
+      where: { id: invitation.examId },
+      select: { id: true, organizationId: true },
+    });
+    if (!exam) {
+      throw new BadRequestException('La evaluación asignada ya no existe.');
+    }
 
-    try {
-      // 1. Intentamos crear el intento real en la DB
-      await this.prisma.examAttempt.create({
+    const result = await this.prisma.$transaction(async (tx) => {
+      const nameParts = (body.candidateName || invitation.candidateName || 'Candidato').trim().split(/\s+/);
+      const firstName = nameParts[0] || 'Candidato';
+      const lastName = nameParts.slice(1).join(' ') || 'Externo';
+      const email = (body.email || invitation.email).trim().toLowerCase();
+
+      let candidate = await tx.user.findFirst({
+        where: {
+          organizationId: exam.organizationId,
+          email,
+        },
+      });
+
+      if (!candidate) {
+        candidate = await tx.user.create({
+          data: {
+            organizationId: exam.organizationId,
+            email,
+            passwordHash: 'CANDIDATE_INVITATION_NO_PASSWORD',
+            firstName,
+            lastName,
+          },
+        });
+      }
+
+      const attempt = await tx.examAttempt.create({
         data: {
-          id: attemptId,
           examId: invitation.examId,
-          userId: candidateUserId,
+          userId: candidate.id,
           status: 'IN_PROGRESS',
-          ipAddress: '189.217.214.72',
-          userAgent: 'Mozilla/5.0 Client',
         }
       });
-      
-      // 2. Actualizamos la invitación
-      await this.prisma.candidateInvitation.update({
+
+      await tx.candidateInvitation.update({
         where: { id: invitation.id },
         data: {
           status: 'USED',
-          attemptId,
+          attemptId: attempt.id,
         }
       });
-    } catch (err) {
-      this.logger.warn('Fallo escritura Prisma. Registrando en memoria local:', err.message);
-      invitation.status = 'USED';
-      invitation.attemptId = attemptId;
-    }
 
-    // Generar un token de sesión dinámico del candidato para que pase el JwtAuthGuard
-    const token = `candidate-session-token-${candidateUserId}`;
+      return { attempt, candidate, organizationId: exam.organizationId };
+    });
+
+    const token = this.iamFacade.issueSessionToken({
+      userId: result.candidate.id,
+      organizationId: result.organizationId,
+      email: result.candidate.email,
+      roles: ['candidate'],
+    });
 
     return {
       status: 'success',
-      attemptId,
+      attemptId: result.attempt.id,
       token,
       message: 'Invitación reclamada con éxito. Sesión de evaluación inicializada.',
     };
@@ -312,10 +337,15 @@ export class EvaluationController {
   })
   @ApiResponse({ status: 200, description: 'Listado de intentos devuelto con éxito.' })
   @Get('attempts')
-  async getAttempts() {
+  @UseGuards(JwtAuthGuard)
+  async getAttempts(@Req() req: any) {
+    this.ensureStaffRole(req.user);
     this.logger.log('Listando todos los intentos de evaluación finalizados...');
+
+    const tenantExamIds = await this.getTenantExamIds(req.user.organizationId);
     
     const attempts = await this.prisma.examAttempt.findMany({
+      where: { examId: { in: tenantExamIds } },
       orderBy: { createdAt: 'desc' },
       include: {
         logs: {
@@ -359,6 +389,126 @@ export class EvaluationController {
   }
 
   /**
+   * Obtener sesión real de examen para el candidato.
+   * GET /evaluations/attempts/:attemptId/session
+   */
+  @ApiOperation({ summary: 'Obtener datos reales de la sesión de examen del candidato' })
+  @ApiParam({ name: 'attemptId', description: 'ID único del intento de evaluación (UUIDv7)', type: String })
+  @Get('attempts/:attemptId/session')
+  @UseGuards(JwtAuthGuard, AttemptOwnerGuard)
+  async getAttemptSession(@Param('attemptId', ParseUUIDPipe) attemptId: string) {
+    const attempt = await this.prisma.examAttempt.findUnique({
+      where: { id: attemptId },
+    });
+
+    if (!attempt) {
+      throw new NotFoundException('Intento de examen no encontrado.');
+    }
+
+    if (!['IN_PROGRESS', 'SUBMITTED'].includes(attempt.status)) {
+      throw new BadRequestException('El intento no se encuentra disponible para el candidato.');
+    }
+
+    const exam = await this.prisma.exam.findUnique({
+      where: { id: attempt.examId },
+    });
+
+    if (!exam) {
+      throw new NotFoundException('Evaluación no encontrada.');
+    }
+
+    const examQuestions = await this.prisma.examQuestion.findMany({
+      where: { examId: exam.id },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    const questions = await this.prisma.question.findMany({
+      where: { id: { in: examQuestions.map((q) => q.questionId) } },
+    });
+    const questionMap = new Map(questions.map((q) => [q.id, q]));
+
+    const safeQuestions = examQuestions
+      .map((examQuestion) => {
+        const question = questionMap.get(examQuestion.questionId);
+        if (!question) return null;
+        const content = this.stripCorrectConfig(question.contentJsonb as any);
+        return {
+          id: question.id,
+          type: question.type,
+          defaultPoints: Number(examQuestion.points || question.defaultPoints),
+          content,
+        };
+      })
+      .filter(Boolean);
+
+    return {
+      attemptId: attempt.id,
+      status: attempt.status,
+      exam: {
+        id: exam.id,
+        title: exam.title,
+        durationMinutes: exam.durationMinutes,
+      },
+      startedAt: attempt.startedAt,
+      submittedAt: attempt.submittedAt,
+      questions: safeQuestions,
+    };
+  }
+
+  /**
+   * Finalizar intento de forma idempotente.
+   * POST /evaluations/attempts/:attemptId/finalize
+   */
+  @ApiOperation({ summary: 'Finalizar intento de evaluación de forma idempotente' })
+  @ApiParam({ name: 'attemptId', description: 'ID único del intento de evaluación (UUIDv7)', type: String })
+  @Post('attempts/:attemptId/finalize')
+  @UseGuards(JwtAuthGuard, AttemptOwnerGuard)
+  @HttpCode(HttpStatus.OK)
+  async finalizeAttempt(@Param('attemptId', ParseUUIDPipe) attemptId: string) {
+    const attempt = await this.prisma.examAttempt.findUnique({
+      where: { id: attemptId },
+    });
+
+    if (!attempt) {
+      throw new NotFoundException('Intento de examen no encontrado.');
+    }
+
+    if (attempt.status === 'COMPLETED') {
+      return {
+        status: attempt.status,
+        message: 'El intento ya había sido finalizado previamente.',
+      };
+    }
+
+    if (attempt.status === 'SUBMITTED') {
+      await this.answersProcessor.consolidateAttemptScore(attemptId);
+      return {
+        status: 'COMPLETED',
+        message: 'El intento ya estaba enviado y fue consolidado nuevamente.',
+      };
+    }
+
+    if (attempt.status !== 'IN_PROGRESS') {
+      throw new BadRequestException('El intento no puede finalizarse desde su estado actual.');
+    }
+
+    await this.prisma.examAttempt.update({
+      where: { id: attemptId },
+      data: {
+        status: 'SUBMITTED',
+        submittedAt: new Date(),
+      },
+    });
+
+    await this.answersProcessor.consolidateAttemptScore(attemptId);
+
+    return {
+      status: 'COMPLETED',
+      message: 'Intento finalizado y consolidado con las respuestas recibidas.',
+    };
+  }
+
+  /**
    * Obtener reporte consolidado detallado de un intento.
    * GET /evaluations/attempts/:attemptId
    */
@@ -370,7 +520,9 @@ export class EvaluationController {
   @ApiResponse({ status: 200, description: 'Reporte del candidato devuelto con éxito.' })
   @ApiResponse({ status: 404, description: 'Intento de examen no encontrado.' })
   @Get('attempts/:attemptId')
-  async getAttemptReport(@Param('attemptId', ParseUUIDPipe) attemptId: string) {
+  @UseGuards(JwtAuthGuard)
+  async getAttemptReport(@Req() req: any, @Param('attemptId', ParseUUIDPipe) attemptId: string) {
+    this.ensureStaffRole(req.user);
     this.logger.log(`Generando reporte para el intento: ${attemptId}`);
 
     const att = await this.prisma.examAttempt.findUnique({
@@ -386,6 +538,8 @@ export class EvaluationController {
     if (!att) {
       throw new BadRequestException('Intento de examen no encontrado.');
     }
+
+    await this.assertAttemptInTenant(att.examId, req.user.organizationId);
 
     const user = await this.prisma.user.findUnique({
       where: { id: att.userId },
@@ -433,7 +587,7 @@ export class EvaluationController {
       overallScore: att.score ? `${att.score}/100` : '0/100',
       ipAddress: att.ipAddress || '127.0.0.1',
       userAgent: att.userAgent || 'Mozilla/5.0 Browser',
-      sessionHmac: att.ltiMapping ? `lti-${att.ltiMapping.id}` : 'local-attempt-signature-chain',
+      sessionHmac: att.ltiMapping ? `lti-${att.ltiMapping.id}` : 'session-audit-metadata',
       dimensions,
       proctoringLogs: logsMapped,
     };
@@ -485,26 +639,9 @@ export class EvaluationController {
     }
 
     try {
-      // 1. Extraer los datos crudos del Base64
-      const parts = body.image.split('base64,');
-      const base64Data = parts[1];
-      const buffer = Buffer.from(base64Data, 'base64');
+      const base64Data = body.image.split('base64,')[1] || '';
+      const approxBytes = Math.floor((base64Data.length * 3) / 4);
 
-      // 2. Definir ruta y asegurar que la carpeta existe
-      const dirPath = path.join(__dirname, '..', '..', '..', '..', 'public', 'snapshots');
-      if (!fs.existsSync(dirPath)) {
-        fs.mkdirSync(dirPath, { recursive: true });
-      }
-
-      // 3. Escribir el archivo en disco
-      const filename = `${attemptId}-${Date.now()}.jpg`;
-      const filePath = path.join(dirPath, filename);
-      fs.writeFileSync(filePath, buffer);
-
-      const publicUrl = `/snapshots/${filename}`;
-      this.logger.log(`Foto guardada físicamente en: ${filePath} | URL pública: ${publicUrl}`);
-
-      // 4. Registrar en la bitácora de auditoría (logs de proctoring)
       const lastLog = await this.prisma.attemptLog.findFirst({
         where: { examAttemptId: attemptId },
         orderBy: { timestamp: 'desc' },
@@ -518,19 +655,21 @@ export class EvaluationController {
           riskLevel: 'INFO',
           metadata: {
             sequence,
-            imageUrl: publicUrl,
+            snapshotStored: false,
+            approxBytes,
+            reason: 'Public snapshot storage disabled until private storage is implemented.',
           },
         },
       });
 
       return {
         status: 'success',
-        message: 'Captura de pantalla registrada de forma exitosa.',
-        imageUrl: publicUrl,
+        message: 'Metadata de captura registrada. El archivo no fue almacenado públicamente.',
+        imageStored: false,
       };
     } catch (err) {
-      this.logger.error(`Error al procesar la foto de supervisión: ${err.message}`, err.stack);
-      throw new BadRequestException(`Fallo al almacenar la imagen en el servidor: ${err.message}`);
+      this.logger.error(`Error al registrar metadata de supervisión: ${err.message}`, err.stack);
+      throw new BadRequestException(`Fallo al registrar metadata de supervisión: ${err.message}`);
     }
   }
 
@@ -542,7 +681,9 @@ export class EvaluationController {
   @ApiParam({ name: 'attemptId', description: 'ID único del intento de evaluación (UUIDv7)', type: String })
   @ApiResponse({ status: 200, description: 'Resultados e IGA calculados devueltos con éxito.' })
   @Get('attempts/:attemptId/resultados')
-  async getAttemptResultados(@Param('attemptId', ParseUUIDPipe) attemptId: string) {
+  @UseGuards(JwtAuthGuard)
+  async getAttemptResultados(@Req() req: any, @Param('attemptId', ParseUUIDPipe) attemptId: string) {
+    this.ensureStaffRole(req.user);
     this.logger.log(`Obteniendo resultados e IGA para el intento: ${attemptId}`);
 
     const attempt = await this.prisma.examAttempt.findUnique({
@@ -560,6 +701,8 @@ export class EvaluationController {
     if (!attempt) {
       throw new BadRequestException('Intento de examen no encontrado.');
     }
+
+    await this.assertAttemptInTenant(attempt.examId, req.user.organizationId);
 
     // Calcular IGA si no existe en la caché
     let igaResult = null;
@@ -645,16 +788,23 @@ export class EvaluationController {
   @ApiParam({ name: 'attemptId', description: 'ID único del intento de evaluación (UUIDv7)', type: String })
   @ApiResponse({ status: 200, description: 'IGA recalculado con éxito.' })
   @Post('attempts/:attemptId/recalcular-iga')
+  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   async recalcularIga(
+    @Req() req: any,
     @Param('attemptId', ParseUUIDPipe) attemptId: string,
     @Body() body: RecalcularIgaDto,
   ) {
+    this.ensureStaffRole(req.user);
     this.logger.log(`Petición de recálculo de IGA para intento: ${attemptId} con perfil: ${body.perfilId}`);
 
-    const igaResult = await this.igaCalculator.calcularIga(attemptId, body.perfilId);
+    const attempt = await this.prisma.examAttempt.findUnique({ where: { id: attemptId } });
+    if (!attempt) throw new BadRequestException('Intento de examen no encontrado.');
+    await this.assertAttemptInTenant(attempt.examId, req.user.organizationId);
 
-    return this.getAttemptResultados(attemptId);
+    await this.igaCalculator.calcularIga(attemptId, body.perfilId);
+
+    return this.getAttemptResultados(req, attemptId);
   }
 
   /**
@@ -664,9 +814,88 @@ export class EvaluationController {
   @ApiOperation({ summary: 'Obtener la lista de todos los perfiles de puesto configurados' })
   @ApiResponse({ status: 200, description: 'Lista de perfiles devuelta con éxito.' })
   @Get('perfiles')
-  async getPerfiles() {
+  @UseGuards(JwtAuthGuard)
+  async getPerfiles(@Req() req: any) {
+    this.ensureStaffRole(req.user);
     return this.prisma.perfilPuesto.findMany({
       orderBy: { nombre: 'asc' },
     });
+  }
+
+  private normalizeAccessCode(accessCode: string): string {
+    if (!accessCode || typeof accessCode !== 'string') {
+      throw new BadRequestException('La clave de acceso es requerida.');
+    }
+    return accessCode.trim().toUpperCase();
+  }
+
+  private async generateUniqueAccessCode(): Promise<string> {
+    for (let i = 0; i < 10; i++) {
+      const accessCode = `IT-${randomInt(100000, 1000000)}`;
+      const existing = await this.prisma.candidateInvitation.findUnique({ where: { accessCode } });
+      if (!existing) return accessCode;
+    }
+    throw new BadRequestException('No fue posible generar una clave de acceso única.');
+  }
+
+  private isUuid(value?: string): boolean {
+    return !!value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  }
+
+  private ensureStaffRole(user: SessionUser): void {
+    const roles = user?.roles || [];
+    const allowed = ['admin', 'recruiter', 'psychologist', 'evaluator'];
+    if (!roles.some((role) => allowed.includes(role))) {
+      throw new ForbiddenException('No tienes permisos para acceder a este recurso.');
+    }
+  }
+
+  private async getTenantExamIds(organizationId: string): Promise<string[]> {
+    const exams = await this.prisma.exam.findMany({
+      where: { organizationId },
+      select: { id: true },
+    });
+    return exams.map((exam) => exam.id);
+  }
+
+  private async assertAttemptInTenant(examId: string, organizationId: string): Promise<void> {
+    const exam = await this.prisma.exam.findFirst({
+      where: { id: examId, organizationId },
+      select: { id: true },
+    });
+    if (!exam) {
+      throw new ForbiddenException('El intento no pertenece a tu organización.');
+    }
+  }
+
+  private async resolveExamForInvitation(examId: string, user: SessionUser) {
+    if (this.isUuid(examId)) {
+      const exam = await this.prisma.exam.findFirst({
+        where: {
+          id: examId,
+          organizationId: user.organizationId,
+        },
+      });
+      if (exam) return exam;
+    }
+
+    const fallbackExam = await this.prisma.exam.findFirst({
+      where: {
+        organizationId: user.organizationId,
+        isPublished: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!fallbackExam) {
+      throw new BadRequestException('No existe una evaluación publicada para crear la invitación.');
+    }
+    return fallbackExam;
+  }
+
+  private stripCorrectConfig(content: any): any {
+    if (!content || typeof content !== 'object') return content;
+    const { correctConfig, correctAnswer, correctAnswers, ...safeContent } = content;
+    return safeContent;
   }
 }

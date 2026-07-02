@@ -66,26 +66,15 @@ export class AnswersQueueProcessor {
         },
       });
 
-      // 4. CONTROL DE CONSOLIDACIÓN CON CONTADOR REDIS
-      // BullMQ expone el cliente de Redis a través de la propiedad 'client' de la cola
-      const redis = job.queue.client;
-      const counterKey = `attempt:${attemptId}:pending_answers`;
-
-      // Decrementar atómicamente el contador en Redis
-      const remainingAnswers = await redis.decr(counterKey);
-      this.logger.debug(`Respuestas pendientes en Redis para intento ${attemptId}: ${remainingAnswers}`);
-
-      // 5. DISPARAR CONSOLIDACIÓN DE NOTA SI SE CUMPLE LA CONDICIÓN
-      // Obtenemos el estado del intento desde la base de datos
+      // 4. Consolidación sin contador Redis: si el intento ya fue finalizado,
+      // recalculamos de forma idempotente con las respuestas persistidas.
       const attempt = await this.prisma.examAttempt.findUnique({
         where: { id: attemptId },
-        select: { status: true },
+        select: { status: true, submittedAt: true },
       });
 
-      // Si el contador es <= 0 y el estudiante ya cliqueó "Submit" (estado SUBMITTED)
-      // significa que esta fue la última respuesta pendiente por procesar de la cola.
-      if (remainingAnswers <= 0 && attempt?.status === 'SUBMITTED') {
-        this.logger.log(`[Worker] Última respuesta procesada para el intento ${attemptId}. Iniciando consolidación final...`);
+      if (attempt && ['SUBMITTED', 'COMPLETED'].includes(attempt.status)) {
+        this.logger.log(`[Worker] Respuesta procesada para intento finalizado ${attemptId}. Recalculando consolidación...`);
         await this.consolidateAttemptScore(attemptId);
       }
 
@@ -100,7 +89,7 @@ export class AnswersQueueProcessor {
    * Evita condiciones de carrera mediante Pessimistic Locking (SELECT FOR UPDATE) en PostgreSQL.
    * Calcula el puntaje total y el desglose de perfil psicométrico por dimensiones.
    */
-  private async consolidateAttemptScore(attemptId: string): Promise<void> {
+  async consolidateAttemptScore(attemptId: string): Promise<void> {
     let finalScore: number;
     await this.prisma.$transaction(async (tx) => {
       // 1. ADQUIRIR BLOQUEO PESIMISTA (FOR UPDATE)
@@ -113,11 +102,6 @@ export class AnswersQueueProcessor {
       const attempt = attempts[0];
       if (!attempt) {
         throw new Error(`Intento ${attemptId} no encontrado para consolidación.`);
-      }
-
-      if (attempt.status === 'COMPLETED') {
-        this.logger.warn(`Intento ${attemptId} ya se encuentra en estado COMPLETED. Omitiendo duplicidad.`);
-        return;
       }
 
       // 2. RECUPERAR RESPUESTAS Y PREGUNTAS ASOCIADAS

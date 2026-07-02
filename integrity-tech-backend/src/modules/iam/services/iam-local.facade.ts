@@ -17,4 +17,8 @@ export class IamLocalFacade implements IamFacade {
   async validateSession(token: string): Promise<SessionUser> {
     return this.authService.verifyJwt(token);
   }
+
+  issueSessionToken(user: SessionUser, expiresInSeconds?: number): string {
+    return this.authService.issueJwt(user, expiresInSeconds);
+  }
 }

@@ -96,7 +96,7 @@ export class LtiController {
     const attempt = await this.ltiService.initializeLtiAttempt(user.id, exam.id, claims);
 
     // 5. Generar token de sesión local para el frontend
-    const localToken = this.ltiService.generateSessionToken(user.id);
+    const localToken = await this.ltiService.generateSessionToken(user.id);
 
     // 6. Redirigir al visualizador de Next.js
     const frontendUrl = `http://localhost:3000/exam/${attempt.id}?token=${localToken}`;

@@ -540,21 +540,58 @@ export default function ExamTakingPage({ params }: { params: { attemptId: string
   const isOffline = useExamStore((state) => state.isOffline);
   const answers = useExamStore((state) => state.answers);
 
-  // Estados locales para simular la hora sincronizada del servidor
+  const [examSession, setExamSession] = useState<{
+    exam: { id: string; title: string; durationMinutes?: number | null };
+    questions: QuestionDto[];
+    status: string;
+  } | null>(null);
+  const [isLoadingSession, setIsLoadingSession] = useState(true);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const [initialServerTimeMs] = useState(Date.now());
-  const [endTimeMs] = useState(Date.now() + 10 * 60 * 1000); // 10 minutos de duración para la demostración
+  const [endTimeMs, setEndTimeMs] = useState(Date.now() + 10 * 60 * 1000);
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
   const [showFeedbackSurvey, setShowFeedbackSurvey] = useState(false);
 
   // Inicializar el store de Zustand con los parámetros de la sesión
   useEffect(() => {
-    startExam(attemptId, MOCK_EXAM.id);
-    // Tracking de inicio de sesión de evaluación (PMF Feedback Loop)
-    analyticsService.track('assessment_started', { attemptId, examId: MOCK_EXAM.id });
+    async function loadSession() {
+      try {
+        const token = localStorage.getItem('auth-token') || '';
+        const response = await fetch(`/api/evaluations/attempts/${attemptId}/session`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || 'No se pudo cargar la evaluación asignada.');
+        }
+
+        const data = await response.json();
+        if (!Array.isArray(data.questions) || data.questions.length === 0) {
+          throw new Error('La evaluación no tiene preguntas configuradas.');
+        }
+
+        setExamSession(data);
+        startExam(attemptId, data.exam.id);
+        setStatus(data.status === 'SUBMITTED' ? 'SUBMITTED' : 'IN_PROGRESS');
+        const durationMinutes = data.exam.durationMinutes || 10;
+        setEndTimeMs(Date.now() + durationMinutes * 60 * 1000);
+        analyticsService.track('assessment_started', { attemptId, examId: data.exam.id });
+      } catch (err: any) {
+        setSessionError(err.message || 'No se pudo cargar la sesión de examen.');
+      } finally {
+        setIsLoadingSession(false);
+      }
+    }
+
+    loadSession();
   }, [attemptId, startExam]);
 
   // Tracking de navegación de preguntas para embudos de drop-off
-  const activeQuestion = MOCK_QUESTIONS[activeQuestionIndex];
+  const questions = examSession?.questions || [];
+  const activeQuestion = questions[activeQuestionIndex];
   useEffect(() => {
     if (activeQuestion) {
       analyticsService.track('question_viewed', {
@@ -594,18 +631,52 @@ export default function ExamTakingPage({ params }: { params: { attemptId: string
 
   // Envío final del examen
   const triggerFinalSubmit = async () => {
-    setStatus('SUBMITTED');
-    setShowFeedbackSurvey(true); // Mostrar encuesta NPS ante entrega
+    try {
+      const flushed = await syncEngine?.flushAnswers(6000);
+      if (flushed === false) {
+        throw new Error('Aún hay respuestas pendientes de sincronización. Espera unos segundos y vuelve a finalizar.');
+      }
 
-    // Tracking de finalización del examen (PMF Feedback Loop)
-    analyticsService.track('assessment_submitted', { attemptId });
-    console.log('Enviando respuestas consolidadas al backend:', answers);
+      const token = localStorage.getItem('auth-token') || '';
+      const response = await fetch(`/api/evaluations/attempts/${attemptId}/finalize`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-    // En un flujo real, aquí llamamos a:
-    // fetch(`/api/evaluations/attempts/${attemptId}/finalize`, { method: 'POST' })
-    // Si falla por red, el SyncEngine se encargará de encolar el cierre definitivo.
-    alert('Examen enviado con éxito. Tus respuestas se han sincronizado.');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'No se pudo finalizar la evaluación.');
+      }
+
+      setStatus('SUBMITTED');
+      setShowFeedbackSurvey(true);
+      analyticsService.track('assessment_submitted', { attemptId });
+      console.log('Respuestas locales al finalizar:', answers);
+    } catch (err: any) {
+      alert(err.message || 'No se pudo finalizar la evaluación. Revisa tu conexión e inténtalo de nuevo.');
+    }
   };
+
+  if (isLoadingSession) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center font-sans">
+        <div className="text-sm text-slate-500 font-medium">Cargando evaluación asignada...</div>
+      </div>
+    );
+  }
+
+  if (sessionError || !examSession) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center font-sans p-6">
+        <div className="max-w-md text-center bg-slate-900 border border-slate-800 rounded-xl p-6">
+          <h1 className="text-lg font-bold text-white">No se pudo abrir la evaluación</h1>
+          <p className="text-sm text-slate-400 mt-2">{sessionError || 'La sesión no está disponible.'}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col">
@@ -618,7 +689,7 @@ export default function ExamTakingPage({ params }: { params: { attemptId: string
             className="w-7 h-7 object-contain rounded-md flex-shrink-0"
           />
           <div>
-            <h1 className="text-sm font-bold text-slate-200 tracking-wide text-left">{MOCK_EXAM.title}</h1>
+            <h1 className="text-sm font-bold text-slate-200 tracking-wide text-left">{examSession.exam.title}</h1>
             <p className="text-3xs text-slate-500 mt-0.5">ID de Intento: {attemptId}</p>
           </div>
         </div>
@@ -673,7 +744,7 @@ export default function ExamTakingPage({ params }: { params: { attemptId: string
             {/* Indicador de Navegación de Preguntas (Minimalista y Unificado) */}
             <div className="flex justify-center items-center py-3 border-b border-slate-900">
               <span className="text-2xs uppercase tracking-widest font-mono text-slate-500 font-semibold">
-                Pregunta <span className="text-indigo-400 font-bold text-sm mx-1">{activeQuestionIndex + 1}</span> de <span className="text-slate-300 font-bold text-sm mx-1">{MOCK_QUESTIONS.length}</span>
+                Pregunta <span className="text-indigo-400 font-bold text-sm mx-1">{activeQuestionIndex + 1}</span> de <span className="text-slate-300 font-bold text-sm mx-1">{questions.length}</span>
               </span>
             </div>
 
@@ -697,7 +768,7 @@ export default function ExamTakingPage({ params }: { params: { attemptId: string
                 Anterior
               </button>
 
-              {activeQuestionIndex < MOCK_QUESTIONS.length - 1 ? (
+              {activeQuestionIndex < questions.length - 1 ? (
                 <button
                   onClick={() => setActiveQuestionIndex((prev) => prev + 1)}
                   className="px-6 py-2.5 rounded-lg bg-slate-800 text-slate-200 text-sm font-medium hover:bg-slate-700 transition-all cursor-pointer"

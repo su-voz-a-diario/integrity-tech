@@ -84,7 +84,10 @@ export default function RecruiterDashboard() {
     try {
       const res = await fetch('/api/evaluations/invitations', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth-token') || ''}`,
+        },
         body: JSON.stringify(inviteForm),
       });
       
@@ -100,7 +103,11 @@ export default function RecruiterDashboard() {
 
   // Carga asíncrona de datos desde la API
   useEffect(() => {
-    fetch('/api/evaluations/attempts')
+    fetch('/api/evaluations/attempts', {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('auth-token') || ''}`,
+      },
+    })
       .then((res) => {
         if (!res.ok) throw new Error('API Error');
         return res.json();
@@ -110,8 +117,8 @@ export default function RecruiterDashboard() {
         setIsLoading(false);
       })
       .catch((err) => {
-        console.warn('[Dashboard] Fallback a mocks locales debido a inactividad del backend:', err);
-        setAttempts(MOCK_ATTEMPTS);
+        console.warn('[Dashboard] No se pudieron cargar intentos reales:', err);
+        setAttempts(process.env.NEXT_PUBLIC_ENABLE_DEMO_MOCKS === 'true' ? MOCK_ATTEMPTS : []);
         setIsLoading(false);
       });
   }, []);

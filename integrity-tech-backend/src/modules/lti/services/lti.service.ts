@@ -1,11 +1,15 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/database/prisma.service';
+import { IamFacade } from '../../iam';
 
 @Injectable()
 export class LtiService {
   private readonly logger = new Logger(LtiService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly iamFacade: IamFacade,
+  ) {}
 
   /**
    * Valida sintácticamente el id_token (JWT) del LMS.
@@ -157,8 +161,19 @@ export class LtiService {
   /**
    * Genera una sesión JWT local válida para que el estudiante acceda a la app.
    */
-  generateSessionToken(userId: string): string {
-    // En producción se firma con la clave privada de Integrity-Tech
-    return `lti-session-token-jwt-for-user-${userId}`;
+  async generateSessionToken(userId: string): Promise<string> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, organizationId: true, email: true },
+    });
+    if (!user) {
+      throw new BadRequestException('Usuario LTI no encontrado para generar sesión.');
+    }
+    return this.iamFacade.issueSessionToken({
+      userId: user.id,
+      organizationId: user.organizationId,
+      email: user.email,
+      roles: ['candidate'],
+    });
   }
 }
