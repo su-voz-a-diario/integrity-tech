@@ -143,11 +143,20 @@ export default function RecruiterDashboard() {
               </p>
             </div>
           </div>
-          <div className="flex items-center justify-between md:justify-end gap-2 bg-slate-900/30 border border-slate-800 py-1.5 px-3 rounded-lg w-full md:w-auto">
-            <span className="text-3xs text-slate-500 font-semibold uppercase tracking-wider">Empresa Cliente:</span>
-            <span className="text-xs font-bold text-indigo-400">
-              Integrity-Tech Corp
-            </span>
+          <div className="flex flex-wrap items-center justify-between md:justify-end gap-3 w-full md:w-auto">
+            <div className="flex items-center gap-2 bg-slate-900/30 border border-slate-800 py-1.5 px-3 rounded-lg">
+              <span className="text-3xs text-slate-500 font-semibold uppercase tracking-wider">Empresa Cliente:</span>
+              <span className="text-xs font-bold text-indigo-400">
+                Integrity-Tech Corp
+              </span>
+            </div>
+            <Link 
+              href="/ciencia" 
+              target="_blank"
+              className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-850 border border-indigo-500/20 hover:border-indigo-500/40 py-1.5 px-3 rounded-lg text-xs font-semibold text-slate-200 transition-all cursor-pointer shadow-sm shadow-indigo-500/5"
+            >
+              🔬 Fundamentos Científicos (White Paper)
+            </Link>
           </div>
         </div>
 

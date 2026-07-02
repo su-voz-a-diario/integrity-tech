@@ -73,9 +73,14 @@ export default function WelcomePage() {
       </div>
 
       {/* METADATOS TÉCNICOS */}
-      <div className="border-t border-slate-900 pt-6 text-2xs text-slate-600 font-mono flex flex-col gap-1">
+      <div className="border-t border-slate-900 pt-6 text-2xs text-slate-600 font-mono flex flex-col gap-2">
         <div>Plataforma Integrada en NestJS (API/Colas) & Next.js (Client)</div>
         <div>Base de Datos: PostgreSQL + Redis (BullMQ)</div>
+        <div className="mt-2 text-xs font-semibold">
+          <Link href="/ciencia" className="text-indigo-400 hover:text-indigo-350 underline">
+            🔬 Respaldado por Ciencia: Ver White Paper Técnico v1.0
+          </Link>
+        </div>
       </div>
 
     </div>
