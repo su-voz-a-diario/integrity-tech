@@ -52,6 +52,9 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
     continuousNorm: {
       findFirst: jest.fn(),
     },
+    equatingCoefficients: {
+      findFirst: jest.fn(),
+    },
     resultadoGlobal: {
       upsert: jest.fn(),
     },
@@ -94,6 +97,7 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
       { id: 'Q2', type: 'verbal' },
       { id: 'Q3', type: 'verbal' },
     ]);
+    dbMocks.equatingCoefficients.findFirst.mockResolvedValue(null);
   });
 
   it('Debe simular estimación de theta ignorando ítems omitidos y calculando IGA dinámico', async () => {

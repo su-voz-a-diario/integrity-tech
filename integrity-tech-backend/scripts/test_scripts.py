@@ -9,6 +9,7 @@ sys.path.append(os.path.dirname(__file__))
 import calibrate
 import analyze_dif
 import continuous_norming
+import equating
 
 class TestPsychometricScripts(unittest.TestCase):
     def setUp(self):
@@ -24,8 +25,8 @@ class TestPsychometricScripts(unittest.TestCase):
         calibrate.run_calibration()
         
         # Verificar que se conectó y llamó al cursor
-        mock_connect.assert_called_once()
-        self.mock_conn.cursor.assert_called_once()
+        mock_connect.assert_called()
+        self.mock_conn.cursor.assert_called()
         
         # Verificar que se ejecutó la query de archivado histórico
         self.assertTrue(any("INSERT INTO parametros_items_historial" in call[0][0] 
@@ -53,9 +54,9 @@ class TestPsychometricScripts(unittest.TestCase):
                 self.assertTrue(rmsea >= 0.0)
         
         # Verificar commit y cierres
-        self.mock_conn.commit.assert_called_once()
-        self.mock_cur.close.assert_called_once()
-        self.mock_conn.close.assert_called_once()
+        self.mock_conn.commit.assert_called()
+        self.mock_cur.close.assert_called()
+        self.mock_conn.close.assert_called()
 
     @patch('psycopg2.connect')
     def test_dif_analysis_script(self, mock_connect):
@@ -131,6 +132,29 @@ class TestPsychometricScripts(unittest.TestCase):
                             for call in self.mock_cur.execute.call_args_list))
         self.assertTrue(any("INSERT INTO continuous_norms" in call[0][0] 
                             for call in self.mock_cur.executemany.call_args_list))
+
+    @patch('psycopg2.connect')
+    def test_equating_script(self, mock_connect):
+        import datetime
+        mock_connect.return_value = self.mock_conn
+        
+        # Simular respuestas en DB para los querys
+        # 1. Nuevos ítems
+        # 2. Fecha de calibración histórica
+        # 3. Ítems históricos
+        self.mock_cur.fetchone.return_value = (datetime.datetime(2026, 1, 1),)
+        
+        self.mock_cur.fetchall.side_effect = [
+            [('Q1', '2PL', -0.5, None, None, None, None), ('Q2', '2PL', 0.5, None, None, None, None)], # nuevos
+            [('Q1', '2PL', -0.6, None, None, None, None), ('Q2', '2PL', 0.4, None, None, None, None)]  # históricos (base)
+        ]
+        
+        # Ejecutar equating
+        equating.run_equating('IT2_AC10')
+        
+        # Verificar que se guardaron los coeficientes en equating_coefficients
+        self.assertTrue(any("INSERT INTO equating_coefficients" in call[0][0]
+                            for call in self.mock_cur.execute.call_args_list))
 
 if __name__ == '__main__':
     unittest.main()

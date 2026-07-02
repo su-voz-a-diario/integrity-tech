@@ -398,6 +398,15 @@ def run_calibration():
         conn.commit()
         print("[IRT Calibrate] Calibración psicométrica completada y guardada con éxito.")
 
+        # 4. Ejecutar equiparación psicométrica (Test Equating)
+        try:
+            import equating
+            print("[IRT Calibrate] Iniciando equiparación automática para colocar escalas en métrica base...")
+            for t_id in ['IT2_I', 'IT2_P10', 'IT2_AC10', 'IT2_CB10']:
+                equating.run_equating(t_id)
+        except Exception as eq_err:
+            print(f"[IRT Calibrate Warning] Error en la equiparación automática: {eq_err}")
+
     except Exception as e:
         conn.rollback()
         print(f"[IRT Calibrate Error] Fallo al procesar la calibración: {e}")

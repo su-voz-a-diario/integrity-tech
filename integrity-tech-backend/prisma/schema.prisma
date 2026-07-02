@@ -428,3 +428,16 @@ model ContinuousNorm {
   @@map("continuous_norms")
 }
 
+model EquatingCoefficients {
+  id             Int      @id @default(autoincrement())
+  testId         String   @map("test_id") @db.VarChar(50)
+  versionOrigen  String   @map("version_origen") @db.VarChar(50)
+  versionDestino String   @map("version_destino") @db.VarChar(50)
+  metodo         String   @default("mean_sigma") @db.VarChar(50)
+  coeficienteA   Float    @map("coeficiente_a")
+  coeficienteB   Float    @map("coeficiente_b")
+  fechaCreacion  DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
+
+  @@map("equating_coefficients")
+}
+

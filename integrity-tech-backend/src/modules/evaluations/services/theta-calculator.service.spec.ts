@@ -14,6 +14,9 @@ describe('ThetaCalculatorService (Unit Tests)', () => {
     question: {
       findMany: jest.fn(),
     },
+    equatingCoefficients: {
+      findFirst: jest.fn(),
+    },
   };
 
   beforeEach(async () => {
@@ -36,6 +39,7 @@ describe('ThetaCalculatorService (Unit Tests)', () => {
       { id: 'Q2', type: 'verbal' },
       { id: 'Q3', type: 'verbal' },
     ]);
+    mockPrismaService.equatingCoefficients.findFirst.mockResolvedValue(null);
   });
 
   it('Debe estimar theta correctamente para ítems dicotómicos 2PL y calcular escalas T-score/CI', async () => {
