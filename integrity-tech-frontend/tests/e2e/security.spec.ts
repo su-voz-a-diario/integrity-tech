@@ -21,7 +21,7 @@ test.describe('Enterprise E2E security controls', () => {
 
     await seedAuthenticatedPage(page, recruiter.accessToken);
     await page.goto('/staff/psychometrics');
-    await expect(page.getByText('No tienes permisos para acceder a la consola editorial.', { exact: true })).toBeVisible();
+    await expect(page.getByText('No tienes permisos para acceder a este recurso.', { exact: true })).toBeVisible();
   });
 
   test('candidate cannot access staff dashboard data', async ({ page, request }) => {
