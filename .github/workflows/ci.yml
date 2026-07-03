@@ -208,11 +208,11 @@ jobs:
       - name: Start backend for smoke validation
         run: |
           mkdir -p .ci-logs
-          (
+          setsid bash -lc '
             cd integrity-tech-backend
             echo "Starting backend from: $(pwd)"
-            npm run start:prod
-          ) > .ci-logs/backend-smoke.log 2>&1 &
+            exec npm run start:prod
+          ' > .ci-logs/backend-smoke.log 2>&1 &
           echo "$!" > .ci-logs/backend-smoke.pid
         env:
           PORT: "3001"
@@ -245,7 +245,7 @@ jobs:
               exit 0
             fi
 
-            if [ -f .ci-logs/backend-smoke.pid ] && ! kill -0 "$(cat .ci-logs/backend-smoke.pid)" 2>/dev/null; then
+            if [ -f .ci-logs/backend-smoke.pid ] && ! kill -0 "-$(cat .ci-logs/backend-smoke.pid)" 2>/dev/null; then
               echo "Backend process exited before readiness."
               print_backend_diagnostics
               exit 1
@@ -262,16 +262,6 @@ jobs:
         working-directory: integrity-tech-backend
         run: npm run smoke
 
-      - name: Stop backend after smoke validation
-        if: always()
-        run: |
-          if [ -f .ci-logs/backend-smoke.pid ]; then
-            pid="$(cat .ci-logs/backend-smoke.pid)"
-            if kill -0 "$pid" 2>/dev/null; then
-              kill "$pid"
-            fi
-          fi
-
       - name: Show backend logs on smoke failure
         if: failure()
         run: |
@@ -284,6 +274,58 @@ jobs:
       - name: Backup and restore smoke validation
         working-directory: integrity-tech-backend
         run: npm run smoke:backup-restore
+
+      - name: Stop backend after smoke validations
+        if: always()
+        run: |
+          print_port_diagnostics() {
+            echo "---- processes listening on 3001 ----"
+            if command -v lsof >/dev/null 2>&1; then
+              lsof -nP -iTCP:3001 -sTCP:LISTEN || true
+            fi
+            if command -v ss >/dev/null 2>&1; then
+              ss -ltnp 'sport = :3001' || true
+            fi
+            echo "---- node/npm processes ----"
+            ps -ef | grep -E 'node|npm|nest' | grep -v grep || true
+            echo "---- backend smoke logs ----"
+            cat .ci-logs/backend-smoke.log || true
+          }
+
+          if [ -f .ci-logs/backend-smoke.pid ]; then
+            pgid="$(cat .ci-logs/backend-smoke.pid)"
+            if kill -0 "-$pgid" 2>/dev/null; then
+              echo "Stopping backend process group $pgid"
+              kill -TERM "-$pgid" 2>/dev/null || true
+
+              for attempt in {1..20}; do
+                if ! kill -0 "-$pgid" 2>/dev/null; then
+                  break
+                fi
+                sleep 1
+              done
+
+              if kill -0 "-$pgid" 2>/dev/null; then
+                echo "Backend process group $pgid did not stop after SIGTERM; sending SIGKILL."
+                kill -KILL "-$pgid" 2>/dev/null || true
+              fi
+
+              wait "$pgid" 2>/dev/null || true
+            fi
+          fi
+
+          for attempt in {1..30}; do
+            status="$(curl -sS -o /tmp/integrity-health-live-after-stop.txt -w "%{http_code}" http://127.0.0.1:3001/health/live || true)"
+            if [ "$status" = "000" ]; then
+              echo "Backend port 3001 is free."
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "Backend port 3001 is still responding after shutdown."
+          print_port_diagnostics
+          exit 1
 
       - name: Install Playwright browser
         working-directory: integrity-tech-frontend
