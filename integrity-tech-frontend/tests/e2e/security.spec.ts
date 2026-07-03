@@ -21,7 +21,7 @@ test.describe('Enterprise E2E security controls', () => {
 
     await seedAuthenticatedPage(page, recruiter.accessToken);
     await page.goto('/staff/psychometrics');
-    await expect(page.getByText(/No tienes permisos|consola editorial|Sesión requerida/i)).toBeVisible();
+    await expect(page.getByText('No tienes permisos para acceder a la consola editorial.', { exact: true })).toBeVisible();
   });
 
   test('candidate cannot access staff dashboard data', async ({ page, request }) => {
@@ -34,7 +34,7 @@ test.describe('Enterprise E2E security controls', () => {
 
     await seedAuthenticatedPage(page, candidate.token);
     await page.goto('/recruiter/dashboard');
-    await expect(page.getByText(/No tienes permisos|No se encontraron candidatos|sesión expiró/i)).toBeVisible();
+    await expect(page.getByText('No tienes permisos para consultar intentos de evaluación.', { exact: true })).toBeVisible();
   });
 
   test('known UUID from another tenant does not expose reports or attempts', async ({ request }) => {
