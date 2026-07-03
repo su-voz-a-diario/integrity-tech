@@ -17,6 +17,7 @@ export class RedisRateLimitStore implements OnModuleDestroy {
   private readonly logger = new Logger(RedisRateLimitStore.name);
   private readonly memoryBuckets = new Map<string, MemoryBucket>();
   private redis: Redis | null = null;
+  private redisConnection: Promise<Redis> | null = null;
   private redisUnavailableLogged = false;
 
   async increment(key: string, windowMs: number): Promise<RateLimitHit> {
@@ -25,7 +26,7 @@ export class RedisRateLimitStore implements OnModuleDestroy {
     }
 
     try {
-      const redis = this.getRedis();
+      const redis = await this.getConnectedRedis();
       const namespacedKey = `integrity:rate-limit:${key}`;
       const count = await redis.incr(namespacedKey);
       if (count === 1) {
@@ -54,10 +55,27 @@ export class RedisRateLimitStore implements OnModuleDestroy {
     if (this.redis) {
       this.redis.disconnect();
     }
+    this.redisConnection = null;
   }
 
   resetForTests() {
     this.memoryBuckets.clear();
+  }
+
+  private async getConnectedRedis(): Promise<Redis> {
+    const redis = this.getRedis();
+    if (redis.status === 'ready') return redis;
+
+    if (!this.redisConnection) {
+      this.redisConnection = redis.connect()
+        .then(() => redis)
+        .catch((error) => {
+          this.redisConnection = null;
+          throw error;
+        });
+    }
+
+    return this.redisConnection;
   }
 
   private getRedis(): Redis {
@@ -67,7 +85,7 @@ export class RedisRateLimitStore implements OnModuleDestroy {
         port: parseInt(process.env.REDIS_PORT || '6379', 10),
         password: process.env.REDIS_PASSWORD || undefined,
         keyPrefix: process.env.REDIS_KEY_PREFIX || '',
-        lazyConnect: false,
+        lazyConnect: true,
         enableOfflineQueue: false,
         maxRetriesPerRequest: 1,
         connectTimeout: 750,
