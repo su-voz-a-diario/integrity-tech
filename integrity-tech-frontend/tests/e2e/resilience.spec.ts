@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import './fixtures/rate-limit-isolation';
 import {
   E2E,
   acceptConsent,

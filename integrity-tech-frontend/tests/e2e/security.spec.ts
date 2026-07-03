@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import './fixtures/rate-limit-isolation';
 import {
   E2E,
   acceptConsent,
@@ -63,7 +64,7 @@ test.describe('Enterprise E2E security controls', () => {
   });
 
   test('rate limit responds with 429 on repeated failed login', async ({ request }) => {
-    const email = `missing-${Date.now()}@e2e.integrity.test`;
+    const email = 'rate-limit-isolation@e2e.integrity.test';
     const statuses: number[] = [];
     for (let i = 0; i < 7; i += 1) {
       const response = await request.post(`${E2E.apiBaseURL}/auth/login`, {
@@ -72,5 +73,13 @@ test.describe('Enterprise E2E security controls', () => {
       statuses.push(response.status());
     }
     expect(statuses).toContain(429);
+  });
+
+  test('rate limit counters are isolated between E2E tests', async ({ request }) => {
+    const response = await request.post(`${E2E.apiBaseURL}/auth/login`, {
+      data: { email: 'rate-limit-isolation@e2e.integrity.test', password: 'wrong-password', organizationSlug: E2E.orgA },
+    });
+
+    expect(response.status()).not.toBe(429);
   });
 });
