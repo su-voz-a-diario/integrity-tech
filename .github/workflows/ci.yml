@@ -201,9 +201,66 @@ jobs:
         working-directory: integrity-tech-backend
         run: npm run seed:e2e
 
+      - name: Build backend for smoke validation
+        working-directory: integrity-tech-backend
+        run: npm run build
+
+      - name: Start backend for smoke validation
+        working-directory: integrity-tech-backend
+        run: |
+          mkdir -p ../.ci-logs
+          nohup npm run start:prod > ../.ci-logs/backend-smoke.log 2>&1 &
+          echo "$!" > ../.ci-logs/backend-smoke.pid
+        env:
+          PORT: "3001"
+
+      - name: Wait for backend readiness
+        run: |
+          for attempt in {1..60}; do
+            status="$(curl -sS -o /tmp/integrity-health-ready.txt -w "%{http_code}" http://127.0.0.1:3001/health/ready || true)"
+            if [ "$status" = "200" ]; then
+              echo "Backend is ready."
+              exit 0
+            fi
+
+            if [ -f .ci-logs/backend-smoke.pid ] && ! kill -0 "$(cat .ci-logs/backend-smoke.pid)" 2>/dev/null; then
+              echo "Backend process exited before readiness."
+              echo "---- backend logs ----"
+              cat .ci-logs/backend-smoke.log || true
+              echo "---- health response ----"
+              cat /tmp/integrity-health-ready.txt || true
+              exit 1
+            fi
+
+            sleep 2
+          done
+
+          echo "Backend did not become ready before timeout."
+          echo "---- backend logs ----"
+          cat .ci-logs/backend-smoke.log || true
+          echo "---- health response ----"
+          cat /tmp/integrity-health-ready.txt || true
+          exit 1
+
       - name: Database smoke validation
         working-directory: integrity-tech-backend
         run: npm run smoke
+
+      - name: Stop backend after smoke validation
+        if: always()
+        run: |
+          if [ -f .ci-logs/backend-smoke.pid ]; then
+            pid="$(cat .ci-logs/backend-smoke.pid)"
+            if kill -0 "$pid" 2>/dev/null; then
+              kill "$pid"
+            fi
+          fi
+
+      - name: Show backend logs on smoke failure
+        if: failure()
+        run: |
+          echo "---- backend smoke logs ----"
+          cat .ci-logs/backend-smoke.log || true
 
       - name: Install PostgreSQL client tools
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
