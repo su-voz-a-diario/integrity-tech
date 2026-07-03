@@ -211,7 +211,7 @@ jobs:
           (
             cd integrity-tech-backend
             echo "Starting backend from: $(pwd)"
-            node dist/main.js
+            npm run start:prod
           ) > .ci-logs/backend-smoke.log 2>&1 &
           echo "$!" > .ci-logs/backend-smoke.pid
         env:

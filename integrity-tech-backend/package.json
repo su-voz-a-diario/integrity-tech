@@ -11,7 +11,7 @@
     "start:dev": "nest start --watch",
     "start:e2e": "nest start",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
+    "start:prod": "node dist/main.js",
     "seed": "ts-node prisma/seed.ts",
     "seed:e2e": "ts-node prisma/seed-e2e.ts",
     "backfill:psychometric-governance": "ts-node prisma/backfill-psychometric-governance.ts",

@@ -55,7 +55,7 @@ services:
       dockerfile: Dockerfile
     container_name: integrity-tech-api
     restart: always
-    command: node dist/main
+    command: node dist/main.js
     ports:
       - "3001:3001"
     environment:
@@ -79,7 +79,7 @@ services:
       dockerfile: Dockerfile
     container_name: integrity-tech-worker
     restart: always
-    command: node dist/main-worker # Sobrescribimos el comando para arrancar en modo Headless
+    command: node dist/main-worker.js # Sobrescribimos el comando para arrancar en modo Headless
     environment:
       - DATABASE_URL=postgresql://postgres:localpassword123@postgres:5432/integrity_tech_db?schema=public
       - REDIS_HOST=redis

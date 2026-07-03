@@ -10,7 +10,7 @@ FROM node:20-alpine AS build
 WORKDIR /app
 RUN apk add --no-cache openssl
 COPY --from=deps /app/node_modules ./node_modules
-COPY package.json package-lock.json tsconfig*.json ./
+COPY package.json package-lock.json nest-cli.json tsconfig*.json ./
 COPY prisma ./prisma
 COPY src ./src
 COPY test ./test
@@ -33,4 +33,4 @@ USER nodeapp
 EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD curl -fsS http://127.0.0.1:${PORT}/health/live || exit 1
-CMD ["node", "dist/main"]
+CMD ["node", "dist/main.js"]
