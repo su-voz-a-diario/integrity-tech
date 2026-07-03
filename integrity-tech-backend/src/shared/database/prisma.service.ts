@@ -1,9 +1,11 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { MetricsService } from '../observability/metrics.service';
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name);
+  private metrics?: MetricsService;
 
   constructor() {
     super({
@@ -15,12 +17,13 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       ],
     });
 
-    // Suscribir a logs de queries en entorno de desarrollo para depuración de rendimiento
-    if (process.env.NODE_ENV !== 'production') {
-      (this as any).$on('query', (e: any) => {
-        this.logger.debug(`Query: ${e.query} | Params: ${e.params} | Duration: ${e.duration}ms`);
-      });
-    }
+    (this as any).$on('query', (e: any) => {
+      this.metrics?.recordDbQuery(e.query || 'UNKNOWN', e.duration || 0);
+    });
+  }
+
+  setMetrics(metrics: MetricsService) {
+    this.metrics = metrics;
   }
 
   async onModuleInit() {
@@ -156,17 +159,17 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
             -- 2. Identificar combinaciones de test y perfiles demográficos de los candidatos en resultados_test usando GROUPING SETS
             FOR r_comb IN
-                SELECT r.test_id, u.pais, u.sector, u.nivel_educativo, u.tipo_puesto, COUNT(*)::INTEGER as cnt
+                SELECT att.organization_id, r.test_id, u.pais, u.sector, u.nivel_educativo, u.tipo_puesto, COUNT(*)::INTEGER as cnt
                 FROM resultados_test r
                 INNER JOIN exam_attempts att ON r.exam_attempt_id = att.id
                 INNER JOIN users u ON att.user_id = u.id
                 WHERE r.theta IS NOT NULL AND r.irt_calculated = true
                 GROUP BY GROUPING SETS (
-                    (r.test_id, u.pais, u.sector, u.nivel_educativo, u.tipo_puesto),
-                    (r.test_id, u.pais, u.sector, u.nivel_educativo),
-                    (r.test_id, u.pais, u.sector),
-                    (r.test_id, u.pais),
-                    (r.test_id)
+                    (att.organization_id, r.test_id, u.pais, u.sector, u.nivel_educativo, u.tipo_puesto),
+                    (att.organization_id, r.test_id, u.pais, u.sector, u.nivel_educativo),
+                    (att.organization_id, r.test_id, u.pais, u.sector),
+                    (att.organization_id, r.test_id, u.pais),
+                    (att.organization_id, r.test_id)
                 )
                 HAVING COUNT(*) >= 100
             LOOP
@@ -179,6 +182,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
                     INNER JOIN exam_attempts att ON r.exam_attempt_id = att.id
                     INNER JOIN users u ON att.user_id = u.id
                     WHERE r.test_id = r_comb.test_id
+                      AND att.organization_id = r_comb.organization_id
                       AND r.theta IS NOT NULL
                       AND r.irt_calculated = true
                       AND (r_comb.pais IS NULL OR u.pais = r_comb.pais)
@@ -188,15 +192,15 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
                     v_theta_max := COALESCE(v_theta_val, -4.0 + (v_percentil * 0.08));
 
-                    INSERT INTO baremos_dinamicos (test_id, pais, sector, nivel_educativo, tipo_puesto, theta_min, theta_max, percentil, n_muestra, fecha_creacion)
-                    VALUES (r_comb.test_id, r_comb.pais, r_comb.sector, r_comb.nivel_educativo, r_comb.tipo_puesto, v_theta_min, v_theta_max, v_percentil, r_comb.cnt, NOW());
+                    INSERT INTO baremos_dinamicos (organization_id, test_id, pais, sector, nivel_educativo, tipo_puesto, theta_min, theta_max, percentil, n_muestra, fecha_creacion)
+                    VALUES (r_comb.organization_id, r_comb.test_id, r_comb.pais, r_comb.sector, r_comb.nivel_educativo, r_comb.tipo_puesto, v_theta_min, v_theta_max, v_percentil, r_comb.cnt, NOW());
 
                     v_theta_min := v_theta_max;
                 END LOOP;
 
                 -- Agregar el percentil 100 (infinito superior)
-                INSERT INTO baremos_dinamicos (test_id, pais, sector, nivel_educativo, tipo_puesto, theta_min, theta_max, percentil, n_muestra, fecha_creacion)
-                VALUES (r_comb.test_id, r_comb.pais, r_comb.sector, r_comb.nivel_educativo, r_comb.tipo_puesto, v_theta_min, 999.0, 100, r_comb.cnt, NOW());
+                INSERT INTO baremos_dinamicos (organization_id, test_id, pais, sector, nivel_educativo, tipo_puesto, theta_min, theta_max, percentil, n_muestra, fecha_creacion)
+                VALUES (r_comb.organization_id, r_comb.test_id, r_comb.pais, r_comb.sector, r_comb.nivel_educativo, r_comb.tipo_puesto, v_theta_min, 999.0, 100, r_comb.cnt, NOW());
             END LOOP;
         END;
         $$ LANGUAGE plpgsql;
@@ -207,12 +211,17 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     }
 
     try {
+      const defaultOrganization = await this.organization.findFirst({
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
       const count = await this.perfilPuesto.count();
-      if (count === 0) {
+      if (count === 0 && defaultOrganization) {
         this.logger.log('Sembrando perfiles de puesto iniciales en la base de datos...');
         await this.perfilPuesto.createMany({
           data: [
             {
+              organizationId: defaultOrganization.id,
               nombre: 'Gerente Comercial',
               wIntegridad: 0.35,
               wPersonalidad: 0.25,
@@ -220,6 +229,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
               wCompetencias: 0.20,
             },
             {
+              organizationId: defaultOrganization.id,
               nombre: 'Desarrollador de Software',
               wIntegridad: 0.20,
               wPersonalidad: 0.20,
@@ -227,6 +237,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
               wCompetencias: 0.20,
             },
             {
+              organizationId: defaultOrganization.id,
               nombre: 'Tesorero / Cajero',
               wIntegridad: 0.60,
               wPersonalidad: 0.15,
@@ -234,6 +245,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
               wCompetencias: 0.10,
             },
             {
+              organizationId: defaultOrganization.id,
               nombre: 'Director de Recursos Humanos',
               wIntegridad: 0.30,
               wPersonalidad: 0.20,
@@ -250,17 +262,21 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 
     // Sembrar CutScores por defecto si está vacío
     try {
+      const defaultOrganization = await this.organization.findFirst({
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
       const cutCount = await this.cutScore.count();
-      if (cutCount === 0) {
+      if (cutCount === 0 && defaultOrganization) {
         this.logger.log('Sembrando estándares de competencia (Cut-scores) por defecto...');
         const testIds = ['IT2_I', 'IT2_P10', 'IT2_AC10', 'IT2_CB10'];
         const cutScoresData = [];
         for (const testId of testIds) {
           cutScoresData.push(
-            { testId, categoria: 'Básico', thetaMin: -999.0, thetaMax: -1.5, orden: 1 },
-            { testId, categoria: 'En desarrollo', thetaMin: -1.5, thetaMax: 0.5, orden: 2 },
-            { testId, categoria: 'Competente', thetaMin: 0.5, thetaMax: 1.5, orden: 3 },
-            { testId, categoria: 'Sobresaliente', thetaMin: 1.5, thetaMax: 999.0, orden: 4 }
+            { organizationId: defaultOrganization.id, testId, categoria: 'Básico', thetaMin: -999.0, thetaMax: -1.5, orden: 1 },
+            { organizationId: defaultOrganization.id, testId, categoria: 'En desarrollo', thetaMin: -1.5, thetaMax: 0.5, orden: 2 },
+            { organizationId: defaultOrganization.id, testId, categoria: 'Competente', thetaMin: 0.5, thetaMax: 1.5, orden: 3 },
+            { organizationId: defaultOrganization.id, testId, categoria: 'Sobresaliente', thetaMin: 1.5, thetaMax: 999.0, orden: 4 }
           );
         }
         await this.cutScore.createMany({

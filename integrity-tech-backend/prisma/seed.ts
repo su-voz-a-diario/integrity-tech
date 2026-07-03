@@ -1,6 +1,14 @@
 import { PrismaClient } from '@prisma/client';
+import { pbkdf2Sync, randomBytes } from 'crypto';
 
 const prisma = new PrismaClient();
+
+function hashPassword(password: string): string {
+  const iterations = 310000;
+  const salt = randomBytes(16).toString('base64url');
+  const hash = pbkdf2Sync(password, salt, iterations, 32, 'sha256').toString('base64url');
+  return `pbkdf2$${iterations}$${salt}$${hash}`;
+}
 
 async function main() {
   const organization = await prisma.organization.upsert({
@@ -14,12 +22,20 @@ async function main() {
 
   const permissions = await Promise.all(
     [
-      'invitation:create',
-      'attempt:list',
-      'attempt:read',
-      'attempt:recalculate',
-      'psychometrics:read',
-      'psychometrics:write',
+      'organization.manage',
+      'users.manage',
+      'roles.manage',
+      'invitations.create',
+      'invitations.read',
+      'attempts.read',
+      'attempts.update',
+      'reports.read',
+      'psychometrics.read',
+      'psychometrics.write',
+      'audit.read',
+      'admin.manage',
+      'exam:create',
+      'exam:attempt',
     ].map((code) =>
       prisma.permission.upsert({
         where: { code },
@@ -50,6 +66,24 @@ async function main() {
     },
   });
 
+  const psychologistRole = await prisma.role.upsert({
+    where: { name: 'psychologist' },
+    update: {},
+    create: {
+      name: 'psychologist',
+      description: 'Psicóloga demo para consulta psicométrica.',
+    },
+  });
+
+  const evaluatorRole = await prisma.role.upsert({
+    where: { name: 'evaluator' },
+    update: {},
+    create: {
+      name: 'evaluator',
+      description: 'Evaluador demo para revisión de resultados.',
+    },
+  });
+
   for (const permission of permissions) {
     await prisma.rolePermission.upsert({
       where: {
@@ -66,7 +100,7 @@ async function main() {
     });
   }
 
-  for (const code of ['invitation:create', 'attempt:list', 'attempt:read']) {
+  for (const code of ['invitations.create', 'invitations.read', 'attempts.read', 'reports.read']) {
     const permission = permissions.find((p) => p.code === code)!;
     await prisma.rolePermission.upsert({
       where: {
@@ -83,6 +117,28 @@ async function main() {
     });
   }
 
+  for (const role of [psychologistRole, evaluatorRole]) {
+    for (const code of ['attempts.read', 'reports.read', 'psychometrics.read']) {
+      const permission = permissions.find((p) => p.code === code)!;
+      await prisma.rolePermission.upsert({
+        where: {
+          roleId_permissionId: {
+            roleId: role.id,
+            permissionId: permission.id,
+          },
+        },
+        update: {},
+        create: {
+          roleId: role.id,
+          permissionId: permission.id,
+        },
+      });
+    }
+  }
+
+  const demoPassword = process.env.DEMO_STAFF_PASSWORD || 'IntegrityDemo123!';
+  const demoPasswordHash = hashPassword(demoPassword);
+
   const admin = await prisma.user.upsert({
     where: {
       unique_email_per_org: {
@@ -94,12 +150,35 @@ async function main() {
       firstName: 'Admin',
       lastName: 'Demo',
       isActive: true,
+      passwordHash: demoPasswordHash,
     },
     create: {
       organizationId: organization.id,
       email: 'admin@integrity.demo',
-      passwordHash: 'DEV_ONLY_PASSWORD_CONFIGURED_IN_ENV',
+      passwordHash: demoPasswordHash,
       firstName: 'Admin',
+      lastName: 'Demo',
+    },
+  });
+
+  const recruiter = await prisma.user.upsert({
+    where: {
+      unique_email_per_org: {
+        organizationId: organization.id,
+        email: 'recruiter@integrity.demo',
+      },
+    },
+    update: {
+      firstName: 'Recruiter',
+      lastName: 'Demo',
+      isActive: true,
+      passwordHash: demoPasswordHash,
+    },
+    create: {
+      organizationId: organization.id,
+      email: 'recruiter@integrity.demo',
+      passwordHash: demoPasswordHash,
+      firstName: 'Recruiter',
       lastName: 'Demo',
     },
   });
@@ -115,6 +194,20 @@ async function main() {
     create: {
       userId: admin.id,
       roleId: adminRole.id,
+    },
+  });
+
+  await prisma.userRole.upsert({
+    where: {
+      userId_roleId: {
+        userId: recruiter.id,
+        roleId: recruiterRole.id,
+      },
+    },
+    update: {},
+    create: {
+      userId: recruiter.id,
+      roleId: recruiterRole.id,
     },
   });
 
@@ -251,9 +344,12 @@ async function main() {
 
   await prisma.perfilPuesto.upsert({
     where: { id: '00000000-0000-7000-8000-000000000401' },
-    update: {},
+    update: {
+      organizationId: organization.id,
+    },
     create: {
       id: '00000000-0000-7000-8000-000000000401',
+      organizationId: organization.id,
       nombre: 'Perfil Demo General',
       wIntegridad: 0.4,
       wPersonalidad: 0.2,
@@ -265,6 +361,7 @@ async function main() {
   console.log('Seed demo completado.');
   console.log('Organizacion:', organization.slug);
   console.log('Admin demo:', admin.email);
+  console.log('Recruiter demo:', recruiter.email);
   console.log('Examen demo:', exam.id);
 }
 

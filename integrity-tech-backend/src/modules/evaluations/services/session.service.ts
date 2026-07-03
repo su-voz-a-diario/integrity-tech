@@ -1,0 +1,133 @@
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../../../shared/database/prisma.service';
+import { AUDIT_ACTIONS, AuditRequestMetadata } from '../../audit/audit-event.types';
+import { AuditService } from '../../audit/services/audit.service';
+import { EvaluationGovernanceResolverService } from '../../psychometric-governance/services/evaluation-governance-resolver.service';
+import { AttemptRepository } from '../repositories/attempt.repository';
+import { CandidateConsentService } from './candidate-consent.service';
+
+@Injectable()
+export class SessionService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly attempts: AttemptRepository,
+    private readonly consentService: CandidateConsentService,
+    private readonly auditService: AuditService,
+    private readonly governanceResolver: EvaluationGovernanceResolverService,
+  ) {}
+
+  async getAttemptSession(
+    attemptId: string,
+    user: { userId: string; organizationId: string },
+    metadata: AuditRequestMetadata = {},
+  ) {
+    const organizationId = user.organizationId;
+    const attempt = await this.attempts.findAttemptInTenant(attemptId, organizationId);
+    if (!attempt) {
+      throw new NotFoundException('Intento de examen no encontrado.');
+    }
+
+    if (!['IN_PROGRESS', 'SUBMITTED'].includes(attempt.status)) {
+      throw new BadRequestException('El intento no se encuentra disponible para el candidato.');
+    }
+
+    const hasConsent = await this.consentService.hasConsent(attemptId, user);
+    if (!hasConsent) {
+      throw new ForbiddenException('Debes aceptar el consentimiento informado antes de iniciar la evaluación.');
+    }
+
+    const exam = await this.attempts.findExamInTenant(attempt.examId, organizationId);
+    if (!exam) {
+      throw new NotFoundException('Evaluación no encontrada.');
+    }
+
+    const safeQuestions = attempt.assessmentVersionId
+      ? await this.getGovernedQuestions(attempt.assessmentVersionId)
+      : await this.getLegacyQuestions(exam.id, organizationId);
+
+    await this.auditService.record({
+      organizationId,
+      actorUserId: user.userId,
+      actorType: 'CANDIDATE',
+      action: AUDIT_ACTIONS.EXAM_SESSION_ACCESSED,
+      resourceType: 'ExamAttempt',
+      resourceId: attempt.id,
+      ipAddress: metadata.ipAddress,
+      userAgent: metadata.userAgent,
+      metadata: {
+        examId: exam.id,
+        assessmentVersionId: attempt.assessmentVersionId || null,
+        mode: attempt.assessmentVersionId ? 'VERSIONED' : 'LEGACY_UNVERSIONED',
+        questionCount: safeQuestions.length,
+      },
+    });
+
+    return {
+      attemptId: attempt.id,
+      status: attempt.status,
+      exam: {
+        id: exam.id,
+        title: exam.title,
+        durationMinutes: exam.durationMinutes,
+      },
+      startedAt: attempt.startedAt,
+      submittedAt: attempt.submittedAt,
+      questions: safeQuestions,
+    };
+  }
+
+  private stripCorrectConfig(content: any): any {
+    if (!content || typeof content !== 'object') return content;
+    const { correctConfig, correctAnswer, correctAnswers, ...safeContent } = content;
+    return safeContent;
+  }
+
+  private async getGovernedQuestions(assessmentVersionId: string) {
+    const governedItems = await this.governanceResolver.findGovernedSessionItems(assessmentVersionId);
+    return governedItems
+      .map((link) => {
+        const stem = link.itemVersion.stemJson as any;
+        const legacyQuestionId = stem?.legacyQuestionId;
+        if (!legacyQuestionId) return null;
+        return {
+          id: legacyQuestionId,
+          itemVersionId: link.itemVersionId,
+          type: stem?.type || 'UNKNOWN',
+          defaultPoints: Number(link.weight || stem?.defaultPoints || 1),
+          content: this.stripCorrectConfig(stem?.content || stem),
+        };
+      })
+      .filter(Boolean);
+  }
+
+  private async getLegacyQuestions(examId: string, organizationId: string) {
+    const examQuestions = await this.prisma.examQuestion.findMany({
+      where: { examId },
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    const questions = await this.prisma.question.findMany({
+      where: {
+        id: { in: examQuestions.map((q) => q.questionId) },
+        questionBank: { organizationId },
+      },
+    });
+    const questionMap = new Map(questions.map((q) => [q.id, q]));
+
+    return examQuestions
+      .map((examQuestion) => {
+        const question = questionMap.get(examQuestion.questionId);
+        if (!question) return null;
+        const content = this.stripCorrectConfig(question.contentJsonb as any);
+        return {
+          id: question.id,
+          itemVersionId: null,
+          type: question.type,
+          defaultPoints: Number(examQuestion.points || question.defaultPoints),
+          content,
+          governanceMode: 'LEGACY_UNVERSIONED',
+        };
+      })
+      .filter(Boolean);
+  }
+}

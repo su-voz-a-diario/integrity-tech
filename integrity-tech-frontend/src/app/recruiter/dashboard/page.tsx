@@ -51,11 +51,21 @@ const MOCK_ATTEMPTS = [
   },
 ];
 
+function getDashboardErrorMessage(status: number) {
+  const messages: Record<number, string> = {
+    401: 'Tu sesión expiró. Vuelve a iniciar sesión para consultar candidatos.',
+    403: 'No tienes permisos para consultar intentos de evaluación.',
+    429: 'Demasiadas solicitudes al dashboard. Espera unos minutos e inténtalo nuevamente.',
+  };
+  return messages[status] || 'No se pudieron cargar los intentos reales.';
+}
+
 export default function RecruiterDashboard() {
   const [filter, setFilter] = useState<'ALL' | 'SAFE' | 'WARNING' | 'CRITICAL'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [attempts, setAttempts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
 
   // Estados para Modal de Invitaciones
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
@@ -91,7 +101,10 @@ export default function RecruiterDashboard() {
         body: JSON.stringify(inviteForm),
       });
       
-      if (!res.ok) throw new Error('Error al generar la invitación');
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || getDashboardErrorMessage(res.status));
+      }
       const data = await res.json();
       setGeneratedInvite(data);
     } catch (err: any) {
@@ -109,15 +122,17 @@ export default function RecruiterDashboard() {
       },
     })
       .then((res) => {
-        if (!res.ok) throw new Error('API Error');
-        return res.json();
+      if (!res.ok) throw new Error(getDashboardErrorMessage(res.status));
+      return res.json();
       })
       .then((data) => {
         setAttempts(Array.isArray(data) ? data : []);
+        setDashboardError(null);
         setIsLoading(false);
       })
       .catch((err) => {
         console.warn('[Dashboard] No se pudieron cargar intentos reales:', err);
+        setDashboardError(err.message || 'No se pudieron cargar los intentos reales.');
         setAttempts(process.env.NEXT_PUBLIC_ENABLE_DEMO_MOCKS === 'true' ? MOCK_ATTEMPTS : []);
         setIsLoading(false);
       });
@@ -244,6 +259,12 @@ export default function RecruiterDashboard() {
             </button>
           </div>
         </div>
+
+        {dashboardError && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+            {dashboardError}
+          </div>
+        )}
 
         {/* VISTA DESKTOP: LISTADO DE CANDIDATOS (TABLA) */}
         <div className="hidden md:block bg-slate-900/30 border border-slate-900 rounded-xl overflow-hidden shadow-lg">

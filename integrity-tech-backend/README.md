@@ -19,3 +19,10 @@ Integrity-Tech es un ecosistema SaaS diseñado para la gestión integral de eval
 - `exams`: Banco de reactivos, modelos psicométricos y configuraciones de prueba.
 - `evaluations`: Motor transaccional de respuestas y workers de análisis.
 - `proctoring`: Telemetría de comportamiento y auditoría de integridad.
+
+## Autenticación Staff en Desarrollo
+- Login real: `POST /api/auth/login` con `email`, `password` y opcionalmente `organizationSlug`.
+- Credenciales demo tras `npm run seed`: `admin@integrity.demo` o `recruiter@integrity.demo` con `DEMO_STAFF_PASSWORD`.
+- El endpoint temporal `POST /api/auth/dev-login` solo funciona con `ENABLE_DEV_AUTH=true` y nunca en `NODE_ENV=production`.
+- Los access tokens son de vida corta (`ACCESS_TOKEN_TTL_SECONDS`) y dependen de una sesión revocable en `user_sessions`.
+- `POST /api/auth/refresh` renueva access token usando refresh token; `POST /api/auth/logout` revoca la sesión actual.

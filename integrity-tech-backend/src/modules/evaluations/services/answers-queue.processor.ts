@@ -1,9 +1,12 @@
 import { Process, Processor } from '@nestjs/bull';
-import { Logger } from '@nestjs/common';
+import { Logger, Optional } from '@nestjs/common';
 import { Job } from 'bull';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { GradingStrategyFactory } from './grading-strategy';
+import { EvaluationGovernanceResolverService } from '../../psychometric-governance/services/evaluation-governance-resolver.service';
+import { MetricsService } from '../../../shared/observability/metrics.service';
+import { RequestContextService } from '../../../shared/observability/request-context.service';
 
 @Processor('answers-queue')
 export class AnswersQueueProcessor {
@@ -12,11 +15,14 @@ export class AnswersQueueProcessor {
   constructor(
     private readonly prisma: PrismaService, // Inyectamos Prisma para la persistencia transaccional
     private readonly eventEmitter: EventEmitter2, // Inyectamos el emisor de eventos para comunicación desacoplada
+    private readonly governanceResolver: EvaluationGovernanceResolverService,
+    @Optional() private readonly metrics?: MetricsService,
+    @Optional() private readonly context?: RequestContextService,
   ) {}
 
   @Process('save-answer')
   async handleSaveAnswer(job: Job<any>) {
-    const { attemptId, questionId, response, tiempoMs, submittedAt } = job.data;
+    const { attemptId, questionId, itemVersionId, response, tiempoMs, submittedAt } = job.data;
     
     this.logger.log(`[Worker] Procesando respuesta. Job: ${job.id} | Intento: ${attemptId} | Tiempo de respuesta: ${tiempoMs || 0}ms`);
 
@@ -26,9 +32,20 @@ export class AnswersQueueProcessor {
         where: { id: questionId },
         select: { type: true, contentJsonb: true, defaultPoints: true },
       });
+      this.metrics?.recordQueueJob('answers-queue', 'save-answer', 'completed');
 
       if (!question) {
         throw new Error(`Pregunta con ID ${questionId} no encontrada.`);
+      }
+
+      const belongsToAttempt = await this.governanceResolver.validateItemVersionBelongsToAttempt({
+        attemptId,
+        questionId,
+        itemVersionId: itemVersionId || null,
+      });
+
+      if (!belongsToAttempt) {
+        throw new Error(`Reactivo ${questionId} no pertenece a la versión psicométrica del intento ${attemptId}.`);
       }
 
       // 2. APLICAR EL PATRÓN ESTRATEGIA PARA OBTENER CALIFICACIÓN
@@ -50,6 +67,7 @@ export class AnswersQueueProcessor {
         },
         update: {
           response,
+          itemVersionId: itemVersionId || null,
           isCorrect,
           pointsEarned,
           tiempoMs,
@@ -58,6 +76,7 @@ export class AnswersQueueProcessor {
         create: {
           examAttemptId: attemptId,
           questionId,
+          itemVersionId: itemVersionId || null,
           response,
           isCorrect,
           pointsEarned,
@@ -79,6 +98,7 @@ export class AnswersQueueProcessor {
       }
 
     } catch (error) {
+      this.metrics?.recordQueueJob('answers-queue', 'save-answer', 'failed');
       this.logger.error(`Error procesando respuesta en Job ${job.id}: ${error.message}`);
       throw error; // Arrojar error activa el backoff y reintentos automáticos de BullMQ
     }
@@ -109,6 +129,7 @@ export class AnswersQueueProcessor {
         where: { examAttemptId: attemptId },
         select: {
           questionId: true,
+          itemVersionId: true,
           pointsEarned: true,
         },
       });

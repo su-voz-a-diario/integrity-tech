@@ -1,40 +1,74 @@
+import './shared/observability/tracing.bootstrap';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { RequestMethod, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import { json, urlencoded } from 'express';
+import helmet from 'helmet';
+import { PrismaService } from './shared/database/prisma.service';
+import { ApiExceptionFilter } from './shared/filters/api-exception.filter';
+import { isCorsOriginAllowed, isSwaggerEnabled, parseAllowedOrigins, validateProductionSecurityConfig } from './shared/bootstrap/security-config';
+import { StructuredLoggerService } from './shared/observability/structured-logger.service';
+import { RequestContextService } from './shared/observability/request-context.service';
 
 async function bootstrap() {
+  validateProductionSecurityConfig(process.env);
   // Inicializar NestJS utilizando el adaptador de Express explícito
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
+  const logger = app.get(StructuredLoggerService);
+  app.useLogger(logger);
   
-  // Configurar límite del parser del Body para admitir imágenes Base64 grandes
-  app.use(json({ limit: '10mb' }));
-  app.use(urlencoded({ limit: '10mb', extended: true }));
+  app.disable('x-powered-by');
+  app.use(helmet({
+    frameguard: { action: 'deny' },
+    referrerPolicy: { policy: 'no-referrer' },
+    crossOriginResourcePolicy: { policy: 'same-site' },
+  }));
+  app.use((req, res, next) => {
+    res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=()');
+    next();
+  });
 
-  // Servir archivos estáticos de forma pública (para almacenar las fotos de los candidatos)
+  const bodyLimit = process.env.API_BODY_LIMIT || '1mb';
+  app.use(json({ limit: bodyLimit }));
+  app.use(urlencoded({ limit: bodyLimit, extended: true }));
+
+  // Servir únicamente assets públicos de la aplicación. Evidencias sensibles usan StorageService privado.
   app.useStaticAssets(join(__dirname, '..', 'public'));
 
   // Establecer prefijo global de API
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix('api', {
+    exclude: [
+      { path: 'health/live', method: RequestMethod.GET },
+      { path: 'health/ready', method: RequestMethod.GET },
+      { path: 'health/dependencies', method: RequestMethod.GET },
+      { path: 'metrics', method: RequestMethod.GET },
+    ],
+  });
   
   // Habilitar validaciones estructuradas globales (class-validator)
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist: true,
+    forbidNonWhitelisted: true,
+    transform: true,
+    transformOptions: { enableImplicitConversion: false },
+  }));
+  app.useGlobalFilters(new ApiExceptionFilter(app.get(PrismaService), app.get(RequestContextService), logger));
 
-  const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000')
-    .split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean);
+  const allowedOrigins = parseAllowedOrigins(process.env.CORS_ORIGINS);
   app.enableCors({
-    origin: allowedOrigins,
+    origin(origin, callback) {
+      if (isCorsOriginAllowed(origin, allowedOrigins, process.env.NODE_ENV)) return callback(null, true);
+      return callback(new Error('Origen CORS no permitido.'), false);
+    },
     credentials: true,
   });
 
   // Configuración de la documentación interactiva Swagger / OpenAPI (restringido a dev/staging)
   const port = process.env.PORT || 3001;
-  if (process.env.NODE_ENV !== 'production' || process.env.SHOW_SWAGGER === 'true') {
+  if (isSwaggerEnabled(process.env)) {
     const config = new DocumentBuilder()
       .setTitle('Integrity-Tech | Platform API')
       .setDescription('Especificación técnica de la API REST para el motor transaccional de evaluaciones psicométricas, telemetría de proctoring y feedback de PMF.')
@@ -51,10 +85,10 @@ async function bootstrap() {
       
     const document = SwaggerModule.createDocument(app, config);
     SwaggerModule.setup('api/docs', app, document);
-    console.log(`[Bootstrap] Documentación interactiva de Swagger montada en: http://localhost:${port}/api/docs`);
+    logger.info({ module: 'Bootstrap', action: 'swagger.enabled', message: `Swagger mounted on /api/docs` });
   }
 
   await app.listen(port);
-  console.log(`[Bootstrap] Servidor de API de Integrity-Tech escuchando en: http://localhost:${port}/api`);
+  logger.info({ module: 'Bootstrap', action: 'api.started', message: `Integrity-Tech API listening on port ${port}` });
 }
 bootstrap();

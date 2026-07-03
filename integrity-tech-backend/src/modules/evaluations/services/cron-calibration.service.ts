@@ -121,13 +121,22 @@ export class CronCalibrationService {
           this.logger.warn(`[PSICOMETRÍA DRIFT ALERTA] El test ${row.test_id} presenta un desvío significativo de habilidad media (${mean.toFixed(3)}). Se recomienda recalibrar.`);
         }
 
+        const organization = await this.prisma.organization.findFirst({
+          orderBy: { createdAt: 'asc' },
+          select: { id: true },
+        });
+        if (!organization) {
+          throw new Error('No existe organización activa para registrar calidad psicométrica.');
+        }
+
         // Calcular la fiabilidad marginal de la escala (basada en IRT)
-        const relMarginal = await this.thetaService.computeMarginalReliability(row.test_id);
+        const relMarginal = await this.thetaService.computeMarginalReliability(row.test_id, organization.id);
         this.logger.log(`[Monitoreo IRT] Test: ${row.test_id} | Fiabilidad Marginal (IRT): ${relMarginal.toFixed(3)}`);
 
         // Registrar en el historial de calidad psicométrica
         await this.prisma.psychometricQualityLog.create({
           data: {
+            organizationId: organization.id,
             testId: row.test_id,
             nAttempts: n,
             meanTheta: mean,

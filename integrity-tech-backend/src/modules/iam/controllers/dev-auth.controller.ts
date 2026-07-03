@@ -1,13 +1,17 @@
 import { Body, Controller, ForbiddenException, Post, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/database/prisma.service';
-import { IamFacade } from '../iam.facade';
-import { IsString } from 'class-validator';
+import { IsEmail, IsString, MaxLength, MinLength } from 'class-validator';
+import { AuthService } from '../services/auth.service';
+import { SessionService } from '../services/session.service';
 
 class DevLoginDto {
-  @IsString()
+  @IsEmail()
+  @MaxLength(255)
   email: string;
 
   @IsString()
+  @MinLength(8)
+  @MaxLength(200)
   password: string;
 }
 
@@ -15,7 +19,8 @@ class DevLoginDto {
 export class DevAuthController {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly iamFacade: IamFacade,
+    private readonly authService: AuthService,
+    private readonly sessionService: SessionService,
   ) {}
 
   @Post('dev-login')
@@ -37,6 +42,7 @@ export class DevAuthController {
         isActive: true,
       },
       include: {
+        organization: true,
         userRoles: {
           include: {
             role: true,
@@ -50,15 +56,28 @@ export class DevAuthController {
     }
 
     const roles = user.userRoles.map((userRole) => userRole.role.name);
-    const token = this.iamFacade.issueSessionToken({
+    if (!user.organization?.isActive) {
+      throw new UnauthorizedException('Organización demo inactiva.');
+    }
+
+    const session = await this.sessionService.createSession({
       userId: user.id,
       organizationId: user.organizationId,
       email: user.email,
       roles,
     });
+    const accessToken = this.authService.issueAccessToken({
+      userId: user.id,
+      organizationId: user.organizationId,
+      email: user.email,
+      roles,
+      sessionId: session.sessionId,
+    });
 
     return {
-      token,
+      accessToken,
+      token: accessToken,
+      refreshToken: session.refreshToken,
       user: {
         id: user.id,
         email: user.email,

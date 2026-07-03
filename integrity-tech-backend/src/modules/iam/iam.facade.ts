@@ -3,6 +3,8 @@ export interface SessionUser {
   organizationId: string;
   email: string;
   roles: string[];
+  sessionId?: string;
+  jti?: string;
 }
 
 export abstract class IamFacade {

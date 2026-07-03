@@ -87,9 +87,10 @@ export class ThetaCalculatorService implements OnModuleInit {
       });
       const tempMap = new Map<string, any[]>();
       for (const p of allParams) {
-        const arr = tempMap.get(p.testId) || [];
+        const cacheKey = `${p.organizationId}:${p.testId}`;
+        const arr = tempMap.get(cacheKey) || [];
         arr.push(p);
-        tempMap.set(p.testId, arr);
+        tempMap.set(cacheKey, arr);
       }
       this.parameterCache = tempMap;
       this.logger.log(`Parámetros de ítems cargados en caché. Test indexados: ${tempMap.size}`);
@@ -110,7 +111,7 @@ export class ThetaCalculatorService implements OnModuleInit {
    * Estima el nivel de habilidad latente (theta) de un candidato
    * utilizando la estimación de Esperanza A Posteriori (EAP).
    */
-  async calcularTheta(testId: string, respuestas: ItemResponsePattern[]): Promise<{ theta: number; error: number; thetaT: number; thetaCi: number; engagement: number }> {
+  async calcularTheta(testId: string, respuestas: ItemResponsePattern[], organizationId?: string): Promise<{ theta: number; error: number; thetaT: number; thetaCi: number; engagement: number }> {
     const start = Date.now();
     
     if (respuestas.length === 0) {
@@ -118,12 +119,13 @@ export class ThetaCalculatorService implements OnModuleInit {
     }
 
     // 1. Obtener los parámetros de los ítems (desde caché o base de datos)
-    let dbParams = this.parameterCache.get(testId);
+    const cacheKey = organizationId ? `${organizationId}:${testId}` : testId;
+    let dbParams = this.parameterCache.get(cacheKey);
     if (!dbParams) {
       dbParams = await this.prisma.parametrosItems.findMany({
-        where: { testId, activo: true },
+        where: { testId, activo: true, ...(organizationId ? { organizationId } : {}) },
       });
-      this.parameterCache.set(testId, dbParams);
+      this.parameterCache.set(cacheKey, dbParams);
     }
 
     // Mapear a una estructura en memoria indexada por itemId para velocidad de búsqueda
@@ -318,13 +320,14 @@ export class ThetaCalculatorService implements OnModuleInit {
   /**
    * Calcula la curva de información del test (TIF) y el error estándar condicional.
    */
-  async getTestInformation(testId: string): Promise<{ theta: number; information: number; se: number | null }[]> {
-    let params = this.parameterCache.get(testId);
+  async getTestInformation(testId: string, organizationId?: string): Promise<{ theta: number; information: number; se: number | null }[]> {
+    const cacheKey = organizationId ? `${organizationId}:${testId}` : testId;
+    let params = this.parameterCache.get(cacheKey);
     if (!params) {
       params = await this.prisma.parametrosItems.findMany({
-        where: { testId },
+        where: { testId, ...(organizationId ? { organizationId } : {}) },
       });
-      this.parameterCache.set(testId, params);
+      this.parameterCache.set(cacheKey, params);
     }
 
     const thetaRange = Array.from({ length: 61 }, (_, i) => -3 + i * 0.1); // -3.0 a 3.0, paso 0.1
@@ -365,13 +368,14 @@ export class ThetaCalculatorService implements OnModuleInit {
    * Calcula la fiabilidad marginal del test (basada en la Teoría de Respuesta al Ítem)
    * integrando la función de información contra el prior normal estándar.
    */
-  async computeMarginalReliability(testId: string): Promise<number> {
-    let params = this.parameterCache.get(testId);
+  async computeMarginalReliability(testId: string, organizationId?: string): Promise<number> {
+    const cacheKey = organizationId ? `${organizationId}:${testId}` : testId;
+    let params = this.parameterCache.get(cacheKey);
     if (!params) {
       params = await this.prisma.parametrosItems.findMany({
-        where: { testId },
+        where: { testId, ...(organizationId ? { organizationId } : {}) },
       });
-      this.parameterCache.set(testId, params);
+      this.parameterCache.set(cacheKey, params);
     }
     
     if (params.length === 0) return 0.0;
@@ -425,14 +429,15 @@ export class ThetaCalculatorService implements OnModuleInit {
   /**
    * Obtiene los parámetros de ítems para un test_id cargados en caché.
    */
-  async getCachedParameters(testId: string): Promise<any[]> {
-    let params = this.parameterCache.get(testId);
+  async getCachedParameters(testId: string, organizationId?: string): Promise<any[]> {
+    const cacheKey = organizationId ? `${organizationId}:${testId}` : testId;
+    let params = this.parameterCache.get(cacheKey);
     if (!params || params.length === 0) {
       params = await this.prisma.parametrosItems.findMany({
-        where: { testId, activo: true },
+        where: { testId, activo: true, ...(organizationId ? { organizationId } : {}) },
       });
       if (params.length > 0) {
-        this.parameterCache.set(testId, params);
+        this.parameterCache.set(cacheKey, params);
       }
     }
     return params || [];

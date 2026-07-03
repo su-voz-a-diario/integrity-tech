@@ -1,12 +1,16 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { SessionUser } from '../iam.facade';
-import { createHmac, timingSafeEqual } from 'crypto';
+import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
 
 @Injectable()
 export class AuthService {
   private readonly issuer = 'integrity-tech';
 
   issueJwt(user: SessionUser, expiresInSeconds = 60 * 60 * 8): string {
+    return this.issueAccessToken(user, expiresInSeconds);
+  }
+
+  issueAccessToken(user: SessionUser, expiresInSeconds = this.getAccessTokenTtlSeconds()): string {
     const now = Math.floor(Date.now() / 1000);
     const payload = {
       iss: this.issuer,
@@ -15,6 +19,8 @@ export class AuthService {
       organizationId: user.organizationId,
       email: user.email,
       roles: user.roles || [],
+      sessionId: user.sessionId,
+      jti: user.jti || randomUUID(),
       iat: now,
       exp: now + expiresInSeconds,
     };
@@ -61,6 +67,8 @@ export class AuthService {
       organizationId: payload.organizationId,
       email: payload.email || '',
       roles: Array.isArray(payload.roles) ? payload.roles : [],
+      sessionId: payload.sessionId,
+      jti: payload.jti,
     };
   }
 
@@ -78,6 +86,10 @@ export class AuthService {
       throw new UnauthorizedException('JWT_SECRET no está configurado correctamente.');
     }
     return secret;
+  }
+
+  private getAccessTokenTtlSeconds(): number {
+    return Number(process.env.ACCESS_TOKEN_TTL_SECONDS || 900);
   }
 
   private safeCompare(a: string, b: string): boolean {

@@ -4,6 +4,8 @@ import { PrismaService } from '../../../shared/database/prisma.service';
 import { ThetaCalculatorService } from './theta-calculator.service';
 import { PersonFitService } from './person-fit.service';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
+import { ScientificTraceService } from '../../psychometric-governance/services/scientific-trace.service';
+import { EvaluationGovernanceResolverService } from '../../psychometric-governance/services/evaluation-governance-resolver.service';
 
 describe('IgaCalculatorService (Unit Tests)', () => {
   let service: IgaCalculatorService;
@@ -24,9 +26,13 @@ describe('IgaCalculatorService (Unit Tests)', () => {
       findFirst: jest.fn(),
       create: jest.fn(),
     },
+    baremosDinamicos: {
+      findFirst: jest.fn(),
+    },
     resultadoTest: {
       findMany: jest.fn(),
       create: jest.fn(),
+      updateMany: jest.fn(),
     },
     resultadoGlobal: {
       upsert: jest.fn(),
@@ -39,6 +45,22 @@ describe('IgaCalculatorService (Unit Tests)', () => {
 
   const mockPersonFitService = {
     calculatePersonFit: jest.fn().mockResolvedValue({ lz: 0.0, aberrante: false }),
+  };
+
+  const mockScientificTrace = {
+    attachTraceToResults: jest.fn().mockResolvedValue({
+      mode: 'VERSIONED',
+      itemVersionIds: [],
+      generatedAt: new Date().toISOString(),
+    }),
+  };
+
+  const mockGovernanceResolver = {
+    resolvePublishedResultVersions: jest.fn().mockResolvedValue({
+      scoringModelVersionId: 'scoring-version-1',
+      normGroupVersionId: 'norm-version-1',
+      reportTemplateVersionId: 'report-template-version-1',
+    }),
   };
 
   beforeEach(async () => {
@@ -57,6 +79,14 @@ describe('IgaCalculatorService (Unit Tests)', () => {
           provide: PersonFitService,
           useValue: mockPersonFitService,
         },
+        {
+          provide: ScientificTraceService,
+          useValue: mockScientificTrace,
+        },
+        {
+          provide: EvaluationGovernanceResolverService,
+          useValue: mockGovernanceResolver,
+        },
       ],
     }).compile();
 
@@ -71,16 +101,21 @@ describe('IgaCalculatorService (Unit Tests)', () => {
       nivelEducativo: null,
       tipoPuesto: null,
     });
+    mockPrismaService.baremosDinamicos.findFirst.mockResolvedValue(null);
+    mockPrismaService.resultadoTest.updateMany.mockResolvedValue({ count: 0 });
+    mockScientificTrace.attachTraceToResults.mockClear();
+    mockGovernanceResolver.resolvePublishedResultVersions.mockClear();
   });
 
   it('Debe calcular IGA correctamente con todos los test completados y sin alertas', async () => {
     // 1. Setup mocks
     mockPrismaService.examAttempt.findUnique.mockResolvedValue({
       id: 'attempt-1111',
+      organizationId: 'org-1',
       status: 'COMPLETED',
       scoreDetails: null,
     });
-    mockPrismaService.perfilPuesto.findUnique.mockResolvedValue({
+    mockPrismaService.perfilPuesto.findFirst.mockResolvedValue({
       id: 'profile-2222',
       nombre: 'Gerente Comercial',
       wIntegridad: 0.35,
@@ -105,15 +140,37 @@ describe('IgaCalculatorService (Unit Tests)', () => {
     expect(result.iga).toBe(80.5);
     expect(result.recomendacion).toBe('Recomendado');
     expect(result.alertas.length).toBe(0);
+    expect(mockPrismaService.resultadoGlobal.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          scoringModelVersionId: 'scoring-version-1',
+          normGroupVersionId: 'norm-version-1',
+          reportTemplateVersionId: 'report-template-version-1',
+        }),
+      }),
+    );
+    expect(mockPrismaService.resultadoTest.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          scoringModelVersionId: 'scoring-version-1',
+          normGroupVersionId: 'norm-version-1',
+        }),
+      }),
+    );
+    expect(mockScientificTrace.attachTraceToResults).toHaveBeenCalledWith({
+      organizationId: 'org-1',
+      attemptId: 'attempt-1111',
+    });
   });
 
   it('Debe redistribuir pesos si falta una evaluación (ej. Cognitiva)', async () => {
     // 1. Setup mocks
     mockPrismaService.examAttempt.findUnique.mockResolvedValue({
       id: 'attempt-3333',
+      organizationId: 'org-1',
       status: 'COMPLETED',
     });
-    mockPrismaService.perfilPuesto.findUnique.mockResolvedValue({
+    mockPrismaService.perfilPuesto.findFirst.mockResolvedValue({
       id: 'profile-2222',
       nombre: 'Gerente Comercial',
       wIntegridad: 0.40,
@@ -138,9 +195,10 @@ describe('IgaCalculatorService (Unit Tests)', () => {
   it('Debe generar alerta de riesgo ético si el percentil de integridad es inferior a 20', async () => {
     mockPrismaService.examAttempt.findUnique.mockResolvedValue({
       id: 'attempt-4444',
+      organizationId: 'org-1',
       status: 'COMPLETED',
     });
-    mockPrismaService.perfilPuesto.findUnique.mockResolvedValue({
+    mockPrismaService.perfilPuesto.findFirst.mockResolvedValue({
       id: 'profile-2222',
       nombre: 'Gerente Comercial',
       wIntegridad: 0.35,

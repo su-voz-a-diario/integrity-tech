@@ -1,5 +1,5 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
-import { IamFacade } from '../../modules/iam';
+import { IamFacade } from '../../modules/iam/iam.facade';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {

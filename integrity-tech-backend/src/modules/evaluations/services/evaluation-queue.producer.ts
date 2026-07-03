@@ -1,8 +1,10 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger, Optional } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
 import { SubmitAnswerDto, SubmitProctoringLogDto } from '../dto/submit-answer.dto';
 import { PrismaService } from '../../../shared/database/prisma.service';
+import { MetricsService } from '../../../shared/observability/metrics.service';
+import { RequestContextService } from '../../../shared/observability/request-context.service';
 
 @Injectable()
 export class EvaluationQueueProducer {
@@ -12,6 +14,8 @@ export class EvaluationQueueProducer {
     @InjectQueue('answers-queue') private readonly answersQueue: Queue,
     @InjectQueue('proctoring-queue') private readonly proctoringQueue: Queue,
     private readonly prisma: PrismaService,
+    @Optional() private readonly metrics?: MetricsService,
+    @Optional() private readonly context?: RequestContextService,
   ) {}
 
   /**
@@ -37,9 +41,12 @@ export class EvaluationQueueProducer {
       {
         attemptId: dto.attemptId,
         questionId: dto.questionId,
+        itemVersionId: dto.itemVersionId || null,
         response: dto.response,
         tiempoMs: dto.tiempoMs,
         submittedAt: new Date().toISOString(),
+        traceId: this.context?.getTraceId() || null,
+        requestId: this.context?.getRequestId() || null,
       },
       {
         jobId, // Idempotencia: BullMQ ignora el job si ya existe un ID idéntico en espera
@@ -54,6 +61,7 @@ export class EvaluationQueueProducer {
     );
 
     this.logger.log(`Respuesta encolada con éxito. Job ID: ${job.id}`);
+    this.metrics?.recordQueueJob('answers-queue', 'save-answer', 'queued');
     return { jobId: job.id as string };
   }
 
@@ -71,6 +79,8 @@ export class EvaluationQueueProducer {
         eventType: dto.eventType,
         metadata: dto.metadata,
         timestamp: new Date().toISOString(),
+        traceId: this.context?.getTraceId() || null,
+        requestId: this.context?.getRequestId() || null,
       },
       {
         attempts: 3,
@@ -83,6 +93,7 @@ export class EvaluationQueueProducer {
       },
     );
 
+    this.metrics?.recordQueueJob('proctoring-queue', 'save-log', 'queued');
     return { jobId: job.id as string };
   }
 
@@ -94,13 +105,28 @@ export class EvaluationQueueProducer {
     this.logger.debug(`Verificando validez del intento ${attemptId} para pregunta ${questionId}`);
     const attempt = await this.prisma.examAttempt.findUnique({
       where: { id: attemptId },
-      select: { examId: true, status: true, submittedAt: true },
+      select: { examId: true, status: true, submittedAt: true, assessmentVersionId: true },
     });
 
     if (!attempt) return false;
     if (attempt.status === 'COMPLETED') return this.isWithinLateAnswerWindow(attempt.submittedAt);
     if (attempt.status === 'SUBMITTED') return this.isWithinLateAnswerWindow(attempt.submittedAt);
     if (attempt.status !== 'IN_PROGRESS') return false;
+
+    if (attempt.assessmentVersionId) {
+      const governedQuestion = await (this.prisma as any).assessmentVersionItem.findFirst({
+        where: {
+          assessmentVersionId: attempt.assessmentVersionId,
+          itemVersion: {
+            item: {
+              itemCode: `QUESTION_${questionId}`,
+            },
+          },
+        },
+        select: { itemVersionId: true },
+      });
+      return !!governedQuestion;
+    }
 
     const examQuestion = await this.prisma.examQuestion.findFirst({
       where: {

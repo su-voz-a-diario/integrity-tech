@@ -23,10 +23,18 @@ export class PrismaEvaluationRepository implements EvaluationRepository {
     // Si la creación del intento de examen tiene éxito, pero falla la creación de la bitácora inicial,
     // toda la transacción se revierte (Rollback) para evitar estados inconsistentes (intento sin logs).
     return this.prisma.$transaction(async (tx) => {
+      const exam = await tx.exam.findUnique({
+        where: { id: data.examId },
+        select: { organizationId: true },
+      });
+      if (!exam) {
+        throw new Error('El examen no existe para iniciar un intento.');
+      }
       
       // 1. Crear el registro del intento en base de datos
       const attempt = await tx.examAttempt.create({
         data: {
+          organizationId: exam.organizationId,
           examId: data.examId,
           userId: data.userId,
           status: 'IN_PROGRESS',

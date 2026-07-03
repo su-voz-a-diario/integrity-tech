@@ -1,5 +1,6 @@
 import { AuthService } from '../src/modules/iam/services/auth.service';
 import { PsychometricsRoleGuard } from '../src/modules/evaluations/guards/psychometrics-role.guard';
+import { PERMISSIONS } from '../src/modules/iam/permissions';
 
 describe('Fase 1 flujo estable (integración ligera)', () => {
   beforeEach(() => {
@@ -29,29 +30,37 @@ describe('Fase 1 flujo estable (integración ligera)', () => {
     await expect(auth.verifyJwt('valid-student-token')).rejects.toThrow();
   });
 
-  it('permite psicometría solo para roles profesionales', () => {
-    const guard = new PsychometricsRoleGuard();
+  it('permite psicometría solo con permiso profesional', async () => {
+    const guard = new PsychometricsRoleGuard({
+      resolve: jest.fn().mockResolvedValue({
+        permissions: [PERMISSIONS.PSYCHOMETRICS_READ],
+      }),
+    } as any);
     const context = {
       switchToHttp: () => ({
         getRequest: () => ({
-          user: { roles: ['psychologist'] },
+          user: { userId: 'psychologist', organizationId: 'org-a' },
         }),
       }),
     };
 
-    expect(guard.canActivate(context as any)).toBe(true);
+    await expect(guard.canActivate(context as any)).resolves.toBe(true);
   });
 
-  it('bloquea psicometría para candidatos', () => {
-    const guard = new PsychometricsRoleGuard();
+  it('bloquea psicometría para candidatos sin permiso', async () => {
+    const guard = new PsychometricsRoleGuard({
+      resolve: jest.fn().mockResolvedValue({
+        permissions: [],
+      }),
+    } as any);
     const context = {
       switchToHttp: () => ({
         getRequest: () => ({
-          user: { roles: ['candidate'] },
+          user: { userId: 'candidate', organizationId: 'org-a' },
         }),
       }),
     };
 
-    expect(() => guard.canActivate(context as any)).toThrow();
+    await expect(guard.canActivate(context as any)).rejects.toThrow();
   });
 });

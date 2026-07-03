@@ -1,4 +1,5 @@
 import { useExamStore } from '../store/exam.store';
+import { shouldRemoveQueuedAnswerAfterResponse } from './sync-engine-policy';
 
 export interface QueuedAnswer {
   id: string; // UUID de la subida
@@ -253,7 +254,7 @@ export class SyncEngine {
         }),
       });
 
-      if (response.status === 202 || response.ok) return true;
+      if (shouldRemoveQueuedAnswerAfterResponse(response.status)) return true;
       if ([400, 401, 403, 404, 409, 422, 429].includes(response.status)) {
         console.warn(`Respuesta no sincronizada; se conserva en IndexedDB. HTTP ${response.status}`);
         return false;

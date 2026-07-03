@@ -2,6 +2,8 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { ThetaCalculatorService } from './theta-calculator.service';
 import { PersonFitService } from './person-fit.service';
+import { ScientificTraceService } from '../../psychometric-governance/services/scientific-trace.service';
+import { EvaluationGovernanceResolverService } from '../../psychometric-governance/services/evaluation-governance-resolver.service';
 
 export interface IgaCalculationResult {
   iga: number;
@@ -26,6 +28,8 @@ export class IgaCalculatorService {
     private readonly prisma: PrismaService,
     private readonly thetaCalculator: ThetaCalculatorService,
     private readonly personFitService: PersonFitService,
+    private readonly scientificTrace: ScientificTraceService,
+    private readonly governanceResolver: EvaluationGovernanceResolverService,
   ) {}
 
   /**
@@ -41,6 +45,9 @@ export class IgaCalculatorService {
     if (!attempt) {
       throw new NotFoundException(`Intento de examen no encontrado: ${attemptId}`);
     }
+    const resultVersions = await this.governanceResolver.resolvePublishedResultVersions(
+      (attempt as any).assessmentVersionId,
+    );
 
     // 2. Determinar perfil final (si no se pasa, intentar obtener el guardado en la invitación o usar uno por defecto)
     let finalPerfilId = perfilId;
@@ -49,11 +56,14 @@ export class IgaCalculatorService {
         where: { attemptId },
       });
       // Como no tenemos perfilId en CandidateInvitation, usamos un perfil por defecto o el primero de la DB
-      const primerPerfil = await this.prisma.perfilPuesto.findFirst();
+      const primerPerfil = await this.prisma.perfilPuesto.findFirst({
+        where: { organizationId: attempt.organizationId },
+      });
       if (!primerPerfil) {
         // Generar un perfil por defecto si la base de datos está vacía para evitar fallas catastróficas
         const defaultPerfil = await this.prisma.perfilPuesto.create({
           data: {
+            organizationId: attempt.organizationId,
             nombre: 'Gerente General (Default)',
             wIntegridad: 0.35,
             wPersonalidad: 0.25,
@@ -67,8 +77,8 @@ export class IgaCalculatorService {
       }
     }
 
-    const perfil = await this.prisma.perfilPuesto.findUnique({
-      where: { id: finalPerfilId },
+    const perfil = await this.prisma.perfilPuesto.findFirst({
+      where: { id: finalPerfilId, organizationId: attempt.organizationId },
     });
     if (!perfil) {
       throw new NotFoundException(`Perfil de puesto no encontrado: ${finalPerfilId}`);
@@ -97,17 +107,21 @@ export class IgaCalculatorService {
         // Si se calculó con IRT (theta), resolver el percentil del baremo dinámico jerárquico
         if (r.irtCalculated && r.theta !== null) {
           try {
-            const rawBaremo: any[] = await this.prisma.$queryRawUnsafe(
-              `SELECT percentil FROM obtener_percentil_dinamico($1, $2, $3, $4, $5, $6) LIMIT 1;`,
-              r.testId,
-              Number(r.theta),
-              user?.pais || null,
-              user?.sector || null,
-              user?.nivelEducativo || null,
-              user?.tipoPuesto || null
-            );
-            if (rawBaremo && rawBaremo.length > 0) {
-              percentilFinal = Number(rawBaremo[0].percentil);
+            const baremo = await this.prisma.baremosDinamicos.findFirst({
+              where: {
+                organizationId: attempt.organizationId,
+                testId: r.testId,
+                thetaMin: { lte: Number(r.theta) },
+                thetaMax: { gt: Number(r.theta) },
+                ...(user?.pais ? { pais: user.pais } : {}),
+                ...(user?.sector ? { sector: user.sector } : {}),
+                ...(user?.nivelEducativo ? { nivelEducativo: user.nivelEducativo } : {}),
+                ...(user?.tipoPuesto ? { tipoPuesto: user.tipoPuesto } : {}),
+              },
+              orderBy: { nMuestra: 'desc' },
+            });
+            if (baremo) {
+              percentilFinal = Number(baremo.percentil);
               this.logger.log(`[IGA Percentil IRT] Resuelto percentil ${percentilFinal} para test ${r.testId} (theta: ${r.theta})`);
             }
           } catch (dbErr) {
@@ -174,6 +188,8 @@ export class IgaCalculatorService {
             data: {
               examAttemptId: attemptId,
               testId,
+              scoringModelVersionId: resultVersions.scoringModelVersionId,
+              normGroupVersionId: resultVersions.normGroupVersionId,
               puntajeBruto: scoreVal,
               percentil: scoreVal,
               irtCalculated: false,
@@ -185,26 +201,30 @@ export class IgaCalculatorService {
         // Calcular IRT theta para cada test con respuestas
         for (const [testId, patterns] of Object.entries(responsesByTest)) {
           const paramsCount = await this.prisma.parametrosItems.count({
-            where: { testId, activo: true },
+            where: { organizationId: attempt.organizationId, testId, activo: true },
           });
 
           if (paramsCount > 0) {
-            const { theta, error, thetaT, thetaCi, engagement } = await this.thetaCalculator.calcularTheta(testId, patterns);
+            const { theta, error, thetaT, thetaCi, engagement } = await this.thetaCalculator.calcularTheta(testId, patterns, attempt.organizationId);
             const { lz, aberrante } = await this.personFitService.calculatePersonFit(testId, patterns, theta);
             
             let percentilFinal = 50.0;
             try {
-              const rawBaremo: any[] = await this.prisma.$queryRawUnsafe(
-                `SELECT percentil FROM obtener_percentil_dinamico($1, $2, $3, $4, $5, $6) LIMIT 1;`,
-                testId,
-                theta,
-                user?.pais || null,
-                user?.sector || null,
-                user?.nivelEducativo || null,
-                user?.tipoPuesto || null
-              );
-              if (rawBaremo && rawBaremo.length > 0) {
-                percentilFinal = Number(rawBaremo[0].percentil);
+              const baremo = await this.prisma.baremosDinamicos.findFirst({
+                where: {
+                  organizationId: attempt.organizationId,
+                  testId,
+                  thetaMin: { lte: theta },
+                  thetaMax: { gt: theta },
+                  ...(user?.pais ? { pais: user.pais } : {}),
+                  ...(user?.sector ? { sector: user.sector } : {}),
+                  ...(user?.nivelEducativo ? { nivelEducativo: user.nivelEducativo } : {}),
+                  ...(user?.tipoPuesto ? { tipoPuesto: user.tipoPuesto } : {}),
+                },
+                orderBy: { nMuestra: 'desc' },
+              });
+              if (baremo) {
+                percentilFinal = Number(baremo.percentil);
               }
             } catch (dbErr) {
               this.logger.warn(`Error al consultar percentil para theta ${theta}: ${dbErr.message}`);
@@ -214,6 +234,8 @@ export class IgaCalculatorService {
               data: {
                 examAttemptId: attemptId,
                 testId,
+                scoringModelVersionId: resultVersions.scoringModelVersionId,
+                normGroupVersionId: resultVersions.normGroupVersionId,
                 puntajeBruto: patterns.length,
                 percentil: percentilFinal,
                 theta,
@@ -233,6 +255,8 @@ export class IgaCalculatorService {
               data: {
                 examAttemptId: attemptId,
                 testId,
+                scoringModelVersionId: resultVersions.scoringModelVersionId,
+                normGroupVersionId: resultVersions.normGroupVersionId,
                 puntajeBruto: scoreVal,
                 percentil: scoreVal,
                 irtCalculated: false,
@@ -257,6 +281,8 @@ export class IgaCalculatorService {
           data: {
             examAttemptId: attemptId,
             testId: tId,
+            scoringModelVersionId: resultVersions.scoringModelVersionId,
+            normGroupVersionId: resultVersions.normGroupVersionId,
             puntajeBruto: val,
             percentil: val,
             theta: 0.8,
@@ -325,6 +351,9 @@ export class IgaCalculatorService {
       where: { examAttemptId: attemptId },
       update: {
         perfilId: finalPerfilId,
+        scoringModelVersionId: resultVersions.scoringModelVersionId,
+        normGroupVersionId: resultVersions.normGroupVersionId,
+        reportTemplateVersionId: resultVersions.reportTemplateVersionId,
         iga,
         recomendacion,
         alertas: alertas,
@@ -332,10 +361,26 @@ export class IgaCalculatorService {
       create: {
         examAttemptId: attemptId,
         perfilId: finalPerfilId,
+        scoringModelVersionId: resultVersions.scoringModelVersionId,
+        normGroupVersionId: resultVersions.normGroupVersionId,
+        reportTemplateVersionId: resultVersions.reportTemplateVersionId,
         iga,
         recomendacion,
         alertas: alertas,
       },
+    });
+
+    await this.prisma.resultadoTest.updateMany({
+      where: { examAttemptId: attemptId },
+      data: {
+        scoringModelVersionId: resultVersions.scoringModelVersionId,
+        normGroupVersionId: resultVersions.normGroupVersionId,
+      },
+    });
+
+    await this.scientificTrace.attachTraceToResults({
+      organizationId: attempt.organizationId,
+      attemptId,
     });
 
     return {

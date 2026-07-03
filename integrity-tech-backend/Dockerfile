@@ -1,48 +1,36 @@
-# ============================================================================
-# ETAPA 1: INSTALACIÓN DE DEPENDENCIAS (deps)
-# ============================================================================
-FROM node:18-alpine AS deps
-RUN apk add --no-cache libc6-compat
-WORKDIR /usr/src/app
+# syntax=docker/dockerfile:1.7
 
-COPY package*.json ./
-COPY prisma ./prisma/
-
-# Instalar todas las dependencias (incluyendo devDependencies para compilar)
+FROM node:20-alpine AS deps
+WORKDIR /app
+RUN apk add --no-cache openssl
+COPY package.json package-lock.json ./
 RUN npm ci
 
-# ============================================================================
-# ETAPA 2: COMPILACIÓN DEL CÓDIGO (build)
-# ============================================================================
-FROM node:18-alpine AS build
-WORKDIR /usr/src/app
-
-COPY --from=deps /usr/src/app/node_modules ./node_modules
-COPY . .
-
-# Generar cliente de Prisma basado en el esquema DDL y compilar NestJS
+FROM node:20-alpine AS build
+WORKDIR /app
+RUN apk add --no-cache openssl
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json package-lock.json tsconfig*.json ./
+COPY prisma ./prisma
+COPY src ./src
+COPY test ./test
 RUN npx prisma generate
 RUN npm run build
+RUN npm prune --omit=dev
 
-# Limpiar dependencias de desarrollo y dejar solo producción para reducir peso
-RUN npm prune --production
-
-# ============================================================================
-# ETAPA 3: IMAGEN DE PRODUCCIÓN MINIFICADA (runner)
-# ============================================================================
-FROM node:18-alpine AS runner
-WORKDIR /usr/src/app
-
+FROM node:20-alpine AS runner
+WORKDIR /app
 ENV NODE_ENV=production
-
-# Copiar artefactos necesarios desde la etapa de compilación
-COPY --from=build /usr/src/app/dist ./dist
-COPY --from=build /usr/src/app/node_modules ./node_modules
-COPY --from=build /usr/src/app/package*.json ./
-COPY --from=build /usr/src/app/prisma ./prisma
-
-# Exponer el puerto para el contenedor de API (los workers ignorarán esto)
-EXPOSE 3000
-
-# Comando por defecto (sobrescribible en docker-compose / ECS)
+ENV PORT=3001
+RUN apk add --no-cache curl openssl \
+  && addgroup -S nodeapp \
+  && adduser -S nodeapp -G nodeapp
+COPY --from=build --chown=nodeapp:nodeapp /app/node_modules ./node_modules
+COPY --from=build --chown=nodeapp:nodeapp /app/dist ./dist
+COPY --from=build --chown=nodeapp:nodeapp /app/prisma ./prisma
+COPY --from=build --chown=nodeapp:nodeapp /app/package.json ./package.json
+USER nodeapp
+EXPOSE 3001
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD curl -fsS http://127.0.0.1:${PORT}/health/live || exit 1
 CMD ["node", "dist/main"]

@@ -29,3 +29,13 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 *.log
+
+# Playwright / E2E
+playwright-report/
+**/playwright-report/
+test-results/
+**/test-results/
+
+# Private local storage
+.private-storage/
+**/.private-storage/

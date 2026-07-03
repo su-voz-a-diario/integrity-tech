@@ -3,6 +3,17 @@
 import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
+function getCandidateAccessErrorMessage(status: number, fallback: string) {
+  const messages: Record<number, string> = {
+    400: 'La clave de acceso no tiene un formato válido.',
+    401: 'La sesión no es válida. Vuelve a intentar desde tu enlace de evaluación.',
+    403: 'No tienes autorización para acceder a esta evaluación.',
+    409: 'La invitación ya no está disponible para iniciar un nuevo intento.',
+    429: 'Demasiados intentos con esta clave. Espera unos minutos antes de volver a intentar.',
+  };
+  return messages[status] || fallback;
+}
+
 export default function CandidateLoginPage() {
   return (
     <Suspense fallback={
@@ -60,8 +71,8 @@ function CandidateLoginForm() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al verificar la clave de acceso.');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(getCandidateAccessErrorMessage(response.status, errorData.message || 'Error al verificar la clave de acceso.'));
       }
 
       const data = await response.json();
@@ -94,8 +105,8 @@ function CandidateLoginForm() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al inicializar la sesión.');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(getCandidateAccessErrorMessage(response.status, errorData.message || 'Error al inicializar la sesión.'));
       }
 
       const data = await response.json();

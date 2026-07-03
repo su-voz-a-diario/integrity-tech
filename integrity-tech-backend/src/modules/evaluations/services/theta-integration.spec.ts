@@ -9,6 +9,8 @@ import { RoiService } from './roi.service';
 import { ContinuousNormingService } from './continuous-norming.service';
 import { RapidGuessingService } from './rapid-guessing.service';
 import { PrismaService } from '../../../shared/database/prisma.service';
+import { ScientificTraceService } from '../../psychometric-governance/services/scientific-trace.service';
+import { EvaluationGovernanceResolverService } from '../../psychometric-governance/services/evaluation-governance-resolver.service';
 
 describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)', () => {
   let thetaService: ThetaCalculatorService;
@@ -27,6 +29,9 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
     parametrosItems: {
       findMany: jest.fn(),
       count: jest.fn(),
+    },
+    baremosDinamicos: {
+      findFirst: jest.fn(),
     },
     examAttempt: {
       findUnique: jest.fn(),
@@ -47,6 +52,7 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
     resultadoTest: {
       findMany: jest.fn(),
       create: jest.fn(),
+      updateMany: jest.fn(),
       count: jest.fn(),
     },
     continuousNorm: {
@@ -77,6 +83,26 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
           provide: PrismaService,
           useValue: dbMocks,
         },
+        {
+          provide: ScientificTraceService,
+          useValue: {
+            attachTraceToResults: jest.fn().mockResolvedValue({
+              mode: 'LEGACY_UNVERSIONED',
+              itemVersionIds: [],
+              generatedAt: new Date().toISOString(),
+            }),
+          },
+        },
+        {
+          provide: EvaluationGovernanceResolverService,
+          useValue: {
+            resolvePublishedResultVersions: jest.fn().mockResolvedValue({
+              scoringModelVersionId: null,
+              normGroupVersionId: null,
+              reportTemplateVersionId: null,
+            }),
+          },
+        },
       ],
     }).compile();
 
@@ -98,6 +124,8 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
       { id: 'Q3', type: 'verbal' },
     ]);
     dbMocks.equatingCoefficients.findFirst.mockResolvedValue(null);
+    dbMocks.baremosDinamicos.findFirst.mockResolvedValue(null);
+    dbMocks.resultadoTest.updateMany.mockResolvedValue({ count: 0 });
   });
 
   it('Debe simular estimación de theta ignorando ítems omitidos y calculando IGA dinámico', async () => {
@@ -130,9 +158,18 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
       wCognitivo: 0.50,
       wCompetencias: 0.00,
     });
+    dbMocks.perfilPuesto.findFirst.mockResolvedValue({
+      id: 'perfil-123',
+      nombre: 'Gerente Comercial',
+      wIntegridad: 0.50,
+      wPersonalidad: 0.00,
+      wCognitivo: 0.50,
+      wCompetencias: 0.00,
+    });
 
     dbMocks.examAttempt.findUnique.mockResolvedValue({
       id: 'attempt-uuid',
+      organizationId: 'org-uuid',
       userId: 'user-uuid',
       scoreDetails: null,
     });
@@ -161,10 +198,7 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
       }
     ]);
 
-    // Simular la llamada a la función obtener_baremo_dinamico de PostgreSQL
-    dbMocks.$queryRawUnsafe.mockResolvedValue([
-      { percentil: 68, n_muestra: 150 }
-    ]);
+    dbMocks.baremosDinamicos.findFirst.mockResolvedValue({ percentil: 68, nMuestra: 150 });
 
     // Calcular IGA
     const igaResult = await igaService.calcularIga('attempt-uuid', 'perfil-123');

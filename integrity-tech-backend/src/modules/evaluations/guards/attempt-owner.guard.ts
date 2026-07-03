@@ -21,7 +21,7 @@ export class AttemptOwnerGuard implements CanActivate {
     // Consultamos la tabla exam_attempts de nuestro propio módulo transaccional
     const attempt = await this.prisma.examAttempt.findUnique({
       where: { id: attemptId },
-      select: { userId: true },
+      select: { userId: true, organizationId: true },
     });
 
     if (!attempt) {
@@ -30,7 +30,7 @@ export class AttemptOwnerGuard implements CanActivate {
 
     // VALIDACIÓN CRÍTICA DE PROPIEDAD:
     // El ID del usuario logueado debe coincidir con el usuario asignado al intento.
-    if (attempt.userId !== user.userId) {
+    if (attempt.userId !== user.userId || attempt.organizationId !== user.organizationId) {
       throw new ForbiddenException('Acceso denegado: Este intento de examen pertenece a otro estudiante.');
     }
 

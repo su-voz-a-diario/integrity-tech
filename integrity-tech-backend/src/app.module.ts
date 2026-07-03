@@ -8,6 +8,11 @@ import { ExamsModule } from './modules/exams/exams.module';
 import { EvaluationsModule } from './modules/evaluations/evaluations.module';
 import { ProctoringModule } from './modules/proctoring/proctoring.module';
 import { LtiModule } from './modules/lti/lti.module';
+import { AuditModule } from './modules/audit/audit.module';
+import { DataGovernanceModule } from './modules/data-governance/data-governance.module';
+import { PsychometricGovernanceModule } from './modules/psychometric-governance/psychometric-governance.module';
+import { ObservabilityModule } from './shared/observability/observability.module';
+import { StorageModule } from './modules/storage/storage.module';
 
 @Module({
   imports: [
@@ -30,12 +35,17 @@ import { LtiModule } from './modules/lti/lti.module';
 
     // 3. Módulo de base de datos relacional global (Prisma)
     DatabaseModule,
+    StorageModule,
+    ObservabilityModule,
 
     // 4. Módulos de Dominios Acotados (Bounded Contexts)
     IamModule,
     ExamsModule,
     EvaluationsModule,
     ProctoringModule,
+    AuditModule,
+    DataGovernanceModule,
+    PsychometricGovernanceModule,
     LtiModule, // Integración LTI v1.3
   ],
 })

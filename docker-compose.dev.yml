@@ -1,0 +1,97 @@
+name: integrity-tech-dev
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: localpassword123
+      POSTGRES_DB: integrity_tech_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d integrity_tech_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./integrity-tech-backend
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      DATABASE_URL: postgresql://postgres:localpassword123@postgres:5432/integrity_tech_db?schema=public
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379
+      REDIS_KEY_PREFIX: integrity:dev:
+      RATE_LIMIT_STORE: redis
+      RATE_LIMIT_REDIS_REQUIRED: "false"
+      JWT_SECRET: dev-only-secret-change-before-production-123456
+      ACCESS_TOKEN_TTL_SECONDS: 900
+      REFRESH_TOKEN_TTL_DAYS: 30
+      CORS_ORIGINS: http://localhost:3000
+      SHOW_SWAGGER: "true"
+      ENABLE_DEV_AUTH: "true"
+      API_BODY_LIMIT: 1mb
+      OTEL_ENABLED: "false"
+      LOG_LEVEL: info
+      STORAGE_PROVIDER: local-private
+      STORAGE_LOCAL_PRIVATE_PATH: /app/.private-storage
+      STORAGE_SIGNED_URL_TTL_SECONDS: 300
+      STORAGE_MAX_FILE_BYTES: 2097152
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3001/health/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  frontend:
+    build:
+      context: ./integrity-tech-frontend
+      dockerfile: Dockerfile
+      args:
+        BACKEND_URL: http://backend:3001
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:3001/api
+        NEXT_PUBLIC_APP_ENV: development
+        NEXT_PUBLIC_BUILD_DATE: local
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      BACKEND_URL: http://backend:3001
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:3001/api
+      NEXT_PUBLIC_APP_ENV: development
+      NEXT_PUBLIC_BUILD_DATE: local
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres_dev_data:
+  redis_dev_data:

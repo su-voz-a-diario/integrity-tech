@@ -1,0 +1,181 @@
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { PrismaService } from '../../../shared/database/prisma.service';
+
+@Injectable()
+export class EvaluationGovernanceResolverService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async resolvePublishedAssessmentVersionForExam(examId: string, organizationId: string) {
+    const assessment = await (this.prisma as any).assessment.findFirst({
+      where: {
+        organizationId,
+        code: this.assessmentCodeForExam(examId),
+      },
+      include: {
+        versions: {
+          where: { status: 'PUBLISHED' },
+          orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
+          take: 1,
+        },
+      },
+    });
+
+    const version = assessment?.versions?.[0];
+    if (!version) {
+      throw new BadRequestException(
+        'La evaluación no tiene una versión psicométrica publicada. Ejecuta el backfill de gobernanza antes de invitar candidatos.',
+      );
+    }
+
+    return version;
+  }
+
+  async resolveItemVersionForAnswer(input: {
+    attemptId: string;
+    organizationId: string;
+    questionId: string;
+  }): Promise<{ itemVersionId: string | null; legacy: boolean }> {
+    const attempt = await this.prisma.examAttempt.findFirst({
+      where: { id: input.attemptId, organizationId: input.organizationId },
+      select: { id: true, examId: true, assessmentVersionId: true },
+    });
+
+    if (!attempt) {
+      throw new BadRequestException('Intento de examen no válido.');
+    }
+
+    if (!attempt.assessmentVersionId) {
+      const legacyQuestion = await this.prisma.examQuestion.findFirst({
+        where: { examId: attempt.examId, questionId: input.questionId },
+        select: { id: true },
+      });
+      if (!legacyQuestion) {
+        throw new BadRequestException('La pregunta no pertenece al intento.');
+      }
+      return { itemVersionId: null, legacy: true };
+    }
+
+    const linkedItem = await (this.prisma as any).assessmentVersionItem.findFirst({
+      where: {
+        assessmentVersionId: attempt.assessmentVersionId,
+        itemVersion: {
+          status: { in: ['ACTIVE', 'PUBLISHED'] },
+          item: {
+            organizationId: input.organizationId,
+            itemCode: this.itemCodeForQuestion(input.questionId),
+          },
+        },
+      },
+      select: { itemVersionId: true },
+    });
+
+    if (!linkedItem) {
+      throw new BadRequestException('El reactivo no pertenece a la versión publicada del intento.');
+    }
+
+    return { itemVersionId: linkedItem.itemVersionId, legacy: false };
+  }
+
+  async validateItemVersionBelongsToAttempt(input: {
+    attemptId: string;
+    questionId: string;
+    itemVersionId?: string | null;
+  }) {
+    const attempt = await this.prisma.examAttempt.findUnique({
+      where: { id: input.attemptId },
+      select: { assessmentVersionId: true, organizationId: true, examId: true },
+    });
+
+    if (!attempt) return false;
+    if (!attempt.assessmentVersionId) {
+      const legacyQuestion = await this.prisma.examQuestion.findFirst({
+        where: { examId: attempt.examId, questionId: input.questionId },
+        select: { id: true },
+      });
+      return !!legacyQuestion && !input.itemVersionId;
+    }
+
+    if (!input.itemVersionId) return false;
+
+    const link = await (this.prisma as any).assessmentVersionItem.findFirst({
+      where: {
+        assessmentVersionId: attempt.assessmentVersionId,
+        itemVersionId: input.itemVersionId,
+        itemVersion: {
+          status: { in: ['ACTIVE', 'PUBLISHED'] },
+          item: {
+            organizationId: attempt.organizationId,
+            itemCode: this.itemCodeForQuestion(input.questionId),
+          },
+        },
+      },
+      select: { itemVersionId: true },
+    });
+
+    return !!link;
+  }
+
+  async findGovernedSessionItems(assessmentVersionId: string) {
+    return (this.prisma as any).assessmentVersionItem.findMany({
+      where: {
+        assessmentVersionId,
+        itemVersion: {
+          status: { in: ['ACTIVE', 'PUBLISHED'] },
+        },
+      },
+      orderBy: { sortOrder: 'asc' },
+      include: {
+        itemVersion: {
+          include: { item: true },
+        },
+      },
+    });
+  }
+
+  async resolvePublishedResultVersions(assessmentVersionId?: string | null) {
+    if (!assessmentVersionId) {
+      return {
+        scoringModelVersionId: null,
+        normGroupVersionId: null,
+      };
+    }
+
+    const [scoringModelVersion, normGroupVersion, reportTemplateVersion] = await Promise.all([
+      (this.prisma as any).scoringModelVersion.findFirst({
+        where: {
+          status: 'PUBLISHED',
+          scoringModel: { assessmentVersionId },
+        },
+        orderBy: [{ effectiveFrom: 'desc' }, { createdAt: 'desc' }],
+      }),
+      (this.prisma as any).normGroupVersion.findFirst({
+        where: {
+          status: 'PUBLISHED',
+          normGroup: { assessmentVersionId },
+        },
+        orderBy: [{ effectiveFrom: 'desc' }, { createdAt: 'desc' }],
+      }),
+      (this.prisma as any).reportTemplateVersion.findFirst({
+        where: {
+          status: 'PUBLISHED',
+          reportTemplate: { assessmentVersionId },
+        },
+        orderBy: [{ effectiveFrom: 'desc' }, { createdAt: 'desc' }],
+      }),
+    ]);
+
+    return {
+      scoringModelVersionId: scoringModelVersion?.id || null,
+      normGroupVersionId: normGroupVersion?.id || null,
+      reportTemplateVersionId: reportTemplateVersion?.id || null,
+    };
+  }
+
+  assessmentCodeForExam(examId: string) {
+    return `EXAM_${examId}`;
+  }
+
+  itemCodeForQuestion(questionId: string) {
+    return `QUESTION_${questionId}`;
+  }
+}

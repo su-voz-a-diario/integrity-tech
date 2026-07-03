@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+!.env.staging.example
+!.env.production.example
+node_modules
+dist
+coverage
+npm-debug.log
+.DS_Store
+.git
+.github
+public/snapshots
+.private-storage

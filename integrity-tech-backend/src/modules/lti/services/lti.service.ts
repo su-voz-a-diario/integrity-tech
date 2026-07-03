@@ -54,9 +54,22 @@ export class LtiService {
   async provisionUser(claims: any): Promise<any> {
     this.logger.log(`Proporcionando usuario JIT en IAM para el sub: ${claims.sub}`);
 
+    let org = await this.prisma.organization.findFirst({
+      where: { slug: 'lti-demo' },
+    });
+    if (!org) {
+      org = await this.prisma.organization.create({
+        data: {
+          name: 'Organización LTI Demo',
+          slug: 'lti-demo',
+        }
+      });
+    }
+
     // Buscamos si existe el usuario por su referencia externa (iss + sub) o email
     let user = await this.prisma.user.findFirst({
       where: {
+        organizationId: org.id,
         OR: [
           { email: claims.email },
           // En producción buscaríamos en una tabla de identidades vinculadas
@@ -66,16 +79,6 @@ export class LtiService {
 
     if (!user) {
       this.logger.log(`Usuario no encontrado. Creando nuevo registro JIT para: ${claims.name}`);
-      let org = await this.prisma.organization.findFirst();
-      if (!org) {
-        org = await this.prisma.organization.create({
-          data: {
-            name: 'Organización LTI Demo',
-            slug: 'lti-demo',
-          }
-        });
-      }
-
       const nameParts = (claims.name || 'Estudiante LTI').split(' ');
       const firstName = nameParts[0] || 'Estudiante';
       const lastName = nameParts.slice(1).join(' ') || 'LTI';
@@ -100,17 +103,24 @@ export class LtiService {
   async resolveExamFromResourceLink(resourceLinkId: string): Promise<any> {
     // Buscamos si hay un examen enlazado a este recurso LTI
     // Si no lo hay, para la demo obtenemos el primer examen existente
-    let exam = await this.prisma.exam.findFirst();
+    let org = await this.prisma.organization.findFirst({
+      where: { slug: 'lti-demo' },
+    });
+    let exam = await this.prisma.exam.findFirst({
+      where: org ? { organizationId: org.id } : undefined,
+    });
 
     if (!exam) {
       this.logger.warn('No hay exámenes registrados en la base de datos local. Creando examen por defecto para el launch LTI...');
       // Creamos una organización ficticia para el examen
-      const org = await this.prisma.organization.create({
-        data: {
-          name: 'Organización LTI Demo',
-          slug: 'lti-demo-' + Date.now()
-        }
-      });
+      if (!org) {
+        org = await this.prisma.organization.create({
+          data: {
+            name: 'Organización LTI Demo',
+            slug: 'lti-demo'
+          }
+        });
+      }
 
       exam = await this.prisma.exam.create({
         data: {
@@ -135,9 +145,18 @@ export class LtiService {
     const lineitemUrl = agsClaim?.lineitem || 'https://moodle.example.com/api/v1/scores';
 
     return await this.prisma.$transaction(async (tx) => {
+      const exam = await tx.exam.findUnique({
+        where: { id: examId },
+        select: { organizationId: true },
+      });
+      if (!exam) {
+        throw new BadRequestException('Examen LTI no encontrado.');
+      }
+
       // 1. Crear el intento de examen local
       const attempt = await tx.examAttempt.create({
         data: {
+          organizationId: exam.organizationId,
           examId,
           userId,
           status: 'IN_PROGRESS',

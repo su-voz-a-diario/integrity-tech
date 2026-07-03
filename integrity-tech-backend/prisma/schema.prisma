@@ -19,7 +19,28 @@ model Organization {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  users     User[]
+  users                User[]
+  userSessions        UserSession[]
+  candidateInvitations CandidateInvitation[]
+  examAttempts        ExamAttempt[]
+  perfilesPuesto      PerfilPuesto[]
+  auditEvents          AuditEvent[]
+  candidateConsents    CandidateConsent[]
+  retentionPolicies    RetentionPolicy[]
+  dataLifecycleRecords DataLifecycleRecord[]
+  dataExportJobs       DataExportJob[]
+  dataDeletionRequests DataDeletionRequest[]
+  criticalAssetVersions CriticalAssetVersion[]
+  backupRecoveryEvents BackupRecoveryEvent[]
+  assessments          Assessment[]
+  psychometricCategories PsychometricCategory[]
+  competencies         Competency[]
+  psychometricScales   PsychometricScale[]
+  items                Item[]
+  normGroups           NormGroup[]
+  scoringModels        ScoringModel[]
+  reportTemplates      ReportTemplate[]
+  privateFiles         PrivateFile[]
 
   @@map("organizations")
 }
@@ -41,9 +62,34 @@ model User {
 
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   userRoles      UserRole[]
+  userSessions   UserSession[]
+  auditEvents    AuditEvent[]
+  candidateConsents CandidateConsent[]
+  privateFiles      PrivateFile[]
 
   @@unique([organizationId, email], name: "unique_email_per_org")
   @@map("users")
+}
+
+model UserSession {
+  id               String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  organizationId   String    @map("organization_id") @db.Uuid
+  refreshTokenHash String    @map("refresh_token_hash") @db.VarChar(128)
+  userAgent        String?   @map("user_agent")
+  ipAddress        String?   @map("ip_address") @db.VarChar(45)
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  lastUsedAt       DateTime  @default(now()) @map("last_used_at") @db.Timestamptz
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt, expiresAt])
+  @@index([refreshTokenHash])
+  @@index([organizationId])
+  @@map("user_sessions")
 }
 
 model Role {
@@ -89,6 +135,562 @@ model UserRole {
 
   @@id([userId, roleId])
   @@map("user_roles")
+}
+
+model AuditEvent {
+  id             String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  organizationId String?  @map("organization_id") @db.Uuid
+  actorUserId    String?  @map("actor_user_id") @db.Uuid
+  actorType      String   @map("actor_type") @db.VarChar(50)
+  action         String   @db.VarChar(120)
+  resourceType   String   @map("resource_type") @db.VarChar(120)
+  resourceId     String?  @map("resource_id") @db.VarChar(120)
+  ipAddress      String?  @map("ip_address") @db.VarChar(45)
+  userAgent      String?  @map("user_agent")
+  metadata       Json?    @db.JsonB
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  actor        User?        @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([resourceType, resourceId])
+  @@map("audit_events")
+}
+
+// ============================================================================
+// MÓDULO 1B: GOBIERNO DE DATOS, RETENCIÓN Y TRAZABILIDAD LEGAL
+// ============================================================================
+
+model RetentionPolicy {
+  id                  String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  organizationId      String   @map("organization_id") @db.Uuid
+  dataType            String   @map("data_type") @db.VarChar(80)
+  classification      String   @db.VarChar(50)
+  activeDays          Int      @map("active_days")
+  archiveAfterDays    Int      @map("archive_after_days")
+  deleteAfterDays     Int      @map("delete_after_days")
+  purgeAfterDays      Int      @map("purge_after_days")
+  legalHoldAllowed    Boolean  @default(true) @map("legal_hold_allowed")
+  description         String?  @db.Text
+  isDefault           Boolean  @default(false) @map("is_default")
+  createdByUserId     String?  @map("created_by_user_id") @db.Uuid
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, dataType])
+  @@index([organizationId, classification])
+  @@map("retention_policies")
+}
+
+model DataLifecycleRecord {
+  id                  String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  organizationId      String    @map("organization_id") @db.Uuid
+  resourceType        String    @map("resource_type") @db.VarChar(80)
+  resourceId          String    @map("resource_id") @db.VarChar(120)
+  classification      String    @db.VarChar(50)
+  state               String    @default("ACTIVE") @db.VarChar(50)
+  activeAt            DateTime  @default(now()) @map("active_at") @db.Timestamptz
+  archivedAt          DateTime? @map("archived_at") @db.Timestamptz
+  deletedAt           DateTime? @map("deleted_at") @db.Timestamptz
+  purgedAt            DateTime? @map("purged_at") @db.Timestamptz
+  legalHoldUntil      DateTime? @map("legal_hold_until") @db.Timestamptz
+  lastReviewedAt      DateTime? @map("last_reviewed_at") @db.Timestamptz
+  metadata            Json?     @db.JsonB
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, resourceType, resourceId])
+  @@index([organizationId, state, resourceType])
+  @@index([organizationId, classification])
+  @@map("data_lifecycle_records")
+}
+
+model DataExportJob {
+  id                 String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  organizationId     String    @map("organization_id") @db.Uuid
+  requestedByUserId  String    @map("requested_by_user_id") @db.Uuid
+  subjectType        String    @map("subject_type") @db.VarChar(80)
+  subjectId          String    @map("subject_id") @db.VarChar(120)
+  format             String    @default("JSON") @db.VarChar(20)
+  status             String    @default("PENDING") @db.VarChar(50)
+  reason             String    @db.Text
+  manifest           Json?     @db.JsonB
+  exportedPayload    Json?     @map("exported_payload") @db.JsonB
+  errorMessage       String?   @map("error_message") @db.Text
+  requestedAt        DateTime  @default(now()) @map("requested_at") @db.Timestamptz
+  completedAt        DateTime? @map("completed_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, subjectType, subjectId])
+  @@index([organizationId, status, requestedAt])
+  @@map("data_export_jobs")
+}
+
+model DataDeletionRequest {
+  id                 String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  organizationId     String    @map("organization_id") @db.Uuid
+  requestedByUserId  String    @map("requested_by_user_id") @db.Uuid
+  subjectType        String    @map("subject_type") @db.VarChar(80)
+  subjectId          String    @map("subject_id") @db.VarChar(120)
+  status             String    @default("PENDING") @db.VarChar(50)
+  reason             String    @db.Text
+  dryRun             Boolean   @default(true) @map("dry_run")
+  approvedByUserId   String?   @map("approved_by_user_id") @db.Uuid
+  approvedAt         DateTime? @map("approved_at") @db.Timestamptz
+  executedAt         DateTime? @map("executed_at") @db.Timestamptz
+  errorMessage       String?   @map("error_message") @db.Text
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  items        DataDeletionItem[]
+
+  @@index([organizationId, subjectType, subjectId])
+  @@index([organizationId, status, createdAt])
+  @@map("data_deletion_requests")
+}
+
+model DataDeletionItem {
+  id                String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  requestId         String    @map("request_id") @db.Uuid
+  resourceType      String    @map("resource_type") @db.VarChar(80)
+  resourceId        String    @map("resource_id") @db.VarChar(120)
+  plannedAction     String    @map("planned_action") @db.VarChar(50)
+  status            String    @default("PENDING") @db.VarChar(50)
+  executedAt        DateTime? @map("executed_at") @db.Timestamptz
+  checksumBefore    String?   @map("checksum_before") @db.VarChar(128)
+  metadata          Json?     @db.JsonB
+
+  request DataDeletionRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, resourceType])
+  @@map("data_deletion_items")
+}
+
+model CriticalAssetVersion {
+  id                 String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  organizationId     String    @map("organization_id") @db.Uuid
+  assetType          String    @map("asset_type") @db.VarChar(80)
+  assetKey           String    @map("asset_key") @db.VarChar(120)
+  version            String    @db.VarChar(50)
+  status             String    @default("DRAFT") @db.VarChar(50)
+  contentHash        String    @map("content_hash") @db.VarChar(128)
+  payload            Json      @db.JsonB
+  effectiveFrom      DateTime? @map("effective_from") @db.Timestamptz
+  effectiveTo        DateTime? @map("effective_to") @db.Timestamptz
+  createdByUserId    String?   @map("created_by_user_id") @db.Uuid
+  approvedByUserId   String?   @map("approved_by_user_id") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  approvedAt         DateTime? @map("approved_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, assetType, assetKey, version])
+  @@index([organizationId, assetType, assetKey, status])
+  @@map("critical_asset_versions")
+}
+
+model BackupRecoveryEvent {
+  id             String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  organizationId String?  @map("organization_id") @db.Uuid
+  eventType      String   @map("event_type") @db.VarChar(80)
+  scope          String   @db.VarChar(80)
+  status         String   @db.VarChar(50)
+  integrityHash  String?  @map("integrity_hash") @db.VarChar(128)
+  storageRef     String?  @map("storage_ref") @db.Text
+  metadata       Json?    @db.JsonB
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@index([eventType, status, createdAt])
+  @@map("backup_recovery_events")
+}
+
+model PrivateFile {
+  id              String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  ownerUserId     String?   @map("owner_user_id") @db.Uuid
+  attemptId       String?   @map("attempt_id") @db.Uuid
+  resourceType    String    @map("resource_type") @db.VarChar(80)
+  resourceId      String?   @map("resource_id") @db.VarChar(120)
+  storageProvider String    @map("storage_provider") @db.VarChar(50)
+  bucket          String?   @db.VarChar(255)
+  objectKey       String    @map("object_key") @db.Text
+  mimeType        String    @map("mime_type") @db.VarChar(120)
+  sizeBytes       BigInt    @map("size_bytes")
+  checksumSha256  String    @map("checksum_sha256") @db.VarChar(64)
+  classification  String    @db.VarChar(50)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  ownerUser    User?        @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
+  attempt      ExamAttempt? @relation(fields: [attemptId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, resourceType, resourceId])
+  @@index([organizationId, attemptId])
+  @@index([organizationId, ownerUserId])
+  @@index([checksumSha256])
+  @@map("private_files")
+}
+
+// ============================================================================
+// MÓDULO 1C: GOBIERNO PSICOMÉTRICO Y TRAZABILIDAD CIENTÍFICA
+// ============================================================================
+
+model PsychometricCategory {
+  id             String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  code           String   @db.VarChar(80)
+  name           String   @db.VarChar(160)
+  description    String?  @db.Text
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  items        Item[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, name])
+  @@map("psychometric_categories")
+}
+
+model Competency {
+  id             String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  code           String   @db.VarChar(80)
+  name           String   @db.VarChar(160)
+  description    String?  @db.Text
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  items        Item[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, name])
+  @@map("competencies")
+}
+
+model PsychometricScale {
+  id             String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  code           String   @db.VarChar(80)
+  name           String   @db.VarChar(160)
+  description    String?  @db.Text
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  subscales    PsychometricSubscale[]
+  items        Item[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, name])
+  @@map("psychometric_scales")
+}
+
+model PsychometricSubscale {
+  id        String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  scaleId   String   @map("scale_id") @db.Uuid
+  code      String   @db.VarChar(80)
+  name      String   @db.VarChar(160)
+  description String? @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  scale PsychometricScale @relation(fields: [scaleId], references: [id], onDelete: Cascade)
+  items Item[]
+
+  @@unique([scaleId, code])
+  @@index([scaleId, name])
+  @@map("psychometric_subscales")
+}
+
+model Assessment {
+  id             String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  code           String   @db.VarChar(80)
+  name           String   @db.VarChar(255)
+  description    String?  @db.Text
+  status         String   @default("DRAFT") @db.VarChar(50)
+  createdByUserId String? @map("created_by_user_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  versions     AssessmentVersion[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, status])
+  @@map("assessments")
+}
+
+model AssessmentVersion {
+  id             String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  assessmentId   String    @map("assessment_id") @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  version        String    @db.VarChar(50)
+  status         String    @default("DRAFT") @db.VarChar(50)
+  title          String    @db.VarChar(255)
+  description    String?   @db.Text
+  blueprintJson  Json      @map("blueprint_json") @db.JsonB
+  contentHash    String    @map("content_hash") @db.VarChar(128)
+  publishedAt    DateTime? @map("published_at") @db.Timestamptz
+  retiredAt      DateTime? @map("retired_at") @db.Timestamptz
+  retirementReason String? @map("retirement_reason") @db.Text
+  createdByUserId String?  @map("created_by_user_id") @db.Uuid
+  approvedByUserId String? @map("approved_by_user_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  itemLinks  AssessmentVersionItem[]
+  attempts   ExamAttempt[]
+  normGroups NormGroup[]
+  scoringModels ScoringModel[]
+  reportTemplates ReportTemplate[]
+
+  @@unique([assessmentId, version])
+  @@index([organizationId, status])
+  @@index([organizationId, publishedAt])
+  @@map("assessment_versions")
+}
+
+model Item {
+  id             String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  itemCode       String   @map("item_code") @db.VarChar(120)
+  categoryId     String?  @map("category_id") @db.Uuid
+  competencyId   String?  @map("competency_id") @db.Uuid
+  scaleId        String?  @map("scale_id") @db.Uuid
+  subscaleId     String?  @map("subscale_id") @db.Uuid
+  status         String   @default("DRAFT") @db.VarChar(50)
+  createdByUserId String? @map("created_by_user_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  category     PsychometricCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  competency   Competency? @relation(fields: [competencyId], references: [id], onDelete: SetNull)
+  scale        PsychometricScale? @relation(fields: [scaleId], references: [id], onDelete: SetNull)
+  subscale     PsychometricSubscale? @relation(fields: [subscaleId], references: [id], onDelete: SetNull)
+  versions     ItemVersion[]
+
+  @@unique([organizationId, itemCode])
+  @@index([organizationId, status])
+  @@index([organizationId, categoryId])
+  @@index([organizationId, competencyId])
+  @@map("items")
+}
+
+model ItemVersion {
+  id                  String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  itemId              String    @map("item_id") @db.Uuid
+  version             String    @db.VarChar(50)
+  status              String    @default("DRAFT") @db.VarChar(50)
+  language            String    @default("es") @db.VarChar(10)
+  stemJson            Json      @map("stem_json") @db.JsonB
+  scoringKeyJson      Json?     @map("scoring_key_json") @db.JsonB
+  tags                Json?     @db.JsonB
+  exposureRate        Decimal?  @map("exposure_rate") @db.Decimal(7, 4)
+  difficulty          Float?
+  discrimination      Float?
+  expectedTimeSeconds Int?      @map("expected_time_seconds")
+  contentHash         String    @map("content_hash") @db.VarChar(128)
+  publishedAt         DateTime? @map("published_at") @db.Timestamptz
+  retiredAt           DateTime? @map("retired_at") @db.Timestamptz
+  retirementReason    String?   @map("retirement_reason") @db.Text
+  createdByUserId     String?   @map("created_by_user_id") @db.Uuid
+  approvedByUserId    String?   @map("approved_by_user_id") @db.Uuid
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  item       Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  assessmentLinks AssessmentVersionItem[]
+  submissions AnswerSubmission[]
+
+  @@unique([itemId, version])
+  @@index([status, language])
+  @@map("item_versions")
+}
+
+model AssessmentVersionItem {
+  assessmentVersionId String  @map("assessment_version_id") @db.Uuid
+  itemVersionId       String  @map("item_version_id") @db.Uuid
+  sortOrder           Int     @default(0) @map("sort_order")
+  weight              Decimal @default(1.00) @db.Decimal(8, 4)
+  role                String? @db.VarChar(50)
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  assessmentVersion AssessmentVersion @relation(fields: [assessmentVersionId], references: [id], onDelete: Cascade)
+  itemVersion       ItemVersion       @relation(fields: [itemVersionId], references: [id], onDelete: Restrict)
+
+  @@id([assessmentVersionId, itemVersionId])
+  @@index([assessmentVersionId, sortOrder])
+  @@map("assessment_version_items")
+}
+
+model NormGroup {
+  id                  String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  organizationId      String   @map("organization_id") @db.Uuid
+  assessmentVersionId String   @map("assessment_version_id") @db.Uuid
+  code                String   @db.VarChar(120)
+  name                String   @db.VarChar(255)
+  description         String?  @db.Text
+  populationJson      Json     @map("population_json") @db.JsonB
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  assessmentVersion AssessmentVersion @relation(fields: [assessmentVersionId], references: [id], onDelete: Restrict)
+  versions          NormGroupVersion[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, assessmentVersionId])
+  @@map("norm_groups")
+}
+
+model NormGroupVersion {
+  id              String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  normGroupId     String    @map("norm_group_id") @db.Uuid
+  version         String    @db.VarChar(50)
+  status          String    @default("DRAFT") @db.VarChar(50)
+  populationJson  Json      @map("population_json") @db.JsonB
+  normTableJson   Json      @map("norm_table_json") @db.JsonB
+  sampleSize      Int?      @map("sample_size")
+  effectiveFrom   DateTime? @map("effective_from") @db.Timestamptz
+  effectiveTo     DateTime? @map("effective_to") @db.Timestamptz
+  retirementReason String?  @map("retirement_reason") @db.Text
+  contentHash     String    @map("content_hash") @db.VarChar(128)
+  createdByUserId String?   @map("created_by_user_id") @db.Uuid
+  approvedByUserId String?  @map("approved_by_user_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  normGroup NormGroup @relation(fields: [normGroupId], references: [id], onDelete: Cascade)
+  resultadosTest ResultadoTest[]
+  resultadosGlobales ResultadoGlobal[]
+
+  @@unique([normGroupId, version])
+  @@index([status, effectiveFrom, effectiveTo])
+  @@map("norm_group_versions")
+}
+
+model ScoringModel {
+  id                  String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  organizationId      String   @map("organization_id") @db.Uuid
+  assessmentVersionId String   @map("assessment_version_id") @db.Uuid
+  code                String   @db.VarChar(120)
+  name                String   @db.VarChar(255)
+  modelType           String   @map("model_type") @db.VarChar(80)
+  description         String?  @db.Text
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  assessmentVersion AssessmentVersion @relation(fields: [assessmentVersionId], references: [id], onDelete: Restrict)
+  versions          ScoringModelVersion[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, assessmentVersionId])
+  @@map("scoring_models")
+}
+
+model ScoringModelVersion {
+  id              String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  scoringModelId  String    @map("scoring_model_id") @db.Uuid
+  version         String    @db.VarChar(50)
+  status          String    @default("DRAFT") @db.VarChar(50)
+  algorithmKey    String    @map("algorithm_key") @db.VarChar(120)
+  parametersJson  Json      @map("parameters_json") @db.JsonB
+  contentHash     String    @map("content_hash") @db.VarChar(128)
+  effectiveFrom   DateTime? @map("effective_from") @db.Timestamptz
+  effectiveTo     DateTime? @map("effective_to") @db.Timestamptz
+  retirementReason String?  @map("retirement_reason") @db.Text
+  createdByUserId String?   @map("created_by_user_id") @db.Uuid
+  approvedByUserId String?  @map("approved_by_user_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  scoringModel ScoringModel @relation(fields: [scoringModelId], references: [id], onDelete: Cascade)
+  resultadosTest ResultadoTest[]
+  resultadosGlobales ResultadoGlobal[]
+
+  @@unique([scoringModelId, version])
+  @@index([status, effectiveFrom, effectiveTo])
+  @@map("scoring_model_versions")
+}
+
+model ReportTemplate {
+  id                  String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  organizationId      String   @map("organization_id") @db.Uuid
+  assessmentVersionId String   @map("assessment_version_id") @db.Uuid
+  code                String   @db.VarChar(120)
+  name                String   @db.VarChar(255)
+  audience            String   @default("STAFF") @db.VarChar(80)
+  description         String?  @db.Text
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  assessmentVersion AssessmentVersion @relation(fields: [assessmentVersionId], references: [id], onDelete: Restrict)
+  versions          ReportTemplateVersion[]
+
+  @@unique([organizationId, code])
+  @@index([organizationId, assessmentVersionId])
+  @@map("report_templates")
+}
+
+model ReportTemplateVersion {
+  id              String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  reportTemplateId String   @map("report_template_id") @db.Uuid
+  version         String    @db.VarChar(50)
+  status          String    @default("DRAFT") @db.VarChar(50)
+  templateJson    Json      @map("template_json") @db.JsonB
+  interpretationRulesJson Json? @map("interpretation_rules_json") @db.JsonB
+  contentHash     String    @map("content_hash") @db.VarChar(128)
+  effectiveFrom   DateTime? @map("effective_from") @db.Timestamptz
+  effectiveTo     DateTime? @map("effective_to") @db.Timestamptz
+  retirementReason String?  @map("retirement_reason") @db.Text
+  createdByUserId String?   @map("created_by_user_id") @db.Uuid
+  approvedByUserId String?  @map("approved_by_user_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  reportTemplate ReportTemplate @relation(fields: [reportTemplateId], references: [id], onDelete: Cascade)
+  resultadosGlobales ResultadoGlobal[]
+  issuedReports ReportIssueRecord[]
+
+  @@unique([reportTemplateId, version])
+  @@index([status, effectiveFrom, effectiveTo])
+  @@map("report_template_versions")
+}
+
+model ReportIssueRecord {
+  id                      String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  organizationId          String   @map("organization_id") @db.Uuid
+  examAttemptId           String   @map("exam_attempt_id") @db.Uuid
+  reportTemplateVersionId String   @map("report_template_version_id") @db.Uuid
+  issuedByUserId          String?  @map("issued_by_user_id") @db.Uuid
+  governanceTrace         Json     @map("governance_trace") @db.JsonB
+  issuedAt                DateTime @default(now()) @map("issued_at") @db.Timestamptz
+
+  attempt ExamAttempt @relation(fields: [examAttemptId], references: [id], onDelete: Cascade)
+  reportTemplateVersion ReportTemplateVersion @relation(fields: [reportTemplateVersionId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, examAttemptId])
+  @@index([reportTemplateVersionId])
+  @@map("report_issue_records")
 }
 
 // ============================================================================
@@ -169,7 +771,9 @@ model ExamQuestion {
 
 model ExamAttempt {
   id          String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
   examId      String    @map("exam_id") @db.Uuid // Referencia Lógica
+  assessmentVersionId String? @map("assessment_version_id") @db.Uuid
   userId      String    @map("user_id") @db.Uuid // Referencia Lógica
   status      String    @default("IN_PROGRESS") @db.VarChar(50)
   startedAt   DateTime  @default(now()) @map("started_at") @db.Timestamptz
@@ -183,12 +787,20 @@ model ExamAttempt {
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  assessmentVersion AssessmentVersion? @relation(fields: [assessmentVersionId], references: [id], onDelete: SetNull)
   submissions AnswerSubmission[]
   logs        AttemptLog[]
   ltiMapping  LtiAttemptMapping?
+  candidateConsent CandidateConsent?
   resultadosTest  ResultadoTest[]
   resultadoGlobal ResultadoGlobal?
+  issuedReports   ReportIssueRecord[]
+  privateFiles     PrivateFile[]
 
+  @@index([organizationId, userId, status])
+  @@index([organizationId, examId, status])
+  @@index([organizationId, assessmentVersionId])
   @@map("exam_attempts")
 }
 
@@ -196,6 +808,7 @@ model AnswerSubmission {
   id            String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
   examAttemptId String   @map("exam_attempt_id") @db.Uuid
   questionId    String   @map("question_id") @db.Uuid // Referencia Lógica
+  itemVersionId String?  @map("item_version_id") @db.Uuid
   response      Json     @db.JsonB // Respuesta exacta del alumno
   isCorrect     Boolean? @map("is_correct")
   pointsEarned  Decimal  @default(0.00) @map("points_earned") @db.Decimal(5, 2)
@@ -203,9 +816,29 @@ model AnswerSubmission {
   submittedAt   DateTime @default(now()) @map("submitted_at") @db.Timestamptz
 
   attempt       ExamAttempt @relation(fields: [examAttemptId], references: [id], onDelete: Cascade)
+  itemVersion   ItemVersion? @relation(fields: [itemVersionId], references: [id], onDelete: SetNull)
 
   @@unique([examAttemptId, questionId], name: "unique_response_per_attempt_question")
+  @@index([itemVersionId])
   @@map("answer_submissions")
+}
+
+model CandidateConsent {
+  id             String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  attemptId      String   @unique @map("attempt_id") @db.Uuid
+  consentVersion String   @map("consent_version") @db.VarChar(50)
+  acceptedAt     DateTime @default(now()) @map("accepted_at") @db.Timestamptz
+  ipAddress      String?  @map("ip_address") @db.VarChar(45)
+  userAgent      String?  @map("user_agent")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attempt      ExamAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, userId])
+  @@map("candidate_consents")
 }
 
 model AttemptLog {
@@ -237,6 +870,8 @@ model LtiAttemptMapping {
 
 model CandidateInvitation {
   id             String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  createdByUserId String?  @map("created_by_user_id") @db.Uuid
   examId         String    @map("exam_id") @db.Uuid
   email          String    @db.VarChar(255)
   candidateName  String    @map("candidate_name") @db.VarChar(255)
@@ -247,11 +882,15 @@ model CandidateInvitation {
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, status, createdAt])
   @@map("candidate_invitations")
 }
 
 model PerfilPuesto {
   id             String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
   nombre         String   @db.VarChar(100)
   wIntegridad    Decimal  @map("w_integridad") @db.Decimal(5, 4)
   wPersonalidad  Decimal  @map("w_personalidad") @db.Decimal(5, 4)
@@ -260,14 +899,18 @@ model PerfilPuesto {
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   resultadosGlobales ResultadoGlobal[]
 
+  @@index([organizationId])
   @@map("perfiles_puesto")
 }
 
 model ResultadoTest {
   id            String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
   examAttemptId String   @map("exam_attempt_id") @db.Uuid
+  scoringModelVersionId String? @map("scoring_model_version_id") @db.Uuid
+  normGroupVersionId    String? @map("norm_group_version_id") @db.Uuid
   testId        String   @map("test_id") @db.VarChar(50) // 'IT2_I', 'IT2_P10', 'IT2_AC10', 'IT2_CB10'
   puntajeBruto  Decimal  @map("puntaje_bruto") @db.Decimal(10, 2)
   percentil     Decimal? @db.Decimal(5, 2)
@@ -279,42 +922,60 @@ model ResultadoTest {
   aberrante     Boolean  @default(false) @map("aberrante")
   engagement    Float?
   irtCalculated Boolean  @default(false) @map("irt_calculated")
+  governanceTrace Json?  @map("governance_trace") @db.JsonB
   fechaCalculo  DateTime @default(now()) @map("fecha_calculo") @db.Timestamptz
 
   attempt       ExamAttempt @relation(fields: [examAttemptId], references: [id], onDelete: Cascade)
+  scoringModelVersion ScoringModelVersion? @relation(fields: [scoringModelVersionId], references: [id], onDelete: SetNull)
+  normGroupVersion NormGroupVersion? @relation(fields: [normGroupVersionId], references: [id], onDelete: SetNull)
 
   @@unique([examAttemptId, testId])
+  @@index([scoringModelVersionId])
+  @@index([normGroupVersionId])
   @@map("resultados_test")
 }
 
 model Baremo {
   id                 String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  organizationId     String   @map("organization_id") @db.Uuid
   testId             String   @map("test_id") @db.VarChar(50)
   percentil          Decimal  @db.Decimal(5, 2)
   puntajeRawMin      Decimal  @map("puntaje_raw_min") @db.Decimal(10, 2)
   puntajeRawMax      Decimal  @map("puntaje_raw_max") @db.Decimal(10, 2)
   fechaActualizacion DateTime @default(now()) @map("fecha_actualizacion") @db.Timestamptz
 
-  @@unique([testId, percentil])
+  @@unique([organizationId, testId, percentil])
+  @@index([organizationId, testId])
   @@map("baremos")
 }
 
 model ResultadoGlobal {
   examAttemptId String   @id @map("exam_attempt_id") @db.Uuid
   perfilId      String   @map("perfil_id") @db.Uuid
+  scoringModelVersionId String? @map("scoring_model_version_id") @db.Uuid
+  normGroupVersionId    String? @map("norm_group_version_id") @db.Uuid
+  reportTemplateVersionId String? @map("report_template_version_id") @db.Uuid
   iga           Decimal  @db.Decimal(5, 2)
   recomendacion String   @db.VarChar(50)
   alertas       Json     @db.JsonB
+  governanceTrace Json?  @map("governance_trace") @db.JsonB
   fechaCalculo  DateTime @default(now()) @map("fecha_calculo") @db.Timestamptz
 
   attempt       ExamAttempt  @relation(fields: [examAttemptId], references: [id], onDelete: Cascade)
   perfil        PerfilPuesto @relation(fields: [perfilId], references: [id], onDelete: Cascade)
+  scoringModelVersion ScoringModelVersion? @relation(fields: [scoringModelVersionId], references: [id], onDelete: SetNull)
+  normGroupVersion NormGroupVersion? @relation(fields: [normGroupVersionId], references: [id], onDelete: SetNull)
+  reportTemplateVersion ReportTemplateVersion? @relation(fields: [reportTemplateVersionId], references: [id], onDelete: SetNull)
 
+  @@index([scoringModelVersionId])
+  @@index([normGroupVersionId])
+  @@index([reportTemplateVersionId])
   @@map("resultados_globales")
 }
 
 model ParametrosItems {
   id               Int      @id @default(autoincrement())
+  organizationId   String   @map("organization_id") @db.Uuid
   testId           String   @map("test_id") @db.VarChar(50) // ej: 'IT2_AC10'
   itemId           String   @map("item_id") @db.VarChar(50)
   modelo           String   @db.VarChar(10) // '2PL' o 'GRM'
@@ -331,12 +992,14 @@ model ParametrosItems {
   rmseaItem        Float?   @map("rmsea_item")
   activo           Boolean  @default(true) @map("activo")
 
-  @@unique([testId, itemId])
+  @@unique([organizationId, testId, itemId])
+  @@index([organizationId, testId])
   @@map("parametros_items")
 }
 
 model BaremosDinamicos {
   id             Int      @id @default(autoincrement())
+  organizationId String   @map("organization_id") @db.Uuid
   testId         String   @map("test_id") @db.VarChar(50)
   pais           String?  @db.VarChar(100)
   sector         String?  @db.VarChar(100)
@@ -348,12 +1011,13 @@ model BaremosDinamicos {
   nMuestra       Int      @map("n_muestra")
   fechaCreacion  DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
 
-  @@index([testId, pais, sector, nivelEducativo, tipoPuesto])
+  @@index([organizationId, testId, pais, sector, nivelEducativo, tipoPuesto])
   @@map("baremos_dinamicos")
 }
 
 model DifFlags {
   id      Int      @id @default(autoincrement())
+  organizationId String @map("organization_id") @db.Uuid
   testId  String   @map("test_id") @db.VarChar(50)
   itemId  String   @map("item_id") @db.VarChar(50)
   variable String   @db.VarChar(100)
@@ -362,11 +1026,13 @@ model DifFlags {
   flag     Boolean
   fecha    DateTime @default(now()) @map("fecha") @db.Timestamptz
 
+  @@index([organizationId, testId])
   @@map("dif_flags")
 }
 
 model PsychometricQualityLog {
   id                  Int      @id @default(autoincrement())
+  organizationId      String   @map("organization_id") @db.Uuid
   testId              String   @map("test_id") @db.VarChar(50)
   fecha               DateTime @default(now()) @map("fecha") @db.Timestamptz
   nAttempts           Int      @map("n_attempts")
@@ -375,22 +1041,26 @@ model PsychometricQualityLog {
   driftAlert          Boolean  @default(false) @map("drift_alert")
   marginalReliability Float    @default(0.80) @map("marginal_reliability")
 
+  @@index([organizationId, testId, fecha])
   @@map("psychometric_quality_logs")
 }
 
 model CutScore {
   id        Int     @id @default(autoincrement())
+  organizationId String @map("organization_id") @db.Uuid
   testId    String  @map("test_id") @db.VarChar(50)
   categoria String  @db.VarChar(100)
   thetaMin  Float   @map("theta_min")
   thetaMax  Float?  @map("theta_max")
   orden     Int
 
+  @@index([organizationId, testId])
   @@map("cut_scores")
 }
 
 model ParametrosItemsHistorial {
   id               Int      @id @default(autoincrement())
+  organizationId   String   @map("organization_id") @db.Uuid
   testId           String   @map("test_id") @db.VarChar(50)
   itemId           String   @map("item_id") @db.VarChar(50)
   modelo           String   @db.VarChar(10)
@@ -407,11 +1077,13 @@ model ParametrosItemsHistorial {
   fechaCalibracion DateTime @map("fecha_calibracion") @db.Timestamptz
   fechaArchivado   DateTime @default(now()) @map("fecha_archivado") @db.Timestamptz
 
+  @@index([organizationId, testId, fechaArchivado])
   @@map("parametros_items_historial")
 }
 
 model ContinuousNorm {
   id                 String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  organizationId     String   @map("organization_id") @db.Uuid
   testId             String   @map("test_id") @db.VarChar(50)
   pais               String?  @db.VarChar(100)
   nivelEducativo     String?  @map("nivel_educativo") @db.VarChar(100)
@@ -425,11 +1097,13 @@ model ContinuousNorm {
   p95                Decimal  @db.Decimal(8, 4)
   fechaActualizacion DateTime @default(now()) @map("fecha_actualizacion") @db.Timestamptz
 
+  @@index([organizationId, testId])
   @@map("continuous_norms")
 }
 
 model EquatingCoefficients {
   id             Int      @id @default(autoincrement())
+  organizationId String   @map("organization_id") @db.Uuid
   testId         String   @map("test_id") @db.VarChar(50)
   versionOrigen  String   @map("version_origen") @db.VarChar(50)
   versionDestino String   @map("version_destino") @db.VarChar(50)
@@ -438,6 +1112,6 @@ model EquatingCoefficients {
   coeficienteB   Float    @map("coeficiente_b")
   fechaCreacion  DateTime @default(now()) @map("fecha_creacion") @db.Timestamptz
 
+  @@index([organizationId, testId])
   @@map("equating_coefficients")
 }
-

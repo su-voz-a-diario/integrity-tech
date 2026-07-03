@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useExamStore } from '../../../store/exam.store';
 import { useSecureTimer } from '../../../hooks/useSecureTimer';
 import { useProctoring } from '../../../hooks/useProctoring';
@@ -18,6 +18,18 @@ const MOCK_EXAM = {
   title: 'Batería de Evaluación Psicométrica Integrada (IT²)',
   durationMinutes: 60,
 };
+
+const CONSENT_VERSION = 'candidate-consent-v1';
+
+function getProfessionalErrorMessage(status: number, fallback: string) {
+  const messages: Record<number, string> = {
+    401: 'Tu sesión expiró o no es válida. Vuelve a ingresar con tu enlace de evaluación.',
+    403: 'No tienes autorización para acceder a esta evaluación.',
+    409: 'El estado actual del intento no permite realizar esta acción.',
+    429: 'Hay demasiadas solicitudes en este momento. Espera unos minutos e inténtalo nuevamente.',
+  };
+  return messages[status] || fallback;
+}
 
 const MOCK_QUESTIONS: QuestionDto[] = [
   {
@@ -546,18 +558,53 @@ export default function ExamTakingPage({ params }: { params: { attemptId: string
     status: string;
   } | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
+  const [isAcceptingConsent, setIsAcceptingConsent] = useState(false);
+  const [consentAccepted, setConsentAccepted] = useState(false);
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [consentError, setConsentError] = useState<string | null>(null);
   const [initialServerTimeMs] = useState(Date.now());
   const [endTimeMs, setEndTimeMs] = useState(Date.now() + 10 * 60 * 1000);
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
   const [showFeedbackSurvey, setShowFeedbackSurvey] = useState(false);
 
+  const loadSession = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('auth-token') || '';
+      const response = await fetch(`/api/evaluations/attempts/${attemptId}/session`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(getProfessionalErrorMessage(response.status, errorData.message || 'No se pudo cargar la evaluación asignada.'));
+      }
+
+      const data = await response.json();
+      if (!Array.isArray(data.questions) || data.questions.length === 0) {
+        throw new Error('La evaluación no tiene preguntas configuradas.');
+      }
+
+      setExamSession(data);
+      startExam(attemptId, data.exam.id);
+      setStatus(data.status === 'SUBMITTED' ? 'SUBMITTED' : 'IN_PROGRESS');
+      const durationMinutes = data.exam.durationMinutes || 10;
+      setEndTimeMs(Date.now() + durationMinutes * 60 * 1000);
+      analyticsService.track('assessment_started', { attemptId, examId: data.exam.id });
+    } catch (err: any) {
+      setSessionError(err.message || 'No se pudo cargar la sesión de examen.');
+    } finally {
+      setIsLoadingSession(false);
+    }
+  }, [attemptId, startExam, setStatus]);
+
   // Inicializar el store de Zustand con los parámetros de la sesión
   useEffect(() => {
-    async function loadSession() {
+    async function verifyConsentAndLoadSession() {
       try {
         const token = localStorage.getItem('auth-token') || '';
-        const response = await fetch(`/api/evaluations/attempts/${attemptId}/session`, {
+        const response = await fetch(`/api/evaluations/attempts/${attemptId}/consent`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -565,29 +612,55 @@ export default function ExamTakingPage({ params }: { params: { attemptId: string
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.message || 'No se pudo cargar la evaluación asignada.');
+          throw new Error(getProfessionalErrorMessage(response.status, errorData.message || 'No se pudo verificar el consentimiento.'));
         }
 
         const data = await response.json();
-        if (!Array.isArray(data.questions) || data.questions.length === 0) {
-          throw new Error('La evaluación no tiene preguntas configuradas.');
+        if (!data.accepted) {
+          setConsentAccepted(false);
+          setIsLoadingSession(false);
+          return;
         }
 
-        setExamSession(data);
-        startExam(attemptId, data.exam.id);
-        setStatus(data.status === 'SUBMITTED' ? 'SUBMITTED' : 'IN_PROGRESS');
-        const durationMinutes = data.exam.durationMinutes || 10;
-        setEndTimeMs(Date.now() + durationMinutes * 60 * 1000);
-        analyticsService.track('assessment_started', { attemptId, examId: data.exam.id });
+        setConsentAccepted(true);
+        await loadSession();
       } catch (err: any) {
-        setSessionError(err.message || 'No se pudo cargar la sesión de examen.');
-      } finally {
+        setSessionError(err.message || 'No se pudo preparar la evaluación.');
         setIsLoadingSession(false);
       }
     }
 
-    loadSession();
-  }, [attemptId, startExam]);
+    verifyConsentAndLoadSession();
+  }, [attemptId, loadSession]);
+
+  const acceptConsent = async () => {
+    try {
+      setIsAcceptingConsent(true);
+      setConsentError(null);
+      const token = localStorage.getItem('auth-token') || '';
+      const response = await fetch(`/api/evaluations/attempts/${attemptId}/consent`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ consentVersion: CONSENT_VERSION }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(getProfessionalErrorMessage(response.status, errorData.message || 'No se pudo registrar el consentimiento.'));
+      }
+
+      setConsentAccepted(true);
+      setIsLoadingSession(true);
+      await loadSession();
+    } catch (err: any) {
+      setConsentError(err.message || 'No se pudo registrar el consentimiento.');
+    } finally {
+      setIsAcceptingConsent(false);
+    }
+  };
 
   // Tracking de navegación de preguntas para embudos de drop-off
   const questions = examSession?.questions || [];
@@ -647,7 +720,7 @@ export default function ExamTakingPage({ params }: { params: { attemptId: string
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'No se pudo finalizar la evaluación.');
+        throw new Error(getProfessionalErrorMessage(response.status, errorData.message || 'No se pudo finalizar la evaluación.'));
       }
 
       setStatus('SUBMITTED');
@@ -663,6 +736,43 @@ export default function ExamTakingPage({ params }: { params: { attemptId: string
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center font-sans">
         <div className="text-sm text-slate-500 font-medium">Cargando evaluación asignada...</div>
+      </div>
+    );
+  }
+
+  if (!consentAccepted && !examSession) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center font-sans p-6">
+        <div className="max-w-2xl bg-slate-900 border border-slate-800 rounded-xl p-6">
+          <h1 className="text-lg font-bold text-white">Consentimiento informado</h1>
+          <div className="mt-4 space-y-3 text-sm text-slate-300 leading-relaxed">
+            <p>
+              Autorizo realizar esta evaluación como parte de un proceso de selección o valoración profesional.
+            </p>
+            <p>
+              Acepto que mis respuestas y datos asociados al intento sean tratados para generar resultados, métricas y
+              reportes relacionados con la evaluación.
+            </p>
+            <p>
+              Entiendo que la sesión puede registrar señales de monitoreo o proctoring cuando aplique, como eventos de
+              navegación, actividad de sesión o metadata técnica.
+            </p>
+            <p>
+              Comprendo que los resultados podrán ser usados por la organización solicitante como una herramienta de
+              apoyo para la toma de decisiones dentro del proceso correspondiente.
+            </p>
+            <p className="text-xs text-slate-500">Versión del consentimiento: {CONSENT_VERSION}</p>
+          </div>
+          {consentError && <p className="mt-4 text-sm text-red-400">{consentError}</p>}
+          <button
+            type="button"
+            onClick={acceptConsent}
+            disabled={isAcceptingConsent}
+            className="mt-6 w-full rounded-lg bg-indigo-600 px-4 py-3 text-sm font-semibold text-white hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isAcceptingConsent ? 'Registrando...' : 'Acepto y continuar'}
+          </button>
+        </div>
       </div>
     );
   }

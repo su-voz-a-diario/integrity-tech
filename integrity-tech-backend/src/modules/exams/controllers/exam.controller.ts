@@ -1,5 +1,7 @@
-import { Controller, Post, Body, Headers, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Body, Headers, BadRequestException, UseGuards } from '@nestjs/common';
 import { ExamService } from '../services/exam.service';
+import { JwtAuthGuard } from '../../../shared/guards/jwt-auth.guard';
+import { PERMISSIONS, Permissions, PermissionsGuard } from '../../iam';
 
 @Controller('exams')
 export class ExamController {
@@ -9,6 +11,8 @@ export class ExamController {
    * Endpoint para que un docente cree un examen.
    */
   @Post()
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PERMISSIONS.ADMIN_MANAGE)
   async create(
     @Headers('authorization') authHeader: string,
     @Body('title') title: string,
@@ -22,6 +26,7 @@ export class ExamController {
    * Endpoint para que un estudiante inicie la toma de un examen.
    */
   @Post('attempts')
+  @UseGuards(JwtAuthGuard)
   async startAttempt(
     @Headers('authorization') authHeader: string,
     @Body('examId') examId: string,

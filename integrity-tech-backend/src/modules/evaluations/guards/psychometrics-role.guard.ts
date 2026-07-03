@@ -1,13 +1,16 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import { OrganizationContextService } from '../../iam';
+import { PERMISSIONS } from '../../iam/permissions';
 
 @Injectable()
 export class PsychometricsRoleGuard implements CanActivate {
-  canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest();
-    const roles: string[] = request.user?.roles || [];
-    const allowed = ['admin', 'psychologist', 'evaluator'];
+  constructor(private readonly organizationContext: OrganizationContextService) {}
 
-    if (!roles.some((role) => allowed.includes(role))) {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest();
+    const orgContext = await this.organizationContext.resolve(request.user);
+
+    if (!orgContext.permissions.includes(PERMISSIONS.PSYCHOMETRICS_READ)) {
       throw new ForbiddenException('No tienes permisos para acceder a recursos psicométricos.');
     }
 
