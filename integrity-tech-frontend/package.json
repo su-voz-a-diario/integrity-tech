@@ -6,6 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "generate:api-types": "node scripts/generate-api-types.mjs",
+    "test:api-client": "node --test tests/api-client.test.mjs",
     "test:sync-engine": "node --test tests/sync-engine-policy.test.mjs",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",

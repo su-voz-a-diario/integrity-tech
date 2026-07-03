@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { apiClient, ApiClientError } from '../../../services/api-client';
+import type { AttemptListItem, CreateInvitationRequest, CreateInvitationResponse } from '../../../generated/api/types';
 
 // Mock de fallback para demostración si la API no responde
-const MOCK_ATTEMPTS = [
+const MOCK_ATTEMPTS: AttemptListItem[] = [
   {
     id: 'att-9876',
     candidateName: 'Sofía Valenzuela',
@@ -63,7 +65,7 @@ function getDashboardErrorMessage(status: number) {
 export default function RecruiterDashboard() {
   const [filter, setFilter] = useState<'ALL' | 'SAFE' | 'WARNING' | 'CRITICAL'>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
-  const [attempts, setAttempts] = useState<any[]>([]);
+  const [attempts, setAttempts] = useState<AttemptListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
 
@@ -92,23 +94,12 @@ export default function RecruiterDashboard() {
     setInviteError(null);
     
     try {
-      const res = await fetch('/api/evaluations/invitations', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth-token') || ''}`,
-        },
-        body: JSON.stringify(inviteForm),
-      });
-      
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || getDashboardErrorMessage(res.status));
-      }
-      const data = await res.json();
+      const payload: CreateInvitationRequest = inviteForm;
+      const data = await apiClient.post<CreateInvitationResponse>('/evaluations/invitations', payload);
       setGeneratedInvite(data);
     } catch (err: any) {
-      setInviteError(err.message || 'Error al conectar con la API.');
+      const fallback = err.message || 'Error al conectar con la API.';
+      setInviteError(err instanceof ApiClientError ? getDashboardErrorMessage(err.status) : fallback);
     } finally {
       setIsInviting(false);
     }
@@ -116,15 +107,7 @@ export default function RecruiterDashboard() {
 
   // Carga asíncrona de datos desde la API
   useEffect(() => {
-    fetch('/api/evaluations/attempts', {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('auth-token') || ''}`,
-      },
-    })
-      .then((res) => {
-      if (!res.ok) throw new Error(getDashboardErrorMessage(res.status));
-      return res.json();
-      })
+    apiClient.get<AttemptListItem[]>('/evaluations/attempts')
       .then((data) => {
         setAttempts(Array.isArray(data) ? data : []);
         setDashboardError(null);
@@ -132,7 +115,7 @@ export default function RecruiterDashboard() {
       })
       .catch((err) => {
         console.warn('[Dashboard] No se pudieron cargar intentos reales:', err);
-        setDashboardError(err.message || 'No se pudieron cargar los intentos reales.');
+        setDashboardError(err instanceof ApiClientError ? getDashboardErrorMessage(err.status) : (err.message || 'No se pudieron cargar los intentos reales.'));
         setAttempts(process.env.NEXT_PUBLIC_ENABLE_DEMO_MOCKS === 'true' ? MOCK_ATTEMPTS : []);
         setIsLoading(false);
       });

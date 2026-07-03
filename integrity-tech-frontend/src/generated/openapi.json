@@ -1,0 +1,2261 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/api/files/{fileId}": {
+      "get": {
+        "operationId": "FilesController_streamFile",
+        "parameters": [
+          {
+            "name": "fileId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Files"
+        ]
+      }
+    },
+    "/api/files/{fileId}/download-url": {
+      "get": {
+        "operationId": "FilesController_getDownloadUrl",
+        "parameters": [
+          {
+            "name": "fileId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Files"
+        ]
+      }
+    },
+    "/api/audit/events": {
+      "get": {
+        "operationId": "AuditController_findEvents",
+        "parameters": [
+          {
+            "name": "resourceType",
+            "required": false,
+            "in": "query",
+            "description": "Tipo de recurso auditado",
+            "schema": {
+              "example": "ExamAttempt",
+              "type": "string"
+            }
+          },
+          {
+            "name": "resourceId",
+            "required": false,
+            "in": "query",
+            "description": "Identificador del recurso auditado",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "actorUserId",
+            "required": false,
+            "in": "query",
+            "description": "ID del usuario actor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Fecha ISO inicial para filtrar eventos",
+            "schema": {
+              "example": "2026-07-01T00:00:00.000Z",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Fecha ISO final para filtrar eventos",
+            "schema": {
+              "example": "2026-07-03T23:59:59.999Z",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Audit"
+        ]
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_refresh",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshTokenDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
+    "/api/auth/dev-login": {
+      "post": {
+        "operationId": "DevAuthController_devLogin",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DevLoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "DevAuth"
+        ]
+      }
+    },
+    "/health/live": {
+      "get": {
+        "operationId": "HealthController_live",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "HealthController_ready",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/health/dependencies": {
+      "get": {
+        "operationId": "HealthController_dependencies",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Health"
+        ]
+      }
+    },
+    "/metrics": {
+      "get": {
+        "operationId": "MetricsController_scrape",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Metrics"
+        ]
+      }
+    },
+    "/api/exams": {
+      "post": {
+        "operationId": "ExamController_create",
+        "parameters": [
+          {
+            "name": "authorization",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Exam"
+        ]
+      }
+    },
+    "/api/exams/attempts": {
+      "post": {
+        "operationId": "ExamController_startAttempt",
+        "parameters": [
+          {
+            "name": "authorization",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Exam"
+        ]
+      }
+    },
+    "/api/evaluations/invitations": {
+      "post": {
+        "operationId": "InvitationsController_createInvitation",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInvitationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Invitación creada con éxito."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear invitación y clave de acceso para un candidato",
+        "tags": [
+          "Evaluations (Motor de Evaluación)"
+        ]
+      }
+    },
+    "/api/evaluations/invitations/verify": {
+      "post": {
+        "operationId": "InvitationsController_verifyInvitation",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyAccessCodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Código de acceso válido."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Verificar la validez de una clave de acceso",
+        "tags": [
+          "Evaluations (Motor de Evaluación)"
+        ]
+      }
+    },
+    "/api/evaluations/invitations/claim": {
+      "post": {
+        "operationId": "InvitationsController_claimInvitation",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimAccessCodeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Intento de evaluación iniciado."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reclamar clave de acceso e iniciar examen",
+        "tags": [
+          "Evaluations (Motor de Evaluación)"
+        ]
+      }
+    },
+    "/api/evaluations/attempts": {
+      "get": {
+        "description": "Devuelve una lista consolidada de intentos de exámenes incluyendo datos de candidatos (IAM) y títulos (Exams).",
+        "operationId": "AttemptsController_getAttempts",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Listado de intentos devuelto con éxito."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar todos los intentos de evaluación para la consola del reclutador",
+        "tags": [
+          "Evaluations (Motor de Evaluación)"
+        ]
+      }
+    },
+    "/api/evaluations/attempts/{attemptId}/consent": {
+      "get": {
+        "operationId": "CandidateConsentController_getConsent",
+        "parameters": [
+          {
+            "name": "attemptId",
+            "required": true,
+            "in": "path",
+            "description": "ID único del intento de evaluación (UUIDv7)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Consultar consentimiento del candidato para un intento",
+        "tags": [
+          "Evaluations (Motor de Evaluación)"
+        ]
+      },
+      "post": {
+        "operationId": "CandidateConsentController_acceptConsent",
+        "parameters": [
+          {
+            "name": "attemptId",
+            "required": true,
+            "in": "path",
+            "description": "ID único del intento de evaluación (UUIDv7)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptCandidateConsentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Aceptar consentimiento del candidato para iniciar evaluación",
+        "tags": [
+          "Evaluations (Motor de Evaluación)"
+        ]
+      }
+    },
+    "/api/evaluations/attempts/{attemptId}/submit": {
+      "post": {
+        "description": "Encola la respuesta del alumno de forma asíncrona en la cola BullMQ answers-queue y retorna un ID de procesamiento (jobId).",
+        "operationId": "ResponsesController_submitAnswer",
+        "parameters": [
+          {
+            "name": "attemptId",
+            "required": true,
+            "in": "path",
+            "description": "ID único del intento de evaluación (UUIDv7)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitAnswerBodyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "La respuesta fue aceptada en la cola de procesamiento."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enviar respuesta de una pregunta de examen",
+        "tags": [
+          "Evaluations (Motor de Evaluación)"
+        ]
+      }
+    },
+    "/api/evaluations/attempts/{attemptId}/feedback": {
+      "post": {
+        "description": "Guarda la puntuación NPS (0-10) y el comentario cualitativo en la tabla exam_attempts al finalizar la sesión.",
+        "operationId": "ResponsesController_submitFeedback",
+        "parameters": [
+          {
+            "name": "attemptId",
+            "required": true,
+            "in": "path",
+            "description": "ID único del intento de evaluación (UUIDv7)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitFeedbackDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registrar encuesta NPS y retroalimentación técnica del alumno",
+        "tags": [
+          "Evaluations (Motor de Evaluación)"
+        ]
+      }
+    },
+    "/api/evaluations/attempts/{attemptId}/snapshots": {
+      "post": {
+        "description": "Recibe una foto codificada en Base64, la guarda en storage privado y registra solo metadata de supervisión en base de datos.",
+        "operationId": "ResponsesController_uploadSnapshot",
+        "parameters": [
+          {
+            "name": "attemptId",
+            "required": true,
+            "in": "path",
+            "description": "ID único del intento de evaluación (UUIDv7)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitSnapshotDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Subir captura de foto de webcam/celular en tiempo real",
+        "tags": [
+          "Evaluations (Motor de Evaluación)"
+        ]
+      }
+    },
+    "/api/evaluations/attempts/{attemptId}/session": {
+      "get": {
+        "operationId": "EvaluationSessionController_getAttemptSession",
+        "parameters": [
+          {
+            "name": "attemptId",
+            "required": true,
+            "in": "path",
+            "description": "ID único del intento de evaluación (UUIDv7)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Obtener datos reales de la sesión de examen del candidato",
+        "tags": [
+          "Evaluations (Motor de Evaluación)"
+        ]
+      }
+    },
+    "/api/evaluations/attempts/{attemptId}/finalize": {
+      "post": {
+        "operationId": "EvaluationFinalizeController_finalizeAttempt",
+        "parameters": [
+          {
+            "name": "attemptId",
+            "required": true,
+            "in": "path",
+            "description": "ID único del intento de evaluación (UUIDv7)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Finalizar intento de evaluación de forma idempotente",
+        "tags": [
+          "Evaluations (Motor de Evaluación)"
+        ]
+      }
+    },
+    "/api/evaluations/attempts/{attemptId}": {
+      "get": {
+        "description": "Devuelve el informe conductual psicométrico por dimensiones y el timeline de proctoring de un candidato.",
+        "operationId": "ReportsController_getAttemptReport",
+        "parameters": [
+          {
+            "name": "attemptId",
+            "required": true,
+            "in": "path",
+            "description": "ID único del intento de evaluación (UUIDv7)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reporte del candidato devuelto con éxito."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Obtener reporte consolidado detallado de un intento",
+        "tags": [
+          "Evaluations (Motor de Evaluación)"
+        ]
+      }
+    },
+    "/api/evaluations/attempts/{attemptId}/resultados": {
+      "get": {
+        "operationId": "ReportsController_getAttemptResultados",
+        "parameters": [
+          {
+            "name": "attemptId",
+            "required": true,
+            "in": "path",
+            "description": "ID único del intento de evaluación (UUIDv7)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Obtener resultados globales detallados e Índice IGA de un intento",
+        "tags": [
+          "Evaluations (Motor de Evaluación)"
+        ]
+      }
+    },
+    "/api/evaluations/attempts/{attemptId}/recalcular-iga": {
+      "post": {
+        "operationId": "ReportsController_recalcularIga",
+        "parameters": [
+          {
+            "name": "attemptId",
+            "required": true,
+            "in": "path",
+            "description": "ID único del intento de evaluación (UUIDv7)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecalcularIgaDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Forzar recálculo del Índice IGA asignando un perfil de puesto",
+        "tags": [
+          "Evaluations (Motor de Evaluación)"
+        ]
+      }
+    },
+    "/api/evaluations/perfiles": {
+      "get": {
+        "operationId": "ReportsController_getPerfiles",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Lista de perfiles devuelta con éxito."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Obtener la lista de todos los perfiles de puesto configurados",
+        "tags": [
+          "Evaluations (Motor de Evaluación)"
+        ]
+      }
+    },
+    "/api/api/v1/psicometria/parametros/{test_id}": {
+      "get": {
+        "operationId": "PsicometriaController_getParameters",
+        "parameters": [
+          {
+            "name": "test_id",
+            "required": true,
+            "in": "path",
+            "description": "ID del test (ej. IT2_AC10)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Obtener parámetros de ítems para un test",
+        "tags": [
+          "Psicometría Avanzada (IRT)"
+        ]
+      }
+    },
+    "/api/api/v1/psicometria/calibrar": {
+      "post": {
+        "operationId": "PsicometriaController_triggerCalibration",
+        "parameters": [],
+        "responses": {
+          "202": {
+            "description": ""
+          }
+        },
+        "summary": "Lanzar calibración psicométrica offline (2PL / GRM)",
+        "tags": [
+          "Psicometría Avanzada (IRT)"
+        ]
+      }
+    },
+    "/api/api/v1/baremos/dinamicos": {
+      "get": {
+        "operationId": "PsicometriaController_getDynamicNorm",
+        "parameters": [
+          {
+            "name": "test_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pais",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sector",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "nivel_educativo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipo_puesto",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Obtener baremo dinámico aplicando especificidad jerárquica",
+        "tags": [
+          "Psicometría Avanzada (IRT)"
+        ]
+      }
+    },
+    "/api/api/v1/baremos/percentil": {
+      "get": {
+        "operationId": "PsicometriaController_getPercentile",
+        "parameters": [
+          {
+            "name": "test_id",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "theta",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "pais",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sector",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "nivel_educativo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipo_puesto",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Obtener percentil y tamaño de muestra directamente según theta y datos de agrupación",
+        "tags": [
+          "Psicometría Avanzada (IRT)"
+        ]
+      }
+    },
+    "/api/evaluations/attempts/{id}/theta": {
+      "get": {
+        "operationId": "PsicometriaController_getAttemptTheta",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "ID del intento de examen (UUID)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Obtener nivel de habilidad latente (theta) de un intento",
+        "tags": [
+          "Psicometría Avanzada (IRT)"
+        ]
+      }
+    },
+    "/api/api/v1/psicometria/{test_id}/informacion": {
+      "get": {
+        "operationId": "PsicometriaController_getTestInformation",
+        "parameters": [
+          {
+            "name": "test_id",
+            "required": true,
+            "in": "path",
+            "description": "ID del test (ej. IT2_AC10)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Obtener la curva de información del test (TIF) y el error estándar condicional",
+        "tags": [
+          "Psicometría Avanzada (IRT)"
+        ]
+      }
+    },
+    "/api/api/v1/psicometria/{test_id}/cut-scores": {
+      "get": {
+        "operationId": "PsicometriaController_getCutScores",
+        "parameters": [
+          {
+            "name": "test_id",
+            "required": true,
+            "in": "path",
+            "description": "ID del test (ej. IT2_AC10)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Obtener los estándares de competencia (Cut-scores) configurados para un test",
+        "tags": [
+          "Psicometría Avanzada (IRT)"
+        ]
+      }
+    },
+    "/api/api/v1/psicometria/items/{test_id}/mal-ajuste": {
+      "get": {
+        "operationId": "PsicometriaController_getMisfittingItems",
+        "parameters": [
+          {
+            "name": "test_id",
+            "required": true,
+            "in": "path",
+            "description": "ID del test (ej. IT2_AC10)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Obtener ítems con desajuste psicométrico significativo (p < 0.01 o RMSEA elevado)",
+        "tags": [
+          "Psicometría Avanzada (IRT)"
+        ]
+      }
+    },
+    "/api/api/v1/psicometria/parametros/{test_id}/historial": {
+      "get": {
+        "operationId": "PsicometriaController_getParametersHistory",
+        "parameters": [
+          {
+            "name": "test_id",
+            "required": true,
+            "in": "path",
+            "description": "ID del test (ej. IT2_AC10)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Obtener el historial completo de calibraciones y parámetros pasados del test",
+        "tags": [
+          "Psicometría Avanzada (IRT)"
+        ]
+      }
+    },
+    "/api/api/v1/psicometria/quality": {
+      "get": {
+        "operationId": "PsicometriaController_getPsychometricQualityDashboard",
+        "parameters": [
+          {
+            "name": "test_id",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "days",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Obtener el panel histórico de calidad psicométrica (drift, fiabilidad, etc.)",
+        "tags": [
+          "Psicometría Avanzada (IRT)"
+        ]
+      }
+    },
+    "/api/api/v1/psicometria/dif/{test_id}": {
+      "get": {
+        "operationId": "PsicometriaController_getItemsWithDIF",
+        "parameters": [
+          {
+            "name": "test_id",
+            "required": true,
+            "in": "path",
+            "description": "ID del test (ej. IT2_AC10)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Obtener ítems con sesgo demográfico significativo (DIF)",
+        "tags": [
+          "Psicometría Avanzada (IRT)"
+        ]
+      }
+    },
+    "/api/api/v1/psicometria/recalcular-historico/{test_id}": {
+      "post": {
+        "operationId": "PsicometriaController_recalculateHistoricalScores",
+        "parameters": [
+          {
+            "name": "test_id",
+            "required": true,
+            "in": "path",
+            "description": "ID del test (ej. IT2_AC10)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Recalcular retroactivamente theta, error, escalas y percentil para históricos usando los parámetros vigentes",
+        "tags": [
+          "Psicometría Avanzada (IRT)"
+        ]
+      }
+    },
+    "/api/api/v1/psicometria/validez/analizar": {
+      "post": {
+        "operationId": "PsicometriaController_analyzePredictiveValidity",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Analizar validez predictiva cargando datos de desempeño",
+        "tags": [
+          "Psicometría Avanzada (IRT)"
+        ]
+      }
+    },
+    "/api/api/v1/psicometria/reporte/{attempt_id}/narrativo": {
+      "get": {
+        "operationId": "PsicometriaController_getReporteNarrativo",
+        "parameters": [
+          {
+            "name": "attempt_id",
+            "required": true,
+            "in": "path",
+            "description": "ID del intento (ej. UUID v7)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Generar reporte narrativo (NLG) para un intento de examen",
+        "tags": [
+          "Psicometría Avanzada (IRT)"
+        ]
+      }
+    },
+    "/api/api/v1/psicometria/impacto-adverso/{test_id}": {
+      "get": {
+        "operationId": "PsicometriaController_getImpactoAdverso",
+        "parameters": [
+          {
+            "name": "test_id",
+            "required": true,
+            "in": "path",
+            "description": "ID del test (ej. IT2_AC10)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Calcular el Impacto Adverso por demografías de grupo (Regla del 80%)",
+        "tags": [
+          "Psicometría Avanzada (IRT)"
+        ]
+      }
+    },
+    "/api/api/v1/psicometria/roi/calcular": {
+      "post": {
+        "operationId": "PsicometriaController_getRoiCalcular",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Calcular el ROI del talento mediante modelo BCG (Brogden-Cronbach-Gleser)",
+        "tags": [
+          "Psicometría Avanzada (IRT)"
+        ]
+      }
+    },
+    "/api/api/v1/psicometria/cat/siguiente": {
+      "post": {
+        "operationId": "PsicometriaController_selectCatItem",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Seleccionar siguiente reactivo adaptativo CAT utilizando MII",
+        "tags": [
+          "Psicometría Avanzada (IRT)"
+        ]
+      }
+    },
+    "/api/api/v1/psicometria/baremo-continuo/calibrar/{test_id}": {
+      "post": {
+        "operationId": "PsicometriaController_runContinuousNormingCalibration",
+        "parameters": [
+          {
+            "name": "test_id",
+            "required": true,
+            "in": "path",
+            "description": "ID del test (ej. IT2_AC10)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Calibrar normas continuas suavizadas GAMLSS para un test específico",
+        "tags": [
+          "Psicometría Avanzada (IRT)"
+        ]
+      }
+    },
+    "/api/api/v1/psicometria/baremo-continuo/percentil": {
+      "get": {
+        "operationId": "PsicometriaController_getPercentileContinuous",
+        "parameters": [
+          {
+            "name": "testId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "theta",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "pais",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "nivelEducativo",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipoPuesto",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "summary": "Consultar percentil suavizado continuo mediante interpolación lineal",
+        "tags": [
+          "Psicometría Avanzada (IRT)"
+        ]
+      }
+    },
+    "/api/evaluations/cat/sessions": {
+      "post": {
+        "operationId": "CatController_startSession",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartCatSessionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Sesión iniciada con éxito. Devuelve la sesión y el primer reactivo."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Iniciar una sesión adaptativa computerizada (CAT)",
+        "tags": [
+          "CAT (Computerized Adaptive Testing Engine)"
+        ]
+      }
+    },
+    "/api/evaluations/cat/sessions/{sessionId}/response": {
+      "post": {
+        "operationId": "CatController_submitResponse",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmitCatResponseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Respuesta procesada. Devuelve el siguiente reactivo o finalización."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enviar respuesta al reactivo adaptativo activo",
+        "tags": [
+          "CAT (Computerized Adaptive Testing Engine)"
+        ]
+      }
+    },
+    "/api/psychometric-governance/assessments": {
+      "get": {
+        "operationId": "EditorialConsoleController_listAssessments",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar pruebas gobernadas del tenant",
+        "tags": [
+          "Psychometric Governance Editorial Console"
+        ]
+      }
+    },
+    "/api/psychometric-governance/assessments/{assessmentId}": {
+      "get": {
+        "operationId": "EditorialConsoleController_getAssessment",
+        "parameters": [
+          {
+            "name": "assessmentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ver detalle de prueba gobernada",
+        "tags": [
+          "Psychometric Governance Editorial Console"
+        ]
+      }
+    },
+    "/api/psychometric-governance/assessments/{assessmentId}/versions": {
+      "get": {
+        "operationId": "EditorialConsoleController_listAssessmentVersions",
+        "parameters": [
+          {
+            "name": "assessmentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar versiones de una prueba gobernada",
+        "tags": [
+          "Psychometric Governance Editorial Console"
+        ]
+      }
+    },
+    "/api/psychometric-governance/assessment-versions/{assessmentVersionId}/detail": {
+      "get": {
+        "operationId": "EditorialConsoleController_getAssessmentVersionDetail",
+        "parameters": [
+          {
+            "name": "assessmentVersionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ver detalle profundo de versión de prueba",
+        "tags": [
+          "Psychometric Governance Editorial Console"
+        ]
+      }
+    },
+    "/api/psychometric-governance/items": {
+      "get": {
+        "operationId": "EditorialConsoleController_listItems",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listar banco de reactivos gobernado",
+        "tags": [
+          "Psychometric Governance Editorial Console"
+        ]
+      }
+    },
+    "/api/psychometric-governance/item-versions/{itemVersionId}": {
+      "get": {
+        "operationId": "EditorialConsoleController_getItemVersion",
+        "parameters": [
+          {
+            "name": "itemVersionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ver versión de reactivo con datos sensibles redactados",
+        "tags": [
+          "Psychometric Governance Editorial Console"
+        ]
+      }
+    },
+    "/api/psychometric-governance/item-versions/{itemVersionId}/detail": {
+      "get": {
+        "operationId": "EditorialConsoleController_getItemVersionDetail",
+        "parameters": [
+          {
+            "name": "itemVersionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ver detalle profundo de versión de reactivo",
+        "tags": [
+          "Psychometric Governance Editorial Console"
+        ]
+      }
+    },
+    "/api/psychometric-governance/versions/{model}/{versionId}/history": {
+      "get": {
+        "operationId": "EditorialConsoleController_getEditorialHistory",
+        "parameters": [
+          {
+            "name": "model",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "versionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ver historial editorial de una versión",
+        "tags": [
+          "Psychometric Governance Editorial Console"
+        ]
+      }
+    },
+    "/api/psychometric-governance/versions/{model}/{versionId}/readiness": {
+      "get": {
+        "operationId": "EditorialConsoleController_validateVersionReadiness",
+        "parameters": [
+          {
+            "name": "model",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "versionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Validar si una versión está lista para publicarse",
+        "tags": [
+          "Psychometric Governance Editorial Console"
+        ]
+      }
+    },
+    "/api/psychometric-governance/versions": {
+      "patch": {
+        "operationId": "EditorialConsoleController_updateDraftVersion",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDraftVersionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Actualizar versión editable no publicada",
+        "tags": [
+          "Psychometric Governance Editorial Console"
+        ]
+      }
+    },
+    "/api/psychometric-governance/workflow": {
+      "post": {
+        "operationId": "EditorialConsoleController_executeWorkflowAction",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditorialActionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ejecutar acción de workflow editorial",
+        "tags": [
+          "Psychometric Governance Editorial Console"
+        ]
+      }
+    },
+    "/api/psychometric-governance/versions/from-published": {
+      "post": {
+        "operationId": "EditorialConsoleController_createVersionFromPublished",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVersionFromPublishedDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Crear nueva versión editable desde una versión publicada",
+        "tags": [
+          "Psychometric Governance Editorial Console"
+        ]
+      }
+    },
+    "/api/proctoring/attempts/{attemptId}/logs/batch": {
+      "post": {
+        "description": "Ingesta de forma asíncrona un conjunto de eventos firmados (pérdida de foco, inactividad) a través de la cola proctoring-queue. Valida la integridad criptográfica y secuencial antes de encolar. Devuelve un 202 Accepted.",
+        "operationId": "ProctoringController_receiveBatch",
+        "parameters": [
+          {
+            "name": "attemptId",
+            "required": true,
+            "in": "path",
+            "description": "ID único del intento de evaluación (UUIDv7)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProctoringBatchDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Lote de logs aceptado y encolado en BullMQ."
+          },
+          "400": {
+            "description": "Secuencia alterada, firmas criptográficas inválidas o lote vacío."
+          },
+          "401": {
+            "description": "No autorizado (JWT inválido)."
+          },
+          "403": {
+            "description": "Prohibido (El intento pertenece a otro candidato)."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Registrar lote de eventos de supervisión (telemetría)",
+        "tags": [
+          "Proctoring (Supervisión e Integridad)"
+        ]
+      }
+    },
+    "/api/lti/login": {
+      "get": {
+        "description": "Endpoint de redirección que inicia el protocolo OIDC de 3 pasos con Moodle/Canvas.",
+        "operationId": "LtiController_initiateLogin",
+        "parameters": [
+          {
+            "name": "iss",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "login_hint",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "target_link_uri",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lti_message_hint",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirección al portal de autenticación del LMS."
+          }
+        },
+        "summary": "Iniciar login federado LTI OIDC",
+        "tags": [
+          "LTI v1.3 Integration (LMS Interoperability)"
+        ]
+      }
+    },
+    "/api/lti/launch": {
+      "post": {
+        "description": "Recibe el id_token firmado por el LMS, valida la sesión, auto-provisiona al estudiante en base de datos, inicializa el intento y lo redirige al visualizador del examen Next.js con un token local.",
+        "operationId": "LtiController_ltiLaunch",
+        "parameters": [],
+        "responses": {
+          "302": {
+            "description": "Redirección al visualizador del examen en el frontend Next.js."
+          }
+        },
+        "summary": "Procesar lanzamiento de examen LTI Launch",
+        "tags": [
+          "LTI v1.3 Integration (LMS Interoperability)"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Integrity-Tech | Platform API",
+    "description": "Especificación técnica de la API REST para el motor transaccional de evaluaciones psicométricas, telemetría de proctoring y feedback de PMF.",
+    "version": "1.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http",
+        "name": "JWT",
+        "description": "Ingresa tu Token JWT de sesión para autenticar las peticiones",
+        "in": "header"
+      }
+    },
+    "schemas": {
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Correo del usuario staff",
+            "example": "admin@integrity.demo"
+          },
+          "password": {
+            "type": "string",
+            "description": "Contraseña del usuario staff",
+            "minLength": 8,
+            "maxLength": 200,
+            "example": "IntegrityDemo123!"
+          },
+          "organizationSlug": {
+            "type": "string",
+            "description": "Slug de la organización para resolver el tenant",
+            "example": "demo-org"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "RefreshTokenDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "Refresh token de sesión revocable",
+            "minLength": 32,
+            "maxLength": 512
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "DevLoginDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "CreateInvitationDto": {
+        "type": "object",
+        "properties": {
+          "candidateName": {
+            "type": "string",
+            "description": "Nombre completo del candidato",
+            "example": "Sofía Valenzuela"
+          },
+          "email": {
+            "type": "string",
+            "description": "Correo electrónico del candidato",
+            "example": "sofia.valenzuela@example.com"
+          },
+          "examId": {
+            "type": "string",
+            "description": "ID del examen asignado",
+            "example": "018f2f2f-1a2b-7abc-bdef-0123456789ab"
+          }
+        },
+        "required": [
+          "candidateName",
+          "email",
+          "examId"
+        ]
+      },
+      "VerifyAccessCodeDto": {
+        "type": "object",
+        "properties": {
+          "accessCode": {
+            "type": "string",
+            "description": "Código o llave de acceso de 6 dígitos",
+            "example": "IT-987654"
+          }
+        },
+        "required": [
+          "accessCode"
+        ]
+      },
+      "ClaimAccessCodeDto": {
+        "type": "object",
+        "properties": {
+          "accessCode": {
+            "type": "string",
+            "description": "Código o llave de acceso de 6 dígitos",
+            "example": "IT-987654"
+          },
+          "candidateName": {
+            "type": "string",
+            "description": "Nombre del candidato",
+            "example": "Sofía Valenzuela"
+          },
+          "email": {
+            "type": "string",
+            "description": "Correo electrónico del candidato",
+            "example": "sofia.valenzuela@example.com"
+          }
+        },
+        "required": [
+          "accessCode",
+          "candidateName",
+          "email"
+        ]
+      },
+      "AcceptCandidateConsentDto": {
+        "type": "object",
+        "properties": {
+          "consentVersion": {
+            "type": "string",
+            "description": "Versión del consentimiento aceptado",
+            "example": "candidate-consent-v1"
+          }
+        }
+      },
+      "SubmitAnswerBodyDto": {
+        "type": "object",
+        "properties": {
+          "questionId": {
+            "type": "string",
+            "description": "Identificador único de la pregunta a responder (UUIDv7)",
+            "example": "018f2f2f-1a2b-7abc-bdef-0123456789ab"
+          },
+          "response": {
+            "type": "object",
+            "description": "Payload dinámico de respuesta (ej: { selectedOptionId: \"opt-1\" } o { value: 4 })",
+            "example": {
+              "selectedOptionId": "opt-correcta"
+            }
+          },
+          "tiempoMs": {
+            "type": "number",
+            "description": "Tiempo de respuesta del candidato en milisegundos",
+            "example": 3500
+          },
+          "itemVersionId": {
+            "type": "string",
+            "description": "Versión gobernada del reactivo, si la sesión la proporcionó"
+          }
+        },
+        "required": [
+          "questionId",
+          "response"
+        ]
+      },
+      "SubmitFeedbackDto": {
+        "type": "object",
+        "properties": {
+          "npsScore": {
+            "type": "number",
+            "description": "Calificación NPS de la experiencia de 0 a 10",
+            "minimum": 0,
+            "maximum": 10,
+            "example": 9
+          },
+          "feedbackText": {
+            "type": "string",
+            "description": "Comentario cualitativo sobre la experiencia técnica del alumno",
+            "maxLength": 1000,
+            "example": "El temporizador cargó rápido y las preguntas Likert se respondieron sin lag."
+          }
+        },
+        "required": [
+          "npsScore"
+        ]
+      },
+      "SubmitSnapshotDto": {
+        "type": "object",
+        "properties": {
+          "image": {
+            "type": "string",
+            "description": "Imagen capturada de la webcam codificada en Base64",
+            "example": "data:image/jpeg;base64,..."
+          }
+        },
+        "required": [
+          "image"
+        ]
+      },
+      "RecalcularIgaDto": {
+        "type": "object",
+        "properties": {
+          "perfilId": {
+            "type": "string",
+            "description": "ID del perfil de puesto a asignar (UUID)",
+            "example": "a1b2c3d4-5e6f-7a8b-9c0d-1e2f3a4b5c6d"
+          }
+        }
+      },
+      "StartCatSessionDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "SubmitCatResponseDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "UpdateDraftVersionDto": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "assessmentVersion",
+              "itemVersion",
+              "normGroupVersion",
+              "scoringModelVersion",
+              "reportTemplateVersion"
+            ],
+            "description": "Tipo de versión editable"
+          },
+          "versionId": {
+            "type": "string",
+            "description": "ID de la versión DRAFT o INTERNAL_REVIEW"
+          },
+          "data": {
+            "type": "object",
+            "description": "Datos editables de la versión no publicada"
+          }
+        },
+        "required": [
+          "model",
+          "versionId",
+          "data"
+        ]
+      },
+      "EditorialActionDto": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "assessmentVersion",
+              "itemVersion",
+              "normGroupVersion",
+              "scoringModelVersion",
+              "reportTemplateVersion"
+            ],
+            "description": "Tipo de versión editorial sobre la que se ejecuta la acción"
+          },
+          "versionId": {
+            "type": "string",
+            "description": "ID de la versión editorial objetivo"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "request_internal_review",
+              "request_psychologist_review",
+              "approve",
+              "publish",
+              "retire",
+              "return_to_draft"
+            ],
+            "description": "Acción editorial solicitada"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Razón o comentario requerido para acciones críticas",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "model",
+          "versionId",
+          "action"
+        ]
+      },
+      "CreateVersionFromPublishedDto": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "enum": [
+              "assessmentVersion",
+              "itemVersion",
+              "normGroupVersion",
+              "scoringModelVersion",
+              "reportTemplateVersion"
+            ],
+            "description": "Tipo de versión publicada a duplicar"
+          },
+          "sourceVersionId": {
+            "type": "string",
+            "description": "ID de la versión publicada fuente"
+          },
+          "newVersion": {
+            "type": "string",
+            "description": "Nueva etiqueta de versión",
+            "example": "1.1.0",
+            "maxLength": 50
+          },
+          "overrides": {
+            "type": "object",
+            "description": "Sobrescrituras controladas para la nueva versión DRAFT"
+          }
+        },
+        "required": [
+          "model",
+          "sourceVersionId",
+          "newVersion"
+        ]
+      },
+      "IndividualProctoringLogDto": {
+        "type": "object",
+        "properties": {
+          "eventType": {
+            "type": "string",
+            "description": "Tipo de evento de supervisión registrado por el navegador (ej: tab_focus_lost, student_idle)",
+            "example": "tab_focus_lost"
+          },
+          "riskLevel": {
+            "type": "string",
+            "description": "Nivel de severidad o riesgo del evento conductual",
+            "enum": [
+              "INFO",
+              "WARNING",
+              "CRITICAL"
+            ],
+            "example": "WARNING"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "Estampa de tiempo del evento",
+            "example": "16:45:10"
+          },
+          "metadata": {
+            "type": "object",
+            "description": "Información técnica adicional: secuencia correlativa y firma HMAC de seguridad del navegador",
+            "example": {
+              "sequence": 2,
+              "trigger": "window_blur",
+              "signature": "sig-9bc88a8f1ff4f5e718884f938d8212e33"
+            }
+          }
+        },
+        "required": [
+          "eventType",
+          "riskLevel",
+          "timestamp",
+          "metadata"
+        ]
+      },
+      "ProctoringBatchDto": {
+        "type": "object",
+        "properties": {
+          "logs": {
+            "description": "Conjunto de logs de supervisión encolados localmente",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IndividualProctoringLogDto"
+            }
+          }
+        },
+        "required": [
+          "logs"
+        ]
+      }
+    }
+  }
+}

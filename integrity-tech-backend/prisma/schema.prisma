@@ -15,6 +15,8 @@ model Organization {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name      String   @db.VarChar(255)
   slug      String   @unique @db.VarChar(255)
+  domain    String?  @unique @db.VarChar(255)
+  branding  Json?    @db.JsonB
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
@@ -41,6 +43,11 @@ model Organization {
   scoringModels        ScoringModel[]
   reportTemplates      ReportTemplate[]
   privateFiles         PrivateFile[]
+  catItemBanks         CatItemBank[]
+  catConfigs           CatConfig[]
+  catItemExposures     CatItemExposure[]
+  businessMetrics      OrganizationBusinessMetrics?
+  employeePerformances EmployeePerformance[]
 
   @@map("organizations")
 }
@@ -66,8 +73,10 @@ model User {
   auditEvents    AuditEvent[]
   candidateConsents CandidateConsent[]
   privateFiles      PrivateFile[]
+  emailHash      String?      @map("email_hash") @db.VarChar(64)
 
   @@unique([organizationId, email], name: "unique_email_per_org")
+  @@unique([organizationId, emailHash], name: "unique_email_hash_per_org")
   @@map("users")
 }
 
@@ -1114,4 +1123,178 @@ model EquatingCoefficients {
 
   @@index([organizationId, testId])
   @@map("equating_coefficients")
+}
+
+model CatItemBank {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String      @map("organization_id") @db.Uuid
+  testType       CatTestType @map("test_type")
+  name           String      @db.VarChar(255)
+  description    String?     @db.Text
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  items          CatItem[]
+  catConfigs     CatConfig[]
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, testType])
+  @@map("cat_item_banks")
+}
+
+model CatItem {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bankId         String    @map("bank_id") @db.Uuid
+  bank           CatItemBank @relation(fields: [bankId], references: [id], onDelete: Cascade)
+  itemCode       String    @map("item_code") @db.VarChar(120)
+  type           String    @db.VarChar(50) // "verbal", "numerical", etc.
+  difficulty     Float     @map("difficulty") // parámetro b de IRT
+  discrimination Float     @map("discrimination") // parámetro a
+  guessing       Float     @default(0.0) @map("guessing") // parámetro c
+  upperAsymptote Float?    @map("upper_asymptote") // parámetro d
+  content        Json      @map("content") @db.JsonB
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  catExposures   CatItemExposure[]
+  catResponses   CatResponse[]
+
+  @@unique([bankId, itemCode])
+  @@map("cat_items")
+}
+
+model CatConfig {
+  id                     String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  bankId                 String          @map("bank_id") @db.Uuid
+  bank                   CatItemBank     @relation(fields: [bankId], references: [id], onDelete: Cascade)
+  organizationId         String          @map("organization_id") @db.Uuid
+  minItems               Int             @default(10) @map("min_items")
+  maxItems               Int             @default(30) @map("max_items")
+  maxTimeSeconds         Int?            @map("max_time_seconds")
+  stoppingSe             Float           @default(0.35) @map("stopping_se")
+  firstItemMethod        CatFirstItemMethod @default(PRIOR_MEDIUM) @map("first_item_method")
+  exposureControl        Boolean         @default(true) @map("exposure_control")
+  maxExposureRate        Float           @default(0.5) @map("max_exposure_rate")
+  rapidGuessingThresholdMs Int           @default(2000) @map("rapid_guessing_threshold_ms")
+  allowExtraItemsOnRapid Boolean         @default(true) @map("allow_extra_items_on_rapid")
+
+  organization           Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sessions               CatSession[]
+
+  @@unique([organizationId, bankId])
+  @@map("cat_configs")
+}
+
+model CatSession {
+  id                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String           @map("user_id") @db.Uuid
+  bankId            String           @map("bank_id") @db.Uuid
+  configId          String           @map("config_id") @db.Uuid
+  config            CatConfig        @relation(fields: [configId], references: [id], onDelete: Cascade)
+  startTime         DateTime         @default(now()) @map("start_time") @db.Timestamptz
+  endTime           DateTime?        @map("end_time") @db.Timestamptz
+  finalTheta        Float?           @map("final_theta")
+  finalSe           Float?           @map("final_se")
+  itemsAdministered Int              @default(0) @map("items_administered")
+  status            CatSessionStatus @default(IN_PROGRESS)
+  log               Json?            @map("log") @db.JsonB
+  currentItemId     String?          @map("current_item_id") @db.Uuid // Mantenimiento de estado y validación de seguridad
+
+  responses         CatResponse[]
+  @@map("cat_sessions")
+}
+
+model CatResponse {
+  id             String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sessionId      String     @map("session_id") @db.Uuid
+  session        CatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  itemId         String     @map("item_id") @db.Uuid
+  item           CatItem    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  position       Int
+  response       String?    @db.VarChar(255)
+  isCorrect      Boolean?   @map("is_correct")
+  responseTimeMs Int        @map("response_time_ms")
+  rapidGuess     Boolean    @default(false) @map("rapid_guess")
+  thetaAfter     Float?     @map("theta_after")
+  seAfter        Float?     @map("se_after")
+
+  @@map("cat_responses")
+}
+
+model CatItemExposure {
+  id                String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  itemId            String      @map("item_id") @db.Uuid
+  item              CatItem     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  organizationId    String      @map("organization_id") @db.Uuid
+  timesAdministered Int         @default(0) @map("times_administered")
+  timesEligible     Int         @default(0) @map("times_eligible")
+  exposureRate      Float?      @map("exposure_rate")
+  updatedAt         DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, organizationId])
+  @@map("cat_item_exposures")
+}
+
+model OrganizationBusinessMetrics {
+  id              String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId  String       @map("organization_id") @db.Uuid
+  costPerHire     Float?       @map("cost_per_hire")
+  avgSalary       Float?       @map("avg_salary")
+  annualHires     Int?         @map("annual_hires")
+  selectionBudget Float?       @map("selection_budget")
+  retentionCost   Float?       @map("retention_cost")
+  updatedAt       DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId])
+  @@map("organization_business_metrics")
+}
+
+model EmployeePerformance {
+  id             String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  employeeId     String       @map("employee_id") @db.VarChar(100)
+  testScore      Float        @map("test_score")
+  performance    Float        @map("performance")
+  hireDate       DateTime     @map("hire_date") @db.Timestamptz
+  department     String?      @db.VarChar(100)
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("employee_performance")
+}
+
+model BenchmarkSnapshot {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  sector    String   @db.VarChar(100)
+  size      String   @db.VarChar(50)
+  metric    String   @db.VarChar(50)
+  value     Float
+  sampleSize Int      @map("sample_size")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("benchmark_snapshots")
+}
+
+enum CatTestType {
+  COGNITIVE
+  COMPETENCY
+}
+
+enum CatFirstItemMethod {
+  PRIOR_JOB_PROFILE
+  PRIOR_EDUCATION
+  PRIOR_MEDIUM
+}
+
+enum CatSessionStatus {
+  IN_PROGRESS
+  COMPLETED
+  TERMINATED_BY_TIME
+  ABANDONED
 }

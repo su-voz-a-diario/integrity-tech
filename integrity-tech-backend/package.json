@@ -12,6 +12,7 @@
     "start:e2e": "node dist/main.js",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main.js",
+    "generate:openapi": "ts-node --transpile-only scripts/generate-openapi.ts",
     "seed": "ts-node prisma/seed.ts",
     "seed:e2e": "ts-node prisma/seed-e2e.ts",
     "backfill:psychometric-governance": "ts-node prisma/backfill-psychometric-governance.ts",

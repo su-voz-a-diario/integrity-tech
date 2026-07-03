@@ -2,6 +2,13 @@
 
 import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { apiClient, ApiClientError } from '../../../services/api-client';
+import type {
+  ClaimInvitationRequest,
+  ClaimInvitationResponse,
+  VerifyInvitationRequest,
+  VerifyInvitationResponse,
+} from '../../../generated/api/types';
 
 function getCandidateAccessErrorMessage(status: number, fallback: string) {
   const messages: Record<number, string> = {
@@ -64,22 +71,13 @@ function CandidateLoginForm() {
     setError(null);
 
     try {
-      const response = await fetch('/api/evaluations/invitations/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accessCode: code }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(getCandidateAccessErrorMessage(response.status, errorData.message || 'Error al verificar la clave de acceso.'));
-      }
-
-      const data = await response.json();
+      const payload: VerifyInvitationRequest = { accessCode: code };
+      const data = await apiClient.post<VerifyInvitationResponse>('/evaluations/invitations/verify', payload, { auth: false });
       setInvitationDetails(data);
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'La clave de acceso ingresada es incorrecta o ya fue utilizada.');
+      const fallback = err.message || 'La clave de acceso ingresada es incorrecta o ya fue utilizada.';
+      setError(err instanceof ApiClientError ? getCandidateAccessErrorMessage(err.status, fallback) : fallback);
       setInvitationDetails(null);
     } finally {
       setIsVerifying(false);
@@ -94,22 +92,12 @@ function CandidateLoginForm() {
     setError(null);
 
     try {
-      const response = await fetch('/api/evaluations/invitations/claim', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          accessCode: searchParams.get('code') || accessCode,
-          candidateName: invitationDetails.candidateName,
-          email: invitationDetails.email,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(getCandidateAccessErrorMessage(response.status, errorData.message || 'Error al inicializar la sesión.'));
-      }
-
-      const data = await response.json();
+      const payload: ClaimInvitationRequest = {
+        accessCode: searchParams.get('code') || accessCode,
+        candidateName: invitationDetails.candidateName,
+        email: invitationDetails.email,
+      };
+      const data = await apiClient.post<ClaimInvitationResponse>('/evaluations/invitations/claim', payload, { auth: false });
       
       // Guardar el Token de Sesión JWT en localStorage para el header
       localStorage.setItem('auth-token', data.token);
@@ -118,7 +106,8 @@ function CandidateLoginForm() {
       router.push(`/exam/${data.attemptId}`);
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Fallo al iniciar el examen. Por favor, reintenta.');
+      const fallback = err.message || 'Fallo al iniciar el examen. Por favor, reintenta.';
+      setError(err instanceof ApiClientError ? getCandidateAccessErrorMessage(err.status, fallback) : fallback);
     } finally {
       setIsClaiming(false);
     }

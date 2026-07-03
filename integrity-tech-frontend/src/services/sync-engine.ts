@@ -1,4 +1,5 @@
 import { useExamStore } from '../store/exam.store';
+import { apiClient } from './api-client';
 import { shouldRemoveQueuedAnswerAfterResponse } from './sync-engine-policy';
 
 export interface QueuedAnswer {
@@ -9,6 +10,7 @@ export interface QueuedAnswer {
   timestamp: number;
   attempts: number;
   tiempoMs?: number;
+  itemVersionId?: string | null;
   nextRetryTimestamp?: number;
 }
 
@@ -85,7 +87,7 @@ export class SyncEngine {
   /**
    * Encola una respuesta en IndexedDB.
    */
-  async queueAnswer(attemptId: string, questionId: string, response: any, tiempoMs?: number): Promise<void> {
+  async queueAnswer(attemptId: string, questionId: string, response: any, tiempoMs?: number, itemVersionId?: string | null): Promise<void> {
     if (!this.db) await this.initDatabase();
 
     const queuedItem: QueuedAnswer = {
@@ -94,6 +96,7 @@ export class SyncEngine {
       questionId,
       response,
       tiempoMs,
+      itemVersionId,
       timestamp: Date.now(),
       attempts: 0,
     };
@@ -241,16 +244,14 @@ export class SyncEngine {
 
   private async sendAnswerToServer(item: QueuedAnswer): Promise<boolean> {
     try {
-      const response = await fetch(`/api/evaluations/attempts/${item.attemptId}/submit`, {
+      const response = await apiClient.raw(`/evaluations/attempts/${item.attemptId}/submit`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`,
-        },
+        token: this.getAuthToken(),
         body: JSON.stringify({
           questionId: item.questionId,
           response: item.response,
           tiempoMs: item.tiempoMs,
+          itemVersionId: item.itemVersionId,
         }),
       });
 
@@ -275,12 +276,9 @@ export class SyncEngine {
         metadata: log.metadata || {},
       }));
 
-      const response = await fetch(`/api/proctoring/attempts/${attemptId}/logs/batch`, {
+      const response = await apiClient.raw(`/proctoring/attempts/${attemptId}/logs/batch`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.getAuthToken()}`,
-        },
+        token: this.getAuthToken(),
         body: JSON.stringify({ logs: cleanLogs }),
       });
 

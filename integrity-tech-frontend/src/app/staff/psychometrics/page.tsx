@@ -2,15 +2,8 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-
-type EditorialVersionModel = 'assessmentVersion' | 'itemVersion';
-type EditorialAction =
-  | 'request_internal_review'
-  | 'request_psychologist_review'
-  | 'approve'
-  | 'publish'
-  | 'retire'
-  | 'return_to_draft';
+import { apiClient, ApiClientError } from '../../../services/api-client';
+import type { EditorialAction, EditorialVersionModel } from '../../../generated/api/types';
 
 type AssessmentVersion = {
   id: string;
@@ -120,21 +113,21 @@ export default function PsychometricsEditorialConsole() {
 
   const apiFetch = useCallback(
     async <T,>(path: string, options: RequestInit = {}): Promise<T> => {
-      const res = await fetch(path, {
-        ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
-          ...(options.headers || {}),
-        },
-      });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.message || getApiErrorMessage(res.status));
+      try {
+        return await apiClient.raw(path, {
+          ...options,
+          token: authToken,
+        }).then(async (res) => {
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            throw new Error(body.message || getApiErrorMessage(res.status));
+          }
+          return res.json();
+        });
+      } catch (error) {
+        if (error instanceof ApiClientError) throw new Error(getApiErrorMessage(error.status));
+        throw error;
       }
-
-      return res.json();
     },
     [authToken],
   );

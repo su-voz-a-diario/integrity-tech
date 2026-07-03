@@ -3,6 +3,8 @@ import { ThetaCalculatorService } from './theta-calculator.service';
 import { IgaCalculatorService } from './iga-calculator.service';
 import { PersonFitService } from './person-fit.service';
 import { CatService } from './cat.service';
+import { ItemSelectorService } from './item-selector.service';
+import { ThetaEstimatorService } from './theta-estimator.service';
 import { ReportGeneratorService } from './report-generator.service';
 import { AdverseImpactService } from './adverse-impact.service';
 import { RoiService } from './roi.service';
@@ -17,6 +19,7 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
   let igaService: IgaCalculatorService;
   let personFitService: PersonFitService;
   let catService: CatService;
+  let itemSelectorService: ItemSelectorService;
   let reportService: ReportGeneratorService;
   let adverseService: AdverseImpactService;
   let roiService: RoiService;
@@ -58,6 +61,12 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
     continuousNorm: {
       findFirst: jest.fn(),
     },
+    catConfig: {
+      findFirst: jest.fn(),
+    },
+    catItem: {
+      findMany: jest.fn(),
+    },
     equatingCoefficients: {
       findFirst: jest.fn(),
     },
@@ -74,6 +83,8 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
         IgaCalculatorService,
         PersonFitService,
         CatService,
+        ItemSelectorService,
+        ThetaEstimatorService,
         ReportGeneratorService,
         AdverseImpactService,
         RoiService,
@@ -110,6 +121,7 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
     igaService = module.get<IgaCalculatorService>(IgaCalculatorService);
     personFitService = module.get<PersonFitService>(PersonFitService);
     catService = module.get<CatService>(CatService);
+    itemSelectorService = module.get<ItemSelectorService>(ItemSelectorService);
     reportService = module.get<ReportGeneratorService>(ReportGeneratorService);
     adverseService = module.get<AdverseImpactService>(AdverseImpactService);
     roiService = module.get<RoiService>(RoiService);
@@ -126,6 +138,33 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
     dbMocks.equatingCoefficients.findFirst.mockResolvedValue(null);
     dbMocks.baremosDinamicos.findFirst.mockResolvedValue(null);
     dbMocks.resultadoTest.updateMany.mockResolvedValue({ count: 0 });
+    dbMocks.catConfig.findFirst.mockResolvedValue({
+      id: 'cat-config-ac10',
+      bankId: 'cat-bank-ac10',
+      organizationId: 'org-uuid',
+      minItems: 10,
+      maxItems: 30,
+      stoppingSe: 0.35,
+      exposureControl: false,
+      maxExposureRate: 0.5,
+      bank: {
+        id: 'cat-bank-ac10',
+        name: 'IT2_AC10',
+      },
+    });
+    dbMocks.catItem.findMany.mockResolvedValue([
+      {
+        id: 'Q2',
+        bankId: 'cat-bank-ac10',
+        itemCode: 'Q2',
+        type: 'cognitive',
+        difficulty: 0.5,
+        discrimination: 1.2,
+        guessing: 0,
+        content: { text: 'Reactivo CAT Q2' },
+        isActive: true,
+      },
+    ]);
   });
 
   it('Debe simular estimación de theta ignorando ítems omitidos y calculando IGA dinámico', async () => {

@@ -1,21 +1,10 @@
 import React from 'react';
 import { useExamStore } from '../../store/exam.store';
 import { syncEngine } from '../../services/sync-engine';
+import type { QuestionDto } from '../../types/exam-contract';
 
 export interface QuestionProps {
-  question: {
-    id: string;
-    type: 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'SHORT_ANSWER' | 'TEXT_RESPONSE' | 'LIKERT';
-    content: {
-      text: string;
-      options?: Array<{ id: string; text: string }>;
-      scale?: {
-        min: number;
-        max: number;
-        labels: Record<string, string>;
-      };
-    };
-  };
+  question: QuestionDto;
 }
 
 export const QuestionRenderer: React.FC<QuestionProps> = ({ question }) => {
@@ -40,7 +29,7 @@ export const QuestionRenderer: React.FC<QuestionProps> = ({ question }) => {
     // 2. Encolar asíncronamente en IndexedDB para la sincronización resiliente con el servidor
     if (attemptId && syncEngine) {
       try {
-        await syncEngine.queueAnswer(attemptId, question.id, responseValue, elapsedMs);
+        await syncEngine.queueAnswer(attemptId, question.id, responseValue, elapsedMs, question.itemVersionId);
       } catch (error) {
         console.error('Error al guardar la respuesta en cola local IndexedDB:', error);
       }

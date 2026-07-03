@@ -1,8 +1,8 @@
 import './shared/observability/tracing.bootstrap';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { RequestMethod, ValidationPipe } from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { ValidationPipe } from '@nestjs/common';
+import { SwaggerModule } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import { json, urlencoded } from 'express';
@@ -12,6 +12,7 @@ import { ApiExceptionFilter } from './shared/filters/api-exception.filter';
 import { isCorsOriginAllowed, isSwaggerEnabled, parseAllowedOrigins, validateProductionSecurityConfig } from './shared/bootstrap/security-config';
 import { StructuredLoggerService } from './shared/observability/structured-logger.service';
 import { RequestContextService } from './shared/observability/request-context.service';
+import { configureApiPrefix, createOpenApiDocument } from './openapi';
 
 async function bootstrap() {
   validateProductionSecurityConfig(process.env);
@@ -39,14 +40,7 @@ async function bootstrap() {
   app.useStaticAssets(join(__dirname, '..', 'public'));
 
   // Establecer prefijo global de API
-  app.setGlobalPrefix('api', {
-    exclude: [
-      { path: 'health/live', method: RequestMethod.GET },
-      { path: 'health/ready', method: RequestMethod.GET },
-      { path: 'health/dependencies', method: RequestMethod.GET },
-      { path: 'metrics', method: RequestMethod.GET },
-    ],
-  });
+  configureApiPrefix(app);
   
   // Habilitar validaciones estructuradas globales (class-validator)
   app.useGlobalPipes(new ValidationPipe({
@@ -69,21 +63,7 @@ async function bootstrap() {
   // Configuración de la documentación interactiva Swagger / OpenAPI (restringido a dev/staging)
   const port = process.env.PORT || 3001;
   if (isSwaggerEnabled(process.env)) {
-    const config = new DocumentBuilder()
-      .setTitle('Integrity-Tech | Platform API')
-      .setDescription('Especificación técnica de la API REST para el motor transaccional de evaluaciones psicométricas, telemetría de proctoring y feedback de PMF.')
-      .setVersion('1.0')
-      .addBearerAuth({
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        name: 'JWT',
-        description: 'Ingresa tu Token JWT de sesión para autenticar las peticiones',
-        in: 'header',
-      })
-      .build();
-      
-    const document = SwaggerModule.createDocument(app, config);
+    const document = createOpenApiDocument(app);
     SwaggerModule.setup('api/docs', app, document);
     logger.info({ module: 'Bootstrap', action: 'swagger.enabled', message: `Swagger mounted on /api/docs` });
   }

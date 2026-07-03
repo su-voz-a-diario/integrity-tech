@@ -26,6 +26,8 @@ import { ThetaCalculatorService } from './services/theta-calculator.service';
 import { CronCalibrationService } from './services/cron-calibration.service';
 import { PersonFitService } from './services/person-fit.service';
 import { CatService } from './services/cat.service';
+import { ItemSelectorService } from './services/item-selector.service';
+import { ThetaEstimatorService } from './services/theta-estimator.service';
 import { ReportGeneratorService } from './services/report-generator.service';
 import { AdverseImpactService } from './services/adverse-impact.service';
 import { RoiService } from './services/roi.service';
@@ -38,6 +40,7 @@ import { SessionService } from './services/session.service';
 import { RateLimitGuard } from '../../shared/security/rate-limit.guard';
 import { RedisRateLimitStore } from '../../shared/security/redis-rate-limit.store';
 import { StorageModule } from '../storage/storage.module';
+import { CatController } from './controllers/cat.controller';
 
 @Module({
   imports: [
@@ -63,6 +66,7 @@ import { StorageModule } from '../storage/storage.module';
     EvaluationFinalizeController,
     ReportsController,
     PsicometriaController,
+    CatController,
   ],
   providers: [
     InvitationRepository,
@@ -83,6 +87,8 @@ import { StorageModule } from '../storage/storage.module';
     CronCalibrationService,
     PersonFitService,
     CatService,
+    ItemSelectorService,
+    ThetaEstimatorService,
     ReportGeneratorService,
     AdverseImpactService,
     RoiService,
@@ -106,6 +112,8 @@ import { StorageModule } from '../storage/storage.module';
     CronCalibrationService,
     PersonFitService,
     CatService,
+    ItemSelectorService,
+    ThetaEstimatorService,
     ReportGeneratorService,
     AdverseImpactService,
     RoiService,

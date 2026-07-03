@@ -13,6 +13,7 @@ import { PermissionsGuard } from './guards/permissions.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { RateLimitGuard } from '../../shared/security/rate-limit.guard';
 import { RedisRateLimitStore } from '../../shared/security/redis-rate-limit.store';
+import { EncryptionService } from './services/encryption.service';
 
 @Module({
   imports: [forwardRef(() => AuditModule)],
@@ -27,6 +28,7 @@ import { RedisRateLimitStore } from '../../shared/security/redis-rate-limit.stor
     RolesGuard,
     RateLimitGuard,
     RedisRateLimitStore,
+    EncryptionService,
     {
       provide: IamFacade,
       useClass: IamLocalFacade, // Vinculación de la abstracción con la implementación local monolítica
@@ -39,6 +41,7 @@ import { RedisRateLimitStore } from '../../shared/security/redis-rate-limit.stor
     RolesGuard,
     RateLimitGuard,
     RedisRateLimitStore,
+    EncryptionService,
   ],
 })
 export class IamModule {}

@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { apiClient } from '../../../../services/api-client';
+import type { AttemptReportResponse, AttemptResultadosResponse, PerfilPuesto } from '../../../../generated/api/types';
 
 // Mock de fallback para demostración si la API no está disponible
 const MOCK_REPORT_DETAILS: Record<string, any> = {
@@ -166,8 +168,8 @@ const MOCK_REPORT_DETAILS: Record<string, any> = {
 
 export default function CandidateAttemptReport({ params }: { params: { attemptId: string } }) {
   const attemptId = params.attemptId;
-  const [report, setReport] = useState<any>(null);
-  const [perfiles, setPerfiles] = useState<any[]>([]);
+  const [report, setReport] = useState<AttemptReportResponse | null>(null);
+  const [perfiles, setPerfiles] = useState<PerfilPuesto[]>([]);
   const [selectedPerfilId, setSelectedPerfilId] = useState<string>('');
   const [igaData, setIgaData] = useState<any>(null);
   const [isRecalculating, setIsRecalculating] = useState(false);
@@ -175,15 +177,7 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
 
   // Consulta dinámica del intento y perfiles
   useEffect(() => {
-    const authHeaders = {
-      'Authorization': `Bearer ${localStorage.getItem('auth-token') || ''}`,
-    };
-
-    const fetchReport = fetch(`/api/evaluations/attempts/${attemptId}`, { headers: authHeaders })
-      .then((res) => {
-        if (!res.ok) throw new Error('Not Found');
-        return res.json();
-      })
+    const fetchReport = apiClient.get<AttemptReportResponse>(`/evaluations/attempts/${attemptId}`)
       .catch((err) => {
         console.warn(`[Reporte] No se pudo cargar reporte real para el attemptId: ${attemptId}`, err);
         return process.env.NEXT_PUBLIC_ENABLE_DEMO_MOCKS === 'true'
@@ -191,12 +185,10 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
           : null;
       });
 
-    const fetchPerfiles = fetch('/api/evaluations/perfiles', { headers: authHeaders })
-      .then((res) => (res.ok ? res.json() : []))
+    const fetchPerfiles = apiClient.get<PerfilPuesto[]>('/evaluations/perfiles')
       .catch(() => []);
 
-    const fetchIga = fetch(`/api/evaluations/attempts/${attemptId}/resultados`, { headers: authHeaders })
-      .then((res) => (res.ok ? res.json() : null))
+    const fetchIga = apiClient.get<AttemptResultadosResponse>(`/evaluations/attempts/${attemptId}/resultados`)
       .catch(() => null);
 
     Promise.all([fetchReport, fetchPerfiles, fetchIga]).then(([reportData, perfilesData, igaRes]) => {
@@ -247,18 +239,8 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
     setIsRecalculating(true);
 
     try {
-      const response = await fetch(`/api/evaluations/attempts/${attemptId}/recalcular-iga`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('auth-token') || ''}`,
-        },
-        body: JSON.stringify({ perfilId }),
-      });
-      if (response.ok) {
-        const newIga = await response.json();
-        setIgaData(newIga);
-      }
+      const newIga = await apiClient.post<AttemptResultadosResponse>(`/evaluations/attempts/${attemptId}/recalcular-iga`, { perfilId });
+      setIgaData(newIga);
     } catch (err) {
       console.error('Error recalcular IGA:', err);
     } finally {
@@ -306,6 +288,8 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
       : 'bg-red-500/10 border-red-500/20 text-red-400';
 
   const allAlerts = [...(report?.alerts || []), ...(igaData?.iga?.alertas || [])];
+  const reportDimensions = report.dimensions || [];
+  const reportProctoringLogs = report.proctoringLogs || [];
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-8">
@@ -409,7 +393,7 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
               </div>
 
               <div className="space-y-6">
-                {report.dimensions.map((dim: any, idx: number) => {
+                {reportDimensions.map((dim: any, idx: number) => {
                   const score = dim.score;
                   const colorClass = score >= 75 
                     ? 'bg-emerald-500' 
@@ -484,10 +468,10 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
 
               {/* Contenedor del timeline vertical */}
               <div className="relative border-l border-slate-800 pl-4 space-y-6">
-                {report.proctoringLogs.length === 0 ? (
+                {reportProctoringLogs.length === 0 ? (
                   <p className="text-xs text-slate-500 font-medium">No se registraron alertas conductuales.</p>
                 ) : (
-                  report.proctoringLogs.map((log: any) => {
+                  reportProctoringLogs.map((log: any) => {
                     const isCritical = log.riskLevel === 'CRITICAL';
                     const isWarning = log.riskLevel === 'WARNING';
                     

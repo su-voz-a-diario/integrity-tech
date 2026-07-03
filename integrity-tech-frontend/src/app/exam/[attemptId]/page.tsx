@@ -11,6 +11,8 @@ import { ProctoringMonitor } from '../../../components/exam/ProctoringMonitor';
 import { FeedbackLayer } from '../../../components/exam/FeedbackLayer';
 import { ProctoringCamera } from '../../../components/exam/ProctoringCamera';
 import { QuestionDto } from '../../../types/exam-contract';
+import { apiClient, ApiClientError } from '../../../services/api-client';
+import type { CandidateConsentResponse, ExamSessionResponse } from '../../../generated/api/types';
 
 // Simulación de carga de datos desde el backend en tiempo de carga de página (mock)
 const MOCK_EXAM = {
@@ -553,6 +555,7 @@ export default function ExamTakingPage({ params }: { params: { attemptId: string
   const answers = useExamStore((state) => state.answers);
 
   const [examSession, setExamSession] = useState<{
+    attemptId?: string;
     exam: { id: string; title: string; durationMinutes?: number | null };
     questions: QuestionDto[];
     status: string;
@@ -569,19 +572,7 @@ export default function ExamTakingPage({ params }: { params: { attemptId: string
 
   const loadSession = useCallback(async () => {
     try {
-      const token = localStorage.getItem('auth-token') || '';
-      const response = await fetch(`/api/evaluations/attempts/${attemptId}/session`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(getProfessionalErrorMessage(response.status, errorData.message || 'No se pudo cargar la evaluación asignada.'));
-      }
-
-      const data = await response.json();
+      const data = await apiClient.get<ExamSessionResponse>(`/evaluations/attempts/${attemptId}/session`);
       if (!Array.isArray(data.questions) || data.questions.length === 0) {
         throw new Error('La evaluación no tiene preguntas configuradas.');
       }
@@ -593,7 +584,8 @@ export default function ExamTakingPage({ params }: { params: { attemptId: string
       setEndTimeMs(Date.now() + durationMinutes * 60 * 1000);
       analyticsService.track('assessment_started', { attemptId, examId: data.exam.id });
     } catch (err: any) {
-      setSessionError(err.message || 'No se pudo cargar la sesión de examen.');
+      const fallback = err.message || 'No se pudo cargar la sesión de examen.';
+      setSessionError(err instanceof ApiClientError ? getProfessionalErrorMessage(err.status, fallback) : fallback);
     } finally {
       setIsLoadingSession(false);
     }
@@ -603,19 +595,7 @@ export default function ExamTakingPage({ params }: { params: { attemptId: string
   useEffect(() => {
     async function verifyConsentAndLoadSession() {
       try {
-        const token = localStorage.getItem('auth-token') || '';
-        const response = await fetch(`/api/evaluations/attempts/${attemptId}/consent`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(getProfessionalErrorMessage(response.status, errorData.message || 'No se pudo verificar el consentimiento.'));
-        }
-
-        const data = await response.json();
+        const data = await apiClient.get<CandidateConsentResponse>(`/evaluations/attempts/${attemptId}/consent`);
         if (!data.accepted) {
           setConsentAccepted(false);
           setIsLoadingSession(false);
@@ -625,7 +605,8 @@ export default function ExamTakingPage({ params }: { params: { attemptId: string
         setConsentAccepted(true);
         await loadSession();
       } catch (err: any) {
-        setSessionError(err.message || 'No se pudo preparar la evaluación.');
+        const fallback = err.message || 'No se pudo preparar la evaluación.';
+        setSessionError(err instanceof ApiClientError ? getProfessionalErrorMessage(err.status, fallback) : fallback);
         setIsLoadingSession(false);
       }
     }
@@ -637,26 +618,14 @@ export default function ExamTakingPage({ params }: { params: { attemptId: string
     try {
       setIsAcceptingConsent(true);
       setConsentError(null);
-      const token = localStorage.getItem('auth-token') || '';
-      const response = await fetch(`/api/evaluations/attempts/${attemptId}/consent`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ consentVersion: CONSENT_VERSION }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(getProfessionalErrorMessage(response.status, errorData.message || 'No se pudo registrar el consentimiento.'));
-      }
+      await apiClient.post<CandidateConsentResponse>(`/evaluations/attempts/${attemptId}/consent`, { consentVersion: CONSENT_VERSION });
 
       setConsentAccepted(true);
       setIsLoadingSession(true);
       await loadSession();
     } catch (err: any) {
-      setConsentError(err.message || 'No se pudo registrar el consentimiento.');
+      const fallback = err.message || 'No se pudo registrar el consentimiento.';
+      setConsentError(err instanceof ApiClientError ? getProfessionalErrorMessage(err.status, fallback) : fallback);
     } finally {
       setIsAcceptingConsent(false);
     }
@@ -710,25 +679,15 @@ export default function ExamTakingPage({ params }: { params: { attemptId: string
         throw new Error('Aún hay respuestas pendientes de sincronización. Espera unos segundos y vuelve a finalizar.');
       }
 
-      const token = localStorage.getItem('auth-token') || '';
-      const response = await fetch(`/api/evaluations/attempts/${attemptId}/finalize`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(getProfessionalErrorMessage(response.status, errorData.message || 'No se pudo finalizar la evaluación.'));
-      }
+      await apiClient.post(`/evaluations/attempts/${attemptId}/finalize`);
 
       setStatus('SUBMITTED');
       setShowFeedbackSurvey(true);
       analyticsService.track('assessment_submitted', { attemptId });
       console.log('Respuestas locales al finalizar:', answers);
     } catch (err: any) {
-      alert(err.message || 'No se pudo finalizar la evaluación. Revisa tu conexión e inténtalo de nuevo.');
+      const fallback = err.message || 'No se pudo finalizar la evaluación. Revisa tu conexión e inténtalo de nuevo.';
+      alert(err instanceof ApiClientError ? getProfessionalErrorMessage(err.status, fallback) : fallback);
     }
   };
 
