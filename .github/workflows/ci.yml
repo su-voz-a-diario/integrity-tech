@@ -206,16 +206,38 @@ jobs:
         run: npm run build
 
       - name: Start backend for smoke validation
-        working-directory: integrity-tech-backend
         run: |
-          mkdir -p ../.ci-logs
-          nohup npm run start:prod > ../.ci-logs/backend-smoke.log 2>&1 &
-          echo "$!" > ../.ci-logs/backend-smoke.pid
+          mkdir -p .ci-logs
+          (
+            cd integrity-tech-backend
+            echo "Starting backend from: $(pwd)"
+            node dist/main.js
+          ) > .ci-logs/backend-smoke.log 2>&1 &
+          echo "$!" > .ci-logs/backend-smoke.pid
         env:
           PORT: "3001"
 
       - name: Wait for backend readiness
         run: |
+          print_backend_diagnostics() {
+            echo "---- pwd ----"
+            pwd
+            echo "---- ls ----"
+            ls -la
+            echo "---- ls integrity-tech-backend ----"
+            ls -la integrity-tech-backend || true
+            echo "---- find integrity-tech-backend/dist -maxdepth 3 -type f ----"
+            find integrity-tech-backend/dist -maxdepth 3 -type f || true
+            echo "---- cat integrity-tech-backend/package.json ----"
+            cat integrity-tech-backend/package.json || true
+            echo "---- start:prod script ----"
+            node -e "const p=require('./integrity-tech-backend/package.json'); console.log(p.scripts && p.scripts['start:prod']);" || true
+            echo "---- backend logs ----"
+            cat .ci-logs/backend-smoke.log || true
+            echo "---- health response ----"
+            cat /tmp/integrity-health-ready.txt || true
+          }
+
           for attempt in {1..60}; do
             status="$(curl -sS -o /tmp/integrity-health-ready.txt -w "%{http_code}" http://127.0.0.1:3001/health/ready || true)"
             if [ "$status" = "200" ]; then
@@ -225,10 +247,7 @@ jobs:
 
             if [ -f .ci-logs/backend-smoke.pid ] && ! kill -0 "$(cat .ci-logs/backend-smoke.pid)" 2>/dev/null; then
               echo "Backend process exited before readiness."
-              echo "---- backend logs ----"
-              cat .ci-logs/backend-smoke.log || true
-              echo "---- health response ----"
-              cat /tmp/integrity-health-ready.txt || true
+              print_backend_diagnostics
               exit 1
             fi
 
@@ -236,10 +255,7 @@ jobs:
           done
 
           echo "Backend did not become ready before timeout."
-          echo "---- backend logs ----"
-          cat .ci-logs/backend-smoke.log || true
-          echo "---- health response ----"
-          cat /tmp/integrity-health-ready.txt || true
+          print_backend_diagnostics
           exit 1
 
       - name: Database smoke validation
