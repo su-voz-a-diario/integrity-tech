@@ -9,6 +9,7 @@ if (!sourceUrl) {
 const requiredBinaries = ['pg_dump', 'pg_restore', 'psql', 'createdb', 'dropdb'];
 
 type DatabaseConnectionParts = {
+  protocol: string;
   host: string;
   port?: string;
   user?: string;
@@ -38,6 +39,7 @@ function parseDatabaseUrl(value: string): DatabaseConnectionParts {
   const database = decodeURIComponent(url.pathname.replace(/^\//, ''));
   if (!database) throw new Error('DATABASE_URL must include a database name');
   return {
+    protocol: url.protocol,
     host: url.hostname,
     port: url.port || undefined,
     user: url.username ? decodeURIComponent(url.username) : undefined,
@@ -57,8 +59,10 @@ function postgresClientEnv(parts: DatabaseConnectionParts) {
   return parts.password ? { PGPASSWORD: parts.password } : {};
 }
 
-function buildDatabaseUrl(databaseName: string) {
-  const url = new URL(sourceUrl as string);
+function buildCleanPostgresUrl(parts: DatabaseConnectionParts, databaseName = parts.database) {
+  const url = new URL(`${parts.protocol}//${parts.host}`);
+  if (parts.user) url.username = parts.user;
+  if (parts.port) url.port = parts.port;
   url.pathname = `/${databaseName}`;
   return url.toString();
 }
@@ -86,7 +90,8 @@ async function main() {
   const sourceParts = parseDatabaseUrl(sourceUrl);
   const originalName = sourceParts.database;
   const restoreName = `${originalName}_restore_smoke_${Date.now()}`;
-  const restoreUrl = buildDatabaseUrl(restoreName);
+  const sourcePostgresUrl = buildCleanPostgresUrl(sourceParts);
+  const restoreUrl = buildCleanPostgresUrl(sourceParts, restoreName);
   const clientArgs = postgresClientArgs(sourceParts);
   const clientEnv = postgresClientEnv(sourceParts);
 
@@ -95,10 +100,10 @@ async function main() {
 
   try {
     console.log('[backup-restore] Dumping source database');
-    const dump = run('pg_dump', ['--format=custom', '--no-owner', '--no-acl', sourceUrl]);
+    const dump = run('pg_dump', ['--format=custom', '--no-owner', '--no-acl', sourcePostgresUrl], { env: clientEnv });
 
     console.log('[backup-restore] Restoring into temporary database');
-    run('pg_restore', ['--no-owner', '--no-acl', '--dbname', restoreUrl], { input: dump });
+    run('pg_restore', ['--no-owner', '--no-acl', '--dbname', restoreUrl], { input: dump, env: clientEnv });
 
     validateRestoredDatabase(restoreUrl);
     console.log('[backup-restore] Backup and restore smoke validation completed.');
