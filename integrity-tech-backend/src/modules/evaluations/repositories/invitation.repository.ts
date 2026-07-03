@@ -41,16 +41,6 @@ export class InvitationRepository {
     });
   }
 
-  findPublishedExamForTenant(organizationId: string) {
-    return this.prisma.exam.findFirst({
-      where: {
-        organizationId,
-        isPublished: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
   accessCodeExists(accessCode: string): Promise<boolean> {
     return this.prisma.candidateInvitation
       .findUnique({

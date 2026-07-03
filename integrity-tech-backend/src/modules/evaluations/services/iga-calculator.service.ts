@@ -49,32 +49,17 @@ export class IgaCalculatorService {
       (attempt as any).assessmentVersionId,
     );
 
-    // 2. Determinar perfil final (si no se pasa, intentar obtener el guardado en la invitación o usar uno por defecto)
+    // 2. Determinar perfil final. Sin perfil real no se calcula IGA.
     let finalPerfilId = perfilId;
     if (!finalPerfilId) {
-      const invitation = await this.prisma.candidateInvitation.findUnique({
-        where: { attemptId },
-      });
-      // Como no tenemos perfilId en CandidateInvitation, usamos un perfil por defecto o el primero de la DB
       const primerPerfil = await this.prisma.perfilPuesto.findFirst({
         where: { organizationId: attempt.organizationId },
+        orderBy: { nombre: 'asc' },
       });
       if (!primerPerfil) {
-        // Generar un perfil por defecto si la base de datos está vacía para evitar fallas catastróficas
-        const defaultPerfil = await this.prisma.perfilPuesto.create({
-          data: {
-            organizationId: attempt.organizationId,
-            nombre: 'Gerente General (Default)',
-            wIntegridad: 0.35,
-            wPersonalidad: 0.25,
-            wCognitivo: 0.20,
-            wCompetencias: 0.20,
-          },
-        });
-        finalPerfilId = defaultPerfil.id;
-      } else {
-        finalPerfilId = primerPerfil.id;
+        throw new BadRequestException('No existe un perfil de puesto real configurado para calcular IGA.');
       }
+      finalPerfilId = primerPerfil.id;
     }
 
     const perfil = await this.prisma.perfilPuesto.findFirst({
@@ -176,28 +161,11 @@ export class IgaCalculatorService {
         }
       }
 
-      if (Object.keys(responsesByTest).length === 0 && attempt.scoreDetails) {
-        // Fallback a scoreDetails si no hay submissions detalladas en la DB
-        const details = attempt.scoreDetails as any;
-        for (const [dimName, val] of Object.entries(details)) {
-          const dimVal = val as any;
-          const testId = mapping[dimName.toUpperCase()] || dimName;
-          const scoreVal = dimVal.percentage !== undefined ? Number(dimVal.percentage) : 50.0;
-          
-          await this.prisma.resultadoTest.create({
-            data: {
-              examAttemptId: attemptId,
-              testId,
-              scoringModelVersionId: resultVersions.scoringModelVersionId,
-              normGroupVersionId: resultVersions.normGroupVersionId,
-              puntajeBruto: scoreVal,
-              percentil: scoreVal,
-              irtCalculated: false,
-            },
-          });
-          percentiles[testId] = scoreVal;
-        }
-      } else if (Object.keys(responsesByTest).length > 0) {
+      if (Object.keys(responsesByTest).length === 0) {
+        throw new BadRequestException('No existen respuestas detalladas reales para calcular IGA.');
+      }
+
+      if (Object.keys(responsesByTest).length > 0) {
         // Calcular IRT theta para cada test con respuestas
         for (const [testId, patterns] of Object.entries(responsesByTest)) {
           const paramsCount = await this.prisma.parametrosItems.count({
@@ -208,7 +176,7 @@ export class IgaCalculatorService {
             const { theta, error, thetaT, thetaCi, engagement } = await this.thetaCalculator.calcularTheta(testId, patterns, attempt.organizationId);
             const { lz, aberrante } = await this.personFitService.calculatePersonFit(testId, patterns, theta);
             
-            let percentilFinal = 50.0;
+            let percentilFinal: number | null = null;
             try {
               const baremo = await this.prisma.baremosDinamicos.findFirst({
                 where: {
@@ -228,6 +196,10 @@ export class IgaCalculatorService {
               }
             } catch (dbErr) {
               this.logger.warn(`Error al consultar percentil para theta ${theta}: ${dbErr.message}`);
+            }
+
+            if (percentilFinal === null) {
+              throw new BadRequestException(`No existe baremo real para calcular percentil del test ${testId}.`);
             }
 
             await this.prisma.resultadoTest.create({
@@ -250,50 +222,14 @@ export class IgaCalculatorService {
             });
             percentiles[testId] = percentilFinal;
           } else {
-            const scoreVal = 50.0;
-            await this.prisma.resultadoTest.create({
-              data: {
-                examAttemptId: attemptId,
-                testId,
-                scoringModelVersionId: resultVersions.scoringModelVersionId,
-                normGroupVersionId: resultVersions.normGroupVersionId,
-                puntajeBruto: scoreVal,
-                percentil: scoreVal,
-                irtCalculated: false,
-              },
-            });
-            percentiles[testId] = scoreVal;
+            throw new BadRequestException(`No existen parámetros calibrados reales para calcular el test ${testId}.`);
           }
         }
       }
     }
 
     if (Object.keys(percentiles).length === 0) {
-      // Inicializar mock de resiliencia completo
-      const fallbackMock = {
-        'IT2_I': 78.0,
-        'IT2_P10': 70.0,
-        'IT2_AC10': 85.0,
-        'IT2_CB10': 82.0,
-      };
-      for (const [tId, val] of Object.entries(fallbackMock)) {
-        await this.prisma.resultadoTest.create({
-          data: {
-            examAttemptId: attemptId,
-            testId: tId,
-            scoringModelVersionId: resultVersions.scoringModelVersionId,
-            normGroupVersionId: resultVersions.normGroupVersionId,
-            puntajeBruto: val,
-            percentil: val,
-            theta: 0.8,
-            thetaError: 0.25,
-            thetaT: 58.0,
-            thetaCi: 112.0,
-            irtCalculated: true,
-          },
-        });
-        percentiles[tId] = val;
-      }
+      throw new BadRequestException('No existen resultados psicométricos reales suficientes para calcular IGA.');
     }
 
     // 4. Mapear pesos del perfil a los testIds

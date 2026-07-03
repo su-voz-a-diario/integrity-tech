@@ -77,50 +77,21 @@ def run_validity_analysis(performance_data_json_path, output_image_path):
         db_rows = cur.fetchall()
         
         if len(db_rows) == 0:
-            print("[IRT Validity Info] No hay suficientes intentos de examen finalizados con thetas calculados en la DB. Usando simulación de validación.")
-            # Si no hay datos, simulamos para asegurar el reporte
-            simulated = True
-        else:
-            simulated = False
+            print("[IRT Validity Error] No hay intentos finalizados con thetas reales calculados. No se permite generar evidencia de validez sintética.")
+            sys.exit(1)
             
         # Agrupar las respuestas por candidato
         candidates_data = {}
-        if not simulated:
-            for email, test_id, theta, IGA in db_rows:
-                if email not in candidates_data:
-                    candidates_data[email] = {'email': email, 'IGA': float(IGA)}
-                candidates_data[email][f"{test_id}_theta"] = float(theta)
-                
-            db_df = pd.DataFrame(list(candidates_data.values()))
-            # Combinar con los datos de desempeño
-            merged = pd.merge(perf_df, db_df, left_on=id_col, right_on='email')
-        else:
-            # Generar datos sintéticos realistas para el reporte offline
-            print("[IRT Validity] Generando simulación sintética de validez predictiva (N=150)...")
-            np.random.seed(42)
-            n_sim = max(100, len(perf_df))
+        for email, test_id, theta, IGA in db_rows:
+            if IGA is None:
+                continue
+            if email not in candidates_data:
+                candidates_data[email] = {'email': email, 'IGA': float(IGA)}
+            candidates_data[email][f"{test_id}_theta"] = float(theta)
             
-            # Generar thetas con cierta correlación real al desempeño
-            desempeno = np.random.uniform(5.0, 10.0, n_sim)
-            # theta_i = desempeno * corr + noise
-            it2_i = (desempeno - 7.5) * 0.4 + np.random.normal(0, 0.5, n_sim)
-            it2_p10 = (desempeno - 7.5) * 0.3 + np.random.normal(0, 0.6, n_sim)
-            it2_ac10 = (desempeno - 7.5) * 0.5 + np.random.normal(0, 0.4, n_sim)
-            it2_cb10 = (desempeno - 7.5) * 0.35 + np.random.normal(0, 0.5, n_sim)
-            
-            # IGA index
-            iga = 50 + 10 * (it2_i * 0.4 + it2_ac10 * 0.3 + it2_p10 * 0.15 + it2_cb10 * 0.15)
-            iga = np.clip(iga, 10.0, 99.0)
-            
-            merged = pd.DataFrame({
-                'email': [f"cand{i}@test.com" for i in range(n_sim)],
-                'desempeno': desempeno,
-                'IT2_I_theta': it2_i,
-                'IT2_P10_theta': it2_p10,
-                'IT2_AC10_theta': it2_ac10,
-                'IT2_CB10_theta': it2_cb10,
-                'IGA': iga
-            })
+        db_df = pd.DataFrame(list(candidates_data.values()))
+        # Combinar con los datos de desempeño
+        merged = pd.merge(perf_df, db_df, left_on=id_col, right_on='email')
 
         sample_size = len(merged)
         if sample_size < 10:
@@ -191,7 +162,7 @@ def run_validity_analysis(performance_data_json_path, output_image_path):
         # 7. Formatear y retornar resultados
         results = {
             'status': 'success',
-            'simulated': simulated,
+            'simulated': False,
             'tamano_muestra': int(sample_size),
             'correlaciones': correlations,
             'regresion': {

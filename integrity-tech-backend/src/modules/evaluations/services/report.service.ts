@@ -56,12 +56,6 @@ export class ReportService {
           description: this.getDimensionDescription(dimName),
         });
       }
-    } else {
-      dimensions.push(
-        { name: 'INTEGRIDAD', score: 0, description: 'Pendiente de calificación por el worker.' },
-        { name: 'LEALTAD ORGANIZACIONAL', score: 0, description: 'Pendiente de calificación por el worker.' },
-        { name: 'TOLERANCIA AL RIESGO', score: 0, description: 'Pendiente de calificación por el worker.' },
-      );
     }
 
     const logsMapped = att.logs.map((log) => ({
@@ -93,14 +87,14 @@ export class ReportService {
     });
     this.metrics?.recordDomainEvent('ReportGeneration', 'attempt_report', 'success');
     return {
-      candidateName: candidate ? `${candidate.firstName} ${candidate.lastName}`.trim() : 'Candidato Externo',
-      email: candidate?.email || 'unknown@example.com',
-      assessmentTitle: exam?.title || 'Evaluación Psicométrica',
+      candidateName: candidate ? `${candidate.firstName} ${candidate.lastName}`.trim() : 'No disponible',
+      email: candidate?.email || 'No disponible',
+      assessmentTitle: exam?.title || 'No disponible',
       date: att.submittedAt ? att.submittedAt.toLocaleString() : att.startedAt.toLocaleString(),
-      overallScore: att.score ? `${att.score}/100` : '0/100',
-      ipAddress: att.ipAddress || '127.0.0.1',
-      userAgent: att.userAgent || 'Mozilla/5.0 Browser',
-      sessionHmac: att.ltiMapping ? `lti-${att.ltiMapping.id}` : 'session-audit-metadata',
+      overallScore: att.score !== null && att.score !== undefined ? `${att.score}/100` : 'No disponible',
+      ipAddress: att.ipAddress || 'No disponible',
+      userAgent: att.userAgent || 'No disponible',
+      sessionHmac: att.ltiMapping ? `lti-${att.ltiMapping.id}` : null,
       governanceTrace,
       dimensions,
       proctoringLogs: logsMapped,
@@ -168,7 +162,7 @@ export class ReportService {
 
     return {
       sesion_id: attemptId,
-      perfil_puesto: attempt.resultadoGlobal?.perfil?.nombre || 'Gerente General (Default)',
+      perfil_puesto: attempt.resultadoGlobal?.perfil?.nombre || null,
       estado: attempt.status,
       resultados_por_test: testResults,
       iga: igaResult ? {

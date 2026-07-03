@@ -5,167 +5,6 @@ import Link from 'next/link';
 import { apiClient } from '../../../../services/api-client';
 import type { AttemptReportResponse, AttemptResultadosResponse, PerfilPuesto } from '../../../../generated/api/types';
 
-// Mock de fallback para demostración si la API no está disponible
-const MOCK_REPORT_DETAILS: Record<string, any> = {
-  'att-1098': {
-    candidateName: 'Andrés López',
-    email: 'andres.lopez@example.com',
-    assessmentTitle: 'Batería de Evaluación Psicométrica Integrada (IT²)',
-    date: '27 Jun 2026, 16:40',
-    overallScore: '46/100',
-    ipAddress: '190.143.45.22',
-    userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-    sessionHmac: 'hmac-84f938d8212e33bc88a8f1ff4f5e7188',
-    dimensions: [
-      {
-        name: 'INTEGRIDAD Y ÉTICA (IT²-I)',
-        score: 18,
-        description: 'Puntaje crítico inferior al umbral mínimo del 20%. El candidato tiende a justificar conductas irregulares (sobrantes en caja, uso privado de recursos).',
-      },
-      {
-        name: 'PERSONALIDAD Y CONDUCTA (IT²-P10)',
-        score: 55,
-        description: 'Nivel promedio. Estilo conductual equilibrado, estable ante el estrés normal, con niveles estándar de responsabilidad.',
-      },
-      {
-        name: 'APTITUD COGNITIVA (IT²-AC10)',
-        score: 70,
-        description: 'Capacidad de aprendizaje y razonamiento abstracto superior a la media. Resuelve problemas numéricos de forma ágil.',
-      },
-      {
-        name: 'COMPETENCIAS BLANDAS (IT²-CB10)',
-        score: 45,
-        description: 'Ajuste social moderado. Muestra dificultades para mediar en conflictos interpersonales y prefiere delegar el feedback correctivo.',
-      },
-    ],
-    alerts: [
-      '⚠️ RIESGO ÉTICO CRÍTICO: El percentil de Integridad (18%) se ubica por debajo del umbral mínimo tolerable del 20%.'
-    ],
-    proctoringLogs: [
-      {
-        id: '1',
-        eventType: 'student_idle',
-        riskLevel: 'WARNING',
-        timestamp: '16:42:15',
-        metadata: {
-          sequence: 1,
-          idleDurationMs: 60000,
-          signature: 'sig-84f938d8212e33bc88a8f1ff4f5e7188',
-        },
-        message: 'Inactividad prolongada (60s sin entrada de teclado ni cursor)',
-      },
-      {
-        id: '2',
-        eventType: 'tab_focus_lost',
-        riskLevel: 'WARNING',
-        timestamp: '16:45:10',
-        metadata: {
-          sequence: 2,
-          trigger: 'window_blur',
-          signature: 'sig-9bc88a8f1ff4f5e718884f938d8212e33',
-        },
-        message: 'Pérdida de foco: Estudiante sale de la ventana del examen (Alt+Tab / cambio de app)',
-      },
-      {
-        id: '3',
-        eventType: 'tab_focus_lost',
-        riskLevel: 'WARNING',
-        timestamp: '16:46:02',
-        metadata: {
-          sequence: 3,
-          trigger: 'visibility_hidden',
-          signature: 'sig-f4f5e718884f938d8212e33bc88a8f1ff',
-        },
-        message: 'Pérdida de foco: Estudiante cambia o minimiza la pestaña',
-      },
-      {
-        id: '4',
-        eventType: 'tab_focus_lost',
-        riskLevel: 'WARNING',
-        timestamp: '16:48:40',
-        metadata: {
-          sequence: 4,
-          trigger: 'window_blur',
-          signature: 'sig-e33bc88a8f1ff4f5e718884f938d8212',
-        },
-        message: 'Pérdida de foco: Segunda salida de ventana en menos de 3 minutos',
-      },
-      {
-        id: '5',
-        eventType: 'suspicious_behavior_detected',
-        riskLevel: 'CRITICAL',
-        timestamp: '16:48:40',
-        metadata: {
-          reason: 'Exceso de pérdidas de foco (3 salidas de ventana en menos de 5 minutos)',
-          focusLostCount: 3,
-          severity: 'HIGH',
-          signature: 'sig-backend-generated-audit-chain',
-        },
-        message: 'COMPORTAMIENTO SOSPECHOSO DETECTADO POR EL WORKER (Límite de desfoques excedido)',
-      },
-    ],
-  },
-  default: {
-    candidateName: 'Sofía Valenzuela',
-    email: 'sofia.valenzuela@example.com',
-    assessmentTitle: 'Batería de Evaluación Psicométrica Integrada (IT²)',
-    date: '28 Jun 2026, 08:24',
-    overallScore: '79/100',
-    ipAddress: '186.22.143.50',
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-    sessionHmac: 'hmac-d4e5f72382f1ff4f5e7188d8212e33bc',
-    dimensions: [
-      {
-        name: 'INTEGRIDAD Y ÉTICA (IT²-I)',
-        score: 78,
-        description: 'Alineación ética óptima. Excelente apego a las normas y políticas organizacionales ante dilemas situacionales reales.',
-      },
-      {
-        name: 'PERSONALIDAD Y CONDUCTA (IT²-P10)',
-        score: 85,
-        description: 'Rasgos de responsabilidad y estabilidad emocional altos. Demuestra resiliencia superior bajo entornos de presión moderada.',
-      },
-      {
-        name: 'APTITUD COGNITIVA (IT²-AC10)',
-        score: 62,
-        description: 'Razonamiento analítico numérico y verbal promedio. Capacidad adecuada para la asimilación rápida de nuevos procedimientos.',
-      },
-      {
-        name: 'COMPETENCIAS BLANDAS (IT²-CB10)',
-        score: 90,
-        description: 'Liderazgo participativo de excelencia. Muestra asertividad óptima para orientar a clientes y colaborar de forma empática.',
-      },
-    ],
-    alerts: [],
-    proctoringLogs: [
-      {
-        id: '1',
-        eventType: 'tab_focus_lost',
-        riskLevel: 'WARNING',
-        timestamp: '08:26:10',
-        metadata: {
-          sequence: 1,
-          trigger: 'window_blur',
-          signature: 'sig-d4e5f72382f1ff4f5e7188d8212e33bc',
-        },
-        message: 'Pérdida de foco: Salida única y breve del navegador',
-      },
-      {
-        id: '2',
-        eventType: 'tab_focus_gained',
-        riskLevel: 'INFO',
-        timestamp: '08:26:14',
-        metadata: {
-          sequence: 2,
-          trigger: 'window_focus',
-          signature: 'sig-f5e7188d8212e33bcd4e5f72382f1ff4',
-        },
-        message: 'Foco restablecido: El estudiante regresa al examen tras 4 segundos',
-      },
-    ],
-  },
-};
-
 export default function CandidateAttemptReport({ params }: { params: { attemptId: string } }) {
   const attemptId = params.attemptId;
   const [report, setReport] = useState<AttemptReportResponse | null>(null);
@@ -180,9 +19,7 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
     const fetchReport = apiClient.get<AttemptReportResponse>(`/evaluations/attempts/${attemptId}`)
       .catch((err) => {
         console.warn(`[Reporte] No se pudo cargar reporte real para el attemptId: ${attemptId}`, err);
-        return process.env.NEXT_PUBLIC_ENABLE_DEMO_MOCKS === 'true'
-          ? (MOCK_REPORT_DETAILS[attemptId] || MOCK_REPORT_DETAILS.default)
-          : null;
+        return null;
       });
 
     const fetchPerfiles = apiClient.get<PerfilPuesto[]>('/evaluations/perfiles')
@@ -200,33 +37,15 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
         return;
       }
       
-      const finalPerfiles = perfilesData.length > 0 ? perfilesData : [
-        { id: 'p1', nombre: 'Gerente Comercial' },
-        { id: 'p2', nombre: 'Desarrollador de Software' },
-        { id: 'p3', nombre: 'Tesorero / Cajero' },
-        { id: 'p4', nombre: 'Director de Recursos Humanos' },
-      ];
+      const finalPerfiles = Array.isArray(perfilesData) ? perfilesData : [];
       setPerfiles(finalPerfiles);
 
       if (igaRes && igaRes.iga) {
         setIgaData(igaRes);
         const matchingProfile = finalPerfiles.find((p: any) => p.nombre === igaRes.perfil_puesto);
-        if (matchingProfile) {
-          setSelectedPerfilId(matchingProfile.id);
-        } else {
-          setSelectedPerfilId(finalPerfiles[0]?.id || '');
-        }
+        setSelectedPerfilId(matchingProfile?.id || finalPerfiles[0]?.id || '');
       } else {
-        const score = parseInt(reportData.overallScore) || 75;
-        const rec = score >= 75 ? 'Recomendado' : (score >= 50 ? 'Aceptable con observaciones' : 'No recomendado');
-        setIgaData({
-          perfil_puesto: finalPerfiles[0]?.nombre || 'Gerente Comercial',
-          iga: {
-            valor: score,
-            recomendacion: rec,
-            alertas: score < 50 ? ['Riesgo ético elevado'] : [],
-          }
-        });
+        setIgaData(null);
         setSelectedPerfilId(finalPerfiles[0]?.id || '');
       }
 
@@ -235,6 +54,7 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
   }, [attemptId]);
 
   const handleRecalcular = async (perfilId: string) => {
+    if (!perfilId) return;
     setSelectedPerfilId(perfilId);
     setIsRecalculating(true);
 
@@ -270,22 +90,20 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
     );
   }
 
-  const numericScore = igaData?.iga?.valor ?? (parseInt(report?.overallScore || '0') || 0);
-  const rawRecomendacion = igaData?.iga?.recomendacion || 'Recomendado';
+  const numericScore = typeof igaData?.iga?.valor === 'number' ? igaData.iga.valor : null;
+  const rawRecomendacion = typeof igaData?.iga?.recomendacion === 'string' ? igaData.iga.recomendacion : '';
   const isRecommended = rawRecomendacion === 'Recomendado';
   const isAcceptable = rawRecomendacion === 'Aceptable con observaciones' || rawRecomendacion === 'Aceptable';
   
-  const statusText = isRecommended 
-    ? 'Ajuste Alto (Recomendado)' 
-    : isAcceptable 
-      ? 'Ajuste Medio (Aceptable)' 
-      : 'Ajuste Bajo (No Recomendado)';
+  const statusText = rawRecomendacion || 'Sin resultado IGA disponible';
 
-  const statusColor = isRecommended 
-    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
-    : isAcceptable 
-      ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' 
-      : 'bg-red-500/10 border-red-500/20 text-red-400';
+  const statusColor = !rawRecomendacion
+    ? 'bg-slate-950 border-slate-800 text-slate-400'
+    : isRecommended 
+      ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+      : isAcceptable 
+        ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' 
+        : 'bg-red-500/10 border-red-500/20 text-red-400';
 
   const allAlerts = [...(report?.alerts || []), ...(igaData?.iga?.alertas || [])];
   const reportDimensions = report.dimensions || [];
@@ -337,9 +155,10 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
                   <select
                     value={selectedPerfilId}
                     onChange={(e) => handleRecalcular(e.target.value)}
-                    disabled={isRecalculating}
-                    className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-500 cursor-pointer"
+                    disabled={isRecalculating || perfiles.length === 0}
+                    className="bg-slate-950 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-indigo-500 cursor-pointer disabled:opacity-50"
                   >
+                    {perfiles.length === 0 && <option value="">Sin perfiles reales disponibles</option>}
                     {perfiles.map((p: any) => (
                       <option key={p.id} value={p.id}>{p.nombre}</option>
                     ))}
@@ -367,7 +186,7 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
                       <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest">Índice IGA</p>
                       <p className="text-[10px] text-slate-500 mt-0.5">Puntaje ponderado</p>
                     </div>
-                    <span className="text-2xl font-extrabold text-indigo-400 tracking-tight font-mono">{numericScore}/100</span>
+                    <span className="text-2xl font-extrabold text-indigo-400 tracking-tight font-mono">{numericScore !== null ? `${numericScore}/100` : 'N/D'}</span>
                   </div>
                 </div>
               </div>
@@ -395,11 +214,7 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
               <div className="space-y-6">
                 {reportDimensions.map((dim: any, idx: number) => {
                   const score = dim.score;
-                  const colorClass = score >= 75 
-                    ? 'bg-emerald-500' 
-                    : score >= 50 
-                      ? 'bg-amber-500' 
-                      : 'bg-red-500';
+                  const colorClass = 'bg-indigo-500';
                   
                   return (
                     <div key={idx} className="flex flex-col gap-2">
@@ -428,10 +243,10 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
             <div className="bg-slate-900 border border-slate-900 p-4 rounded-xl flex items-center justify-between shadow-md text-xs">
               <div className="flex items-center gap-2">
                 <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-                <span className="text-slate-300 font-medium">Cadena de Firmas Criptográficas Válida</span>
+                <span className="text-slate-300 font-medium">Cadena de Firmas Registrada</span>
               </div>
               <div className="font-mono text-slate-500 select-all truncate max-w-xs lg:max-w-md">
-                {report.sessionHmac}
+                {report.sessionHmac || 'No disponible'}
               </div>
             </div>
 
@@ -513,7 +328,7 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
                             <div>Seq: {log.metadata.sequence || '1'}</div>
                             {log.metadata.trigger && <div>Trig: {log.metadata.trigger}</div>}
                             {log.metadata.idleDurationMs && <div>Idle: {log.metadata.idleDurationMs}ms</div>}
-                            <div className="truncate">Sign: {log.metadata.signature || 'local-chain-valid'}</div>
+                            <div className="truncate">Sign: {log.metadata.signature || 'No registrada'}</div>
                           </div>
                         </div>
                       </div>

@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { RapidGuessingService } from './rapid-guessing.service';
@@ -115,7 +115,7 @@ export class ThetaCalculatorService implements OnModuleInit {
     const start = Date.now();
     
     if (respuestas.length === 0) {
-      return { theta: 0.0, error: 1.0, thetaT: 50.0, thetaCi: 100.0, engagement: 1.0 };
+      throw new BadRequestException(`No existen respuestas reales para calcular theta del test ${testId}.`);
     }
 
     // 1. Obtener los parámetros de los ítems (desde caché o base de datos)
@@ -175,10 +175,9 @@ export class ThetaCalculatorService implements OnModuleInit {
         };
       });
 
-    // Si no hay parámetros calibrados, retornar fallback
     if (itemsValidos.length === 0) {
-      this.logger.warn(`No se encontraron parámetros calibrados para el test ${testId}. Retornando fallback theta=0.0`);
-      return { theta: 0.0, error: 1.0, thetaT: 50.0, thetaCi: 100.0, engagement: 1.0 };
+      this.logger.warn(`No se encontraron parámetros calibrados para el test ${testId}.`);
+      throw new BadRequestException(`No existen parámetros calibrados reales para calcular theta del test ${testId}.`);
     }
 
     const totalItems = itemsValidos.length;

@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Headers, BadRequestException, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Headers, BadRequestException, Req, UseGuards } from '@nestjs/common';
 import { ExamService } from '../services/exam.service';
 import { JwtAuthGuard } from '../../../shared/guards/jwt-auth.guard';
 import { PERMISSIONS, Permissions, PermissionsGuard } from '../../iam';
@@ -6,6 +6,17 @@ import { PERMISSIONS, Permissions, PermissionsGuard } from '../../iam';
 @Controller('exams')
 export class ExamController {
   constructor(private readonly examService: ExamService) {}
+
+
+  /**
+   * Endpoint para listar evaluaciones publicadas disponibles para invitaciones.
+   */
+  @Get()
+  @UseGuards(JwtAuthGuard, PermissionsGuard)
+  @Permissions(PERMISSIONS.INVITATIONS_CREATE)
+  async listPublished(@Req() req: any) {
+    return this.examService.listPublishedExams(req.user.organizationId);
+  }
 
   /**
    * Endpoint para que un docente cree un examen.

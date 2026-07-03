@@ -43,9 +43,10 @@ export class AdverseImpactService {
     const totalThetas: number[] = [];
 
     for (const r of resultados) {
+      if (r.theta === null || r.theta === undefined) continue;
       const user = userMap.get(r.attempt.userId);
       const pais = user?.pais || 'Global';
-      const theta = r.theta ?? 0.0;
+      const theta = Number(r.theta);
       totalThetas.push(theta);
 
       const list = groupsMap.get(pais) || [];
@@ -53,9 +54,17 @@ export class AdverseImpactService {
       groupsMap.set(pais, list);
     }
 
+    if (totalThetas.length === 0) {
+      return {
+        testId,
+        mensaje: 'No hay suficientes thetas reales para realizar el estudio de Impacto Adverso.',
+        grupos: [],
+      };
+    }
+
     // 4. Determinar el umbral de selección (usamos la mediana global de theta)
     totalThetas.sort((a, b) => a - b);
-    const medianTheta = totalThetas[Math.floor(totalThetas.length / 2)] ?? 0.0;
+    const medianTheta = totalThetas[Math.floor(totalThetas.length / 2)];
 
     // 5. Calcular tasa de selección para cada grupo
     const groupsList: any[] = [];

@@ -1,5 +1,6 @@
-import { Injectable, UnauthorizedException, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
 import { IamFacade } from '../../iam';
+import { PrismaService } from '../../../shared/database/prisma.service';
 
 @Injectable()
 export class ExamService {
@@ -7,7 +8,37 @@ export class ExamService {
 
   constructor(
     private readonly iamFacade: IamFacade, // Inyección de la Fachada de Identidad (Abstracción)
+    private readonly prisma: PrismaService,
   ) {}
+
+
+  async listPublishedExams(organizationId: string) {
+    const exams = await this.prisma.exam.findMany({
+      where: {
+        organizationId,
+        isPublished: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        isPublished: true,
+        organizationId: true,
+      },
+    });
+
+    return exams.map((exam) => ({
+      id: exam.id,
+      title: exam.title,
+      nombre: exam.title,
+      description: exam.description,
+      descripcion: exam.description,
+      publicationStatus: exam.isPublished ? 'PUBLISHED' : 'DRAFT',
+      isPublished: exam.isPublished,
+      organizationId: exam.organizationId,
+    }));
+  }
 
   /**
    * Crea una nueva definición de examen.
@@ -24,16 +55,20 @@ export class ExamService {
       throw new ForbiddenException('No tienes permiso para crear exámenes en esta organización.');
     }
 
-    // 3. Persistir definición del examen (Simulado)
-    this.logger.log(`Creando examen "${title}" para la organización: ${user.organizationId}`);
-    return {
-      id: 'mock-exam-id-1111',
-      title,
-      description,
-      organizationId: user.organizationId,
-      createdBy: user.userId,
-      createdAt: new Date().toISOString(),
-    };
+    const normalizedTitle = title?.trim();
+    if (!normalizedTitle) {
+      throw new BadRequestException('El título del examen es obligatorio.');
+    }
+
+    this.logger.log(`Creando examen "${normalizedTitle}" para la organización: ${user.organizationId}`);
+    return this.prisma.exam.create({
+      data: {
+        organizationId: user.organizationId,
+        title: normalizedTitle,
+        description: description?.trim() || null,
+        createdBy: user.userId,
+      },
+    });
   }
 
   /**
@@ -51,19 +86,35 @@ export class ExamService {
       throw new ForbiddenException('No tienes permisos de estudiante para realizar exámenes.');
     }
 
-    // 3. Validación de la existencia del examen (Simulado)
-    if (examId !== 'mock-exam-id-1111') {
-      throw new NotFoundException('El examen solicitado no existe o no pertenece a tu organización.');
+    const exam = await this.prisma.exam.findFirst({
+      where: {
+        id: examId,
+        organizationId: user.organizationId,
+        isPublished: true,
+      },
+      select: { id: true, organizationId: true },
+    });
+
+    if (!exam) {
+      throw new NotFoundException('El examen solicitado no existe, no está publicado o no pertenece a tu organización.');
     }
 
-    // 4. Crear intento (Persistencia simulada)
-    this.logger.log(`Registrando intento de examen ${examId} para el alumno: ${user.userId}`);
+    this.logger.log(`Registrando intento de examen ${exam.id} para el alumno: ${user.userId}`);
+    const attempt = await this.prisma.examAttempt.create({
+      data: {
+        organizationId: exam.organizationId,
+        examId: exam.id,
+        userId: user.userId,
+        status: 'IN_PROGRESS',
+      },
+    });
+
     return {
-      attemptId: 'mock-attempt-id-7777',
-      examId,
-      userId: user.userId,
-      status: 'IN_PROGRESS',
-      startedAt: new Date().toISOString(),
+      attemptId: attempt.id,
+      examId: attempt.examId,
+      userId: attempt.userId,
+      status: attempt.status,
+      startedAt: attempt.startedAt.toISOString(),
     };
   }
 }

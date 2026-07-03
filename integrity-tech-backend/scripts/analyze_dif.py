@@ -37,46 +37,12 @@ def run_dif_analysis():
         items = cur.fetchall()
 
         if len(items) == 0:
-            print("[IRT DIF Info] No hay ítems en parametros_items para analizar. Por favor ejecuta la calibración primero.")
-            return
+            print("[IRT DIF Error] No hay ítems reales en parametros_items para analizar. Ejecuta una calibración real antes del análisis DIF.")
+            sys.exit(1)
 
         print(f"[IRT DIF] Encontrados {len(items)} ítems para evaluar sesgo demográfico (variable: género, método: regresión logística).")
-        
-        # Limpiar registros DIF anteriores
-        cur.execute("TRUNCATE TABLE dif_flags RESTART IDENTITY;")
-
-        dif_count = 0
-        for test_id, item_id in items:
-            # Simular p-value del análisis de regresión logística para la demo
-            # En producción, usar statsmodels: Logit(formula='respuesta ~ habilidad + genero')
-            # Si el p-value para género < 0.01, se marca flag=true
-            p_value = 0.85 # Por defecto no hay sesgo
-            
-            # Forzar de forma determinista un ítem con sesgo para demostración
-            if item_id == 'Q5' and test_id == 'IT2_AC10':
-                p_value = 0.003
-            
-            has_dif = p_value < 0.01
-            
-            # Guardar en bitácora dif_flags
-            cur.execute("""
-                INSERT INTO dif_flags (test_id, item_id, variable, metodo, p_value, flag, fecha)
-                VALUES (%s, %s, 'genero', 'logistic_regression', %s, %s, NOW());
-            """, (test_id, item_id, p_value, has_dif))
-
-            # Actualizar flag_dif en la tabla de parámetros
-            cur.execute("""
-                UPDATE parametros_items 
-                SET flag_dif = %s
-                WHERE test_id = %s AND item_id = %s;
-            """, (has_dif, test_id, item_id))
-            
-            if has_dif:
-                dif_count += 1
-                print(f"[IRT DIF Alerta] Ítem sesgado detectado: Test: {test_id} | Ítem: {item_id} | p-value: {p_value:.4f}")
-
-        conn.commit()
-        print(f"[IRT DIF] Análisis completado. Marcados {dif_count} ítems con alerta DIF.")
+        print("[IRT DIF Error] El análisis DIF real todavía no está implementado en este script. No se permite generar p-values simulados ni escribir resultados ficticios.")
+        sys.exit(1)
 
     except Exception as e:
         conn.rollback()

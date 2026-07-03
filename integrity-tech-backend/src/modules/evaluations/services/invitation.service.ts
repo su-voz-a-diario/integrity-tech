@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, Optional } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import { randomInt } from 'crypto';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { AUDIT_ACTIONS, AuditRequestMetadata } from '../../audit/audit-event.types';
@@ -261,24 +261,24 @@ export class InvitationService {
   }
 
   private isUuid(value?: string): boolean {
-    return !!value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(value);
+    return !!value && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
   }
 
   private async resolveExamForInvitation(examId: string, user: SessionUser) {
-    if (this.isUuid(examId)) {
-      const exam = await this.prisma.exam.findFirst({
-        where: {
-          id: examId,
-          organizationId: user.organizationId,
-        },
-      });
-      if (exam) return exam;
+    if (!this.isUuid(examId)) {
+      throw new BadRequestException('El identificador de evaluación no es válido.');
     }
 
-    const fallbackExam = await this.invitations.findPublishedExamForTenant(user.organizationId);
-    if (!fallbackExam) {
-      throw new BadRequestException('No existe una evaluación publicada para crear la invitación.');
+    const exam = await this.prisma.exam.findFirst({
+      where: {
+        id: examId,
+        organizationId: user.organizationId,
+      },
+    });
+    if (!exam) {
+      throw new NotFoundException('La evaluación solicitada no existe para esta organización.');
     }
-    return fallbackExam;
+
+    return exam;
   }
 }

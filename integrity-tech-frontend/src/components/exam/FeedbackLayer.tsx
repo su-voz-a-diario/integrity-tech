@@ -53,13 +53,9 @@ export function FeedbackLayer({ attemptId, onFeedbackSubmitted }: FeedbackLayerP
         throw new Error('Fallo al registrar retroalimentación en el servidor.');
       }
     } catch (error: any) {
-      console.warn('[Feedback Layer] API o Backend no disponible. Activando fallback de simulación (Modo Demo Failsafe):', error);
-      
-      // Simulamos éxito en la UI para que la demo continúe con fluidez sin pantallas en blanco
-      setIsSubmitted(true);
-      setTimeout(() => {
-        onFeedbackSubmitted();
-      }, 2000);
+      console.warn('[Feedback Layer] No se pudo registrar la retroalimentación:', error);
+      setErrorMessage('No pudimos registrar tu feedback. Revisa tu conexión e inténtalo nuevamente.');
+      setIsSubmitting(false);
     }
   };
 

@@ -65,7 +65,6 @@ describe('InvitationService audit events', () => {
       accessCodeExists: jest.fn().mockResolvedValue(false),
       findByAccessCode: jest.fn().mockResolvedValue(invitation),
       findExamForInvitation: jest.fn().mockResolvedValue(exam),
-      findPublishedExamForTenant: jest.fn().mockResolvedValue(exam),
     };
     auditService = {
       record: jest.fn().mockResolvedValue(undefined),

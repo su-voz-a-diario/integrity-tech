@@ -5,53 +5,11 @@ import Link from 'next/link';
 import { apiClient, ApiClientError } from '../../../services/api-client';
 import type { AttemptListItem, CreateInvitationRequest, CreateInvitationResponse } from '../../../generated/api/types';
 
-// Mock de fallback para demostración si la API no responde
-const MOCK_ATTEMPTS: AttemptListItem[] = [
-  {
-    id: 'att-9876',
-    candidateName: 'Sofía Valenzuela',
-    email: 'sofia.valenzuela@example.com',
-    assessmentTitle: 'Evaluación de Honestidad y Valores v2',
-    date: '28 Jun 2026, 08:24',
-    overallScore: '92/100',
-    incidentsCount: 0,
-    riskStatus: 'SAFE',
-    statusLabel: 'Sin alertas',
-  },
-  {
-    id: 'att-5432',
-    candidateName: 'Carlos Mendoza',
-    email: 'carlos.mendoza@example.com',
-    assessmentTitle: 'Perfil Psicométrico Conductual',
-    date: '28 Jun 2026, 07:15',
-    overallScore: '74/100',
-    incidentsCount: 2,
-    riskStatus: 'WARNING',
-    statusLabel: 'Sospechoso',
-  },
-  {
-    id: 'att-1098',
-    candidateName: 'Andrés López',
-    email: 'andres.lopez@example.com',
-    assessmentTitle: 'Evaluación de Honestidad y Valores v2',
-    date: '27 Jun 2026, 16:40',
-    overallScore: '48/100',
-    incidentsCount: 6,
-    riskStatus: 'CRITICAL',
-    statusLabel: 'Fraude probable',
-  },
-  {
-    id: 'att-4321',
-    candidateName: 'Mariana Herrera',
-    email: 'mariana.herrera@example.com',
-    assessmentTitle: 'Perfil Psicométrico Conductual',
-    date: '27 Jun 2026, 14:10',
-    overallScore: '85/100',
-    incidentsCount: 1,
-    riskStatus: 'SAFE',
-    statusLabel: 'Sin alertas',
-  },
-];
+type ExamOption = {
+  id: string;
+  title: string;
+  description?: string | null;
+};
 
 function getDashboardErrorMessage(status: number) {
   const messages: Record<number, string> = {
@@ -68,13 +26,16 @@ export default function RecruiterDashboard() {
   const [attempts, setAttempts] = useState<AttemptListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState<string | null>(null);
+  const [availableExams, setAvailableExams] = useState<ExamOption[]>([]);
+  const [isLoadingExams, setIsLoadingExams] = useState(true);
+  const [examsError, setExamsError] = useState<string | null>(null);
 
   // Estados para Modal de Invitaciones
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [inviteForm, setInviteForm] = useState({
     candidateName: '',
     email: '',
-    examId: 'mock-exam-id-1111',
+    examId: '',
   });
   const [generatedInvite, setGeneratedInvite] = useState<{
     accessCode: string;
@@ -85,8 +46,8 @@ export default function RecruiterDashboard() {
 
   const handleSendInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inviteForm.candidateName || !inviteForm.email) {
-      setInviteError('Por favor complete todos los campos.');
+    if (!inviteForm.candidateName || !inviteForm.email || !inviteForm.examId) {
+      setInviteError('Por favor complete todos los campos y selecciona una evaluación real.');
       return;
     }
     
@@ -116,9 +77,29 @@ export default function RecruiterDashboard() {
       .catch((err) => {
         console.warn('[Dashboard] No se pudieron cargar intentos reales:', err);
         setDashboardError(err instanceof ApiClientError ? getDashboardErrorMessage(err.status) : (err.message || 'No se pudieron cargar los intentos reales.'));
-        setAttempts(process.env.NEXT_PUBLIC_ENABLE_DEMO_MOCKS === 'true' ? MOCK_ATTEMPTS : []);
+        setAttempts([]);
         setIsLoading(false);
       });
+  }, []);
+
+  useEffect(() => {
+    apiClient.get<ExamOption[]>('/exams')
+      .then((data) => {
+        const exams = Array.isArray(data) ? data.filter((exam) => exam?.id && exam?.title) : [];
+        setAvailableExams(exams);
+        setInviteForm((current) => ({
+          ...current,
+          examId: current.examId || exams[0]?.id || '',
+        }));
+        setExamsError(null);
+      })
+      .catch((err) => {
+        console.warn('[Dashboard] No se pudieron cargar evaluaciones reales:', err);
+        setAvailableExams([]);
+        setInviteForm((current) => ({ ...current, examId: '' }));
+        setExamsError('No hay evaluaciones reales disponibles para invitar candidatos.');
+      })
+      .finally(() => setIsLoadingExams(false));
   }, []);
 
   // Filtrado de candidatos basado en las interacciones
@@ -169,23 +150,23 @@ export default function RecruiterDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
           <div className="bg-slate-900 border border-slate-900 p-5 md:p-6 rounded-xl shadow-md text-left">
             <p className="text-3xs font-bold text-slate-500 uppercase tracking-widest">Total Evaluados</p>
-            <h3 className="text-2xl md:text-3xl font-bold text-slate-100 mt-2">1,248</h3>
+            <h3 className="text-2xl md:text-3xl font-bold text-slate-100 mt-2">{attempts.length}</h3>
             <p className="text-3xs text-slate-400 mt-2">
-              <span className="text-emerald-500 font-semibold">↑ 12%</span> respecto a la semana anterior
+              Basado en intentos reales cargados desde la API
             </p>
           </div>
           <div className="bg-slate-900 border border-slate-900 p-5 md:p-6 rounded-xl shadow-md text-left">
             <p className="text-3xs font-bold text-slate-500 uppercase tracking-widest">Índice de Integridad</p>
-            <h3 className="text-2xl md:text-3xl font-bold text-slate-100 mt-2">78.4%</h3>
+            <h3 className="text-2xl md:text-3xl font-bold text-slate-100 mt-2">N/D</h3>
             <p className="text-3xs text-slate-400 mt-2">
-              Promedio de coincidencia con perfiles de confianza
+              Métrica disponible cuando el backend entregue datos agregados
             </p>
           </div>
           <div className="bg-slate-900 border border-slate-900 p-5 md:p-6 rounded-xl shadow-md border-r-amber-500/20 text-left">
             <p className="text-3xs font-bold text-slate-500 uppercase tracking-widest text-amber-500">Alertas Críticas</p>
-            <h3 className="text-2xl md:text-3xl font-bold text-amber-500 mt-2">12</h3>
+            <h3 className="text-2xl md:text-3xl font-bold text-amber-500 mt-2">N/D</h3>
             <p className="text-3xs text-slate-400 mt-2">
-              Candidatos sospechosos de manipulación en 24h
+              Sin endpoint real de métricas críticas conectado
             </p>
           </div>
         </div>
@@ -233,7 +214,7 @@ export default function RecruiterDashboard() {
               onClick={() => {
                 setGeneratedInvite(null);
                 setInviteError(null);
-                setInviteForm({ candidateName: '', email: '', examId: 'mock-exam-id-1111' });
+                setInviteForm({ candidateName: '', email: '', examId: availableExams[0]?.id || '' });
                 setIsInviteModalOpen(true);
               }}
               className="px-4 py-2.5 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white cursor-pointer transition-all flex items-center justify-center gap-1.5 whitespace-nowrap w-full sm:w-auto shadow-md shadow-indigo-600/10"
@@ -413,7 +394,7 @@ export default function RecruiterDashboard() {
                   <input
                     type="text"
                     required
-                    placeholder="Ej: Sofía Valenzuela"
+                    placeholder="Nombre completo del candidato"
                     value={inviteForm.candidateName}
                     onChange={(e) => setInviteForm({ ...inviteForm, candidateName: e.target.value })}
                     className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-300 focus:outline-none focus:border-indigo-600"
@@ -441,10 +422,19 @@ export default function RecruiterDashboard() {
                   <select
                     value={inviteForm.examId}
                     onChange={(e) => setInviteForm({ ...inviteForm, examId: e.target.value })}
-                    className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-300 focus:outline-none focus:border-indigo-600"
+                    disabled={isLoadingExams || availableExams.length === 0}
+                    className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-300 focus:outline-none focus:border-indigo-600 disabled:opacity-50"
                   >
-                    <option value="mock-exam-id-1111">Batería de Evaluación Psicométrica Integrada (IT²)</option>
+                    <option value="">{isLoadingExams ? 'Cargando evaluaciones reales...' : 'Selecciona una evaluación'}</option>
+                    {availableExams.map((exam) => (
+                      <option key={exam.id} value={exam.id}>{exam.title}</option>
+                    ))}
                   </select>
+                  {(examsError || (!isLoadingExams && availableExams.length === 0)) && (
+                    <p className="text-3xs text-amber-400 mt-1">
+                      {examsError || 'No hay evaluaciones reales disponibles.'}
+                    </p>
+                  )}
                 </div>
 
                 {inviteError && (
@@ -455,7 +445,7 @@ export default function RecruiterDashboard() {
 
                 <button
                   type="submit"
-                  disabled={isInviting}
+                  disabled={isInviting || !inviteForm.examId}
                   className="w-full mt-2 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   {isInviting ? 'Generando...' : 'Generar Clave de Acceso'}

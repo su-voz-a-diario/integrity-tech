@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/database/prisma.service';
 
 @Injectable()
@@ -80,8 +80,14 @@ export class ReportGeneratorService {
     // 2. Generar descripción detallada para cada resultado de test
     for (const r of resultados) {
       const scaleName = this.mapTestId(r.testId);
-      const theta = r.theta ?? 0.0;
-      const percentile = r.percentil ? Number(r.percentil).toFixed(0) : 'N/D';
+      if (r.theta === null || r.theta === undefined) {
+        reportMarkdown += `### Sección: ${scaleName}\n`;
+        reportMarkdown += `* **Resultado:** No disponible por falta de theta real calculada.\n\n`;
+        continue;
+      }
+
+      const theta = Number(r.theta);
+      const percentile = r.percentil !== null && r.percentil !== undefined ? Number(r.percentil).toFixed(0) : 'N/D';
       
       let interpretableScale = '';
       if (theta < -1.5) interpretableScale = 'Básico / Crítico';
@@ -90,16 +96,19 @@ export class ReportGeneratorService {
       else interpretableScale = 'Sobresaliente / Experto';
 
       reportMarkdown += `### Sección: ${scaleName}\n`;
-      reportMarkdown += `* **Nivel de Habilidad Latente ($\\theta$):** \`${theta.toFixed(2)}\` (Escala estándar: T-score: \`${r.thetaT?.toFixed(1) || 'N/D'}\`, CI: \`${r.thetaCi?.toFixed(1) || 'N/D'}\`)\n`;
-      reportMarkdown += `* **Percentil Poblacional:** **${percentile}%** (Comparación baremo dinámico)\n`;
+      reportMarkdown += `* **Nivel de Habilidad Latente ($\theta$):** \`${theta.toFixed(2)}\` (Escala estándar: T-score: \`${r.thetaT?.toFixed(1) || 'N/D'}\`, CI: \`${r.thetaCi?.toFixed(1) || 'N/D'}\`)\n`;
+      reportMarkdown += `* **Percentil Poblacional:** **${percentile}** (Comparación baremo dinámico)\n`;
       reportMarkdown += `* **Categoría de Competencia:** **${interpretableScale}**\n\n`;
 
-      // Narrativa de acuerdo a las reglas psicométricas
       reportMarkdown += `${this.getNarrativeParagraph(r.testId, theta)}\n\n`;
     }
 
+    if (attempt.score === null || attempt.score === undefined) {
+      throw new BadRequestException('No existe IGA real para generar recomendación final narrativa.');
+    }
+
     // 3. Recomendación de contratación/desarrollo final basado en el IGA
-    const IGA = Number(attempt.score ?? 50.0);
+    const IGA = Number(attempt.score);
     reportMarkdown += `## Recomendación Final de Selección\n`;
     if (IGA >= 80.0) {
       reportMarkdown += `El perfil del candidato demuestra una compatibilidad **altamente sobresaliente** con las exigencias del puesto. Sus habilidades cognitivas combinadas con su nivel de integridad denotan un alto potencial de desempeño y un riesgo conductual extremadamente bajo. **Recomendación: Altamente Apto.**`;

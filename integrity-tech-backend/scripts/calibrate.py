@@ -7,7 +7,6 @@ and estimates item fit statistics (S-X2 and RMSEA) via custom mathematical algor
 """
 import os
 import sys
-import random
 import numpy as np
 import pandas as pd
 from scipy.stats import chi2
@@ -44,6 +43,10 @@ def archive_existing_parameters(cur):
         print("[IRT Calibrate] Parámetros archivados con éxito.")
     except Exception as err:
         print(f"[IRT Calibrate Warning] No se pudo archivar parámetros (puede ser la primera calibración): {err}")
+
+def fail_without_writing(message):
+    print(f"[IRT Calibrate Error] {message}")
+    raise RuntimeError(message)
 
 def store_params_2pl(cur, test_id, item_id, a, b, p_val, rmsea):
     cur.execute("""
@@ -199,45 +202,6 @@ def calculate_item_fit(responses, thetas, a, b, model='2PL'):
         
     return p_values, rmseas
 
-def generate_simulated_data(test_id, model='2PL'):
-    # Generar 200 respondedores y 10 ítems para calibración
-    np.random.seed(42)
-    thetas = np.random.normal(0.0, 1.0, 200)
-    n_items = 10
-    
-    if model == '2PL':
-        a_true = np.random.uniform(0.8, 2.0, n_items)
-        b_true = np.random.uniform(-1.5, 1.5, n_items)
-        responses = np.zeros((200, n_items))
-        for i in range(n_items):
-            p = 1.0 / (1.0 + np.exp(-a_true[i] * (thetas - b_true[i])))
-            responses[:, i] = np.random.binomial(1, p)
-        return responses, a_true, b_true
-    else:
-        a_true = np.random.uniform(0.8, 2.0, n_items)
-        thresholds_true = []
-        for i in range(n_items):
-            t = np.sort(np.random.uniform(-2.0, 2.0, 4))
-            thresholds_true.append(t)
-            
-        responses = np.zeros((200, n_items))
-        for i in range(n_items):
-            t = thresholds_true[i]
-            cum_p = np.zeros((5, 200))
-            cum_p[0] = 1.0
-            for k in range(4):
-                cum_p[k+1] = 1.0 / (1.0 + np.exp(-a_true[i] * (thetas - t[k])))
-            
-            for j in range(200):
-                probs = []
-                for k in range(4):
-                    probs.append(cum_p[k, j] - cum_p[k+1, j])
-                probs.append(cum_p[4, j])
-                probs = np.clip(probs, 0.0, 1.0)
-                probs /= probs.sum()
-                responses[j, i] = np.random.choice(5, p=probs)
-        return responses, a_true, thresholds_true
-
 def run_calibration():
     print("[IRT Calibrate] Iniciando proceso de calibración psicométrica...")
     
@@ -256,17 +220,12 @@ def run_calibration():
         sys.exit(1)
 
     try:
-        # 1. Archivar los parámetros actuales a la tabla histórica antes de recalibrar
-        archive_existing_parameters(cur)
-
         # Cargar dependencias de calibración real
-        has_girth = False
         try:
             from girth import twopl_mml, grm_mml_eap
-            has_girth = True
             print("[IRT Calibrate] Librería girth importada correctamente.")
         except ImportError:
-            print("[IRT Calibrate Warning] Librería 'girth' no encontrada. Se usará estimación propia simulada.")
+            fail_without_writing("Falta la librería 'girth'. No se permite calibrar con parámetros simulados.")
 
         # 2. Consultar respuestas de la base de datos
         cur.execute("""
@@ -291,18 +250,39 @@ def run_calibration():
             'IT2_CB10': 'GRM'
         }
 
+        mapping = {
+            'IT2_I': 'INTEGRIDAD',
+            'IT2_P10': 'PERSONALIDAD',
+            'IT2_AC10': 'COGNITIVO',
+            'IT2_CB10': 'COMPETENCIAS'
+        }
+
+        for test_id in tests:
+            target_dim = mapping[test_id]
+            test_rows = [r for r in db_rows if r[3] and r[3].upper() == target_dim]
+            if len(test_rows) < 50:
+                fail_without_writing(
+                    f"Muestra real insuficiente para {test_id}: se requieren al menos 50 respuestas reales completadas; se encontraron {len(test_rows)}."
+                )
+
+            df = pd.DataFrame(test_rows, columns=['attempt_id', 'question_id', 'response', 'dimension'])
+            df['response'] = pd.to_numeric(df['response'])
+            matrix = df.pivot(index='attempt_id', columns='question_id', values='response')
+            data_clean = matrix.to_numpy()
+            data_clean = data_clean[~np.isnan(data_clean).any(axis=1)]
+            if data_clean.shape[0] < 10:
+                fail_without_writing(
+                    f"Muestra limpia insuficiente para {test_id}: se requieren al menos 10 patrones completos; se encontraron {data_clean.shape[0]}."
+                )
+
+        # 1. Archivar los parámetros actuales solo después de validar datos reales suficientes.
+        archive_existing_parameters(cur)
+
         # Procesar cada test
         for test_id, model in tests.items():
             print(f"[IRT Calibrate] Calibrando escala {test_id} ({model})...")
             
             # Intentar estructurar matriz de datos desde DB
-            # Mapear dimensiones
-            mapping = {
-                'IT2_I': 'INTEGRIDAD',
-                'IT2_P10': 'PERSONALIDAD',
-                'IT2_AC10': 'COGNITIVO',
-                'IT2_CB10': 'COMPETENCIAS'
-            }
             target_dim = mapping[test_id]
             test_rows = [r for r in db_rows if r[3] and r[3].upper() == target_dim]
             
@@ -314,34 +294,28 @@ def run_calibration():
                 data = matrix.to_numpy()
                 item_ids = list(matrix.columns)
             else:
-                # Generar datos simulados de calibración Monte Carlo para asegurar ejecución correcta
-                print(f"[IRT Calibrate Info] Muestra real insuficiente para {test_id}. Generando simulación Monte Carlo (N=200)...")
-                data, a_true, b_true = generate_simulated_data(test_id, model)
-                item_ids = [f"Q{i+1}" for i in range(10)]
+                fail_without_writing(
+                    f"Muestra real insuficiente para {test_id}: se requieren al menos 50 respuestas reales completadas; se encontraron {len(test_rows)}."
+                )
 
             # Limpiar NaNs de la matriz
             valid_mask = ~np.isnan(data).any(axis=1)
             data_clean = data[valid_mask]
             
             if data_clean.shape[0] < 10:
-                print(f"[IRT Calibrate Warning] Sin respuestas suficientes para calibrar {test_id}. Omitiendo.")
-                continue
+                fail_without_writing(
+                    f"Muestra limpia insuficiente para {test_id}: se requieren al menos 10 patrones completos; se encontraron {data_clean.shape[0]}."
+                )
 
             # Ejecutar calibración real con Girth
             if model == '2PL':
-                if has_girth:
-                    try:
-                        # Girth espera matriz shape (n_items, n_respondents)
-                        girth_result = twopl_mml(data_clean.T.astype(int))
-                        a_estimated = girth_result['Discrimination']
-                        b_estimated = girth_result['Difficulty']
-                    except Exception as err:
-                        print(f"[IRT Calibrate Error] Fallo en twopl_mml de girth: {err}. Usando estimación alternativa.")
-                        a_estimated = np.random.uniform(0.8, 1.8, len(item_ids))
-                        b_estimated = np.random.uniform(-1.0, 1.0, len(item_ids))
-                else:
-                    a_estimated = np.random.uniform(0.8, 1.8, len(item_ids))
-                    b_estimated = np.random.uniform(-1.0, 1.0, len(item_ids))
+                try:
+                    # Girth espera matriz shape (n_items, n_respondents)
+                    girth_result = twopl_mml(data_clean.T.astype(int))
+                    a_estimated = girth_result['Discrimination']
+                    b_estimated = girth_result['Difficulty']
+                except Exception as err:
+                    fail_without_writing(f"Fallo en twopl_mml de girth: {err}. No se permite usar estimaciones simuladas.")
 
                 # Estimar thetas de respondedores con EAP
                 thetas = estimate_theta_eap_python(data_clean, a_estimated, b_estimated, '2PL')
@@ -353,22 +327,16 @@ def run_calibration():
                     store_params_2pl(cur, test_id, item_id, a_estimated[idx], b_estimated[idx], p_values[idx], rmseas[idx])
             
             else: # GRM
-                if has_girth:
-                    try:
-                        # Girth espera matriz shape (n_items, n_respondents) y categorías >= 0
-                        min_val = data_clean.min()
-                        data_girth = (data_clean - min_val).T.astype(int)
-                        girth_result = grm_mml_eap(data_girth)
-                        a_estimated = girth_result['Discrimination']
-                        # Girth devuelve Difficulty con shape (n_items, n_thresholds)
-                        thresholds_estimated = girth_result['Difficulty'] + min_val
-                    except Exception as err:
-                        print(f"[IRT Calibrate Error] Fallo en grm_mml_eap de girth: {err}. Usando estimación alternativa.")
-                        a_estimated = np.random.uniform(0.8, 1.8, len(item_ids))
-                        thresholds_estimated = np.array([np.sort(np.random.uniform(-1.5, 1.5, 4)) for _ in item_ids])
-                else:
-                    a_estimated = np.random.uniform(0.8, 1.8, len(item_ids))
-                    thresholds_estimated = np.array([np.sort(np.random.uniform(-1.5, 1.5, 4)) for _ in item_ids])
+                try:
+                    # Girth espera matriz shape (n_items, n_respondents) y categorías >= 0
+                    min_val = data_clean.min()
+                    data_girth = (data_clean - min_val).T.astype(int)
+                    girth_result = grm_mml_eap(data_girth)
+                    a_estimated = girth_result['Discrimination']
+                    # Girth devuelve Difficulty con shape (n_items, n_thresholds)
+                    thresholds_estimated = girth_result['Difficulty'] + min_val
+                except Exception as err:
+                    fail_without_writing(f"Fallo en grm_mml_eap de girth: {err}. No se permite usar estimaciones simuladas.")
 
                 # Estimar thetas de respondedores con EAP
                 thetas = estimate_theta_eap_python(data_clean, a_estimated, thresholds_estimated, 'GRM')
@@ -378,22 +346,6 @@ def run_calibration():
                 # Guardar en base de datos
                 for idx, item_id in enumerate(item_ids):
                     store_params_grm(cur, test_id, item_id, a_estimated[idx], thresholds_estimated[idx], p_values[idx], rmseas[idx])
-
-        # 3. Sembrar baremos dinámicos iniciales si la tabla de baremos está vacía
-        cur.execute("SELECT COUNT(*) FROM baremos_dinamicos;")
-        baremos_count = cur.fetchone()[0]
-        if baremos_count == 0:
-            print("[IRT Calibrate] Sembrando tabla baremos_dinamicos con distribución de referencia...")
-            for t_id in ['IT2_I', 'IT2_P10', 'IT2_AC10', 'IT2_CB10']:
-                thetas = [round(-3.0 + i*0.06, 2) for i in range(100)]
-                for idx, th in enumerate(thetas):
-                    pct = int((idx / len(thetas)) * 98) + 1
-                    theta_min = float(th)
-                    theta_max = float(th + 0.06)
-                    cur.execute("""
-                        INSERT INTO baremos_dinamicos (test_id, pais, sector, nivel_educativo, tipo_puesto, theta_min, theta_max, percentil, n_muestra, fecha_creacion)
-                        VALUES (%s, NULL, NULL, NULL, NULL, %s, %s, %s, 1000, NOW())
-                    """, (t_id, theta_min, theta_max, pct))
 
         conn.commit()
         print("[IRT Calibrate] Calibración psicométrica completada y guardada con éxito.")
@@ -410,6 +362,7 @@ def run_calibration():
     except Exception as e:
         conn.rollback()
         print(f"[IRT Calibrate Error] Fallo al procesar la calibración: {e}")
+        sys.exit(1)
     finally:
         cur.close()
         conn.close()

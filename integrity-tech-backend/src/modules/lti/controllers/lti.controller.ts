@@ -7,7 +7,8 @@ import {
   Res,
   HttpCode, 
   HttpStatus, 
-  Logger
+  Logger,
+  NotImplementedException
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Response } from 'express';
@@ -38,29 +39,7 @@ export class LtiController {
     @Res() res: Response
   ) {
     this.logger.log(`OIDC Login Init recibido del emisor: ${iss} | login_hint: ${loginHint}`);
-
-    // MOCK: Generar un código 'state' y 'nonce' y guardarlos en Redis
-    const state = 'state-temp-uuid-123';
-    const nonce = 'nonce-temp-random-456';
-    
-    // Obtener la URL de autenticación del LMS (en producción se lee de los clientes registrados)
-    const lmsAuthUrl = `${iss}/oauth2/auth`;
-    
-    const redirectUrl = `${lmsAuthUrl}?` + new URLSearchParams({
-      scope: 'openid',
-      response_type: 'id_token',
-      response_mode: 'form_post',
-      prompt: 'none',
-      client_id: 'integrity-tech-client-id-001',
-      redirect_uri: targetLinkUri, // Enlace de retorno (nuestro /lti/launch)
-      login_hint: loginHint,
-      lti_message_hint: ltiMessageHint,
-      state,
-      nonce
-    }).toString();
-
-    this.logger.log(`Redirigiendo estudiante al LMS OIDC Auth endpoint: ${redirectUrl}`);
-    return res.redirect(redirectUrl);
+    throw new NotImplementedException('LTI OIDC requiere configuración real de plataforma LMS antes de habilitarse.');
   }
 
   /**
@@ -79,29 +58,7 @@ export class LtiController {
     @Body('state') state: string,
     @Res() res: Response
   ) {
-    this.logger.log('POST /lti/launch recibido. Procesando id_token JWT...');
-
-    // 1. Validar el token LTI
-    const claims = await this.ltiService.validateIdToken(idToken);
-
-    // 2. Auto-provisionar usuario en IAM
-    const user = await this.ltiService.provisionUser(claims);
-
-    // 3. Resolver examen local a partir del recurso LMS
-    const exam = await this.ltiService.resolveExamFromResourceLink(
-      claims['https://purl.imsglobal.org/spec/lti/claim/resource_link']?.id
-    );
-
-    // 4. Crear el intento local y guardar mapeo de notas LTI AGS
-    const attempt = await this.ltiService.initializeLtiAttempt(user.id, exam.id, claims);
-
-    // 5. Generar token de sesión local para el frontend
-    const localToken = await this.ltiService.generateSessionToken(user.id);
-
-    // 6. Redirigir al visualizador de Next.js
-    const frontendUrl = `http://localhost:3000/exam/${attempt.id}?token=${localToken}`;
-    this.logger.log(`Lanzamiento LTI exitoso. Redirigiendo alumno al frontend: ${frontendUrl}`);
-    
-    return res.redirect(frontendUrl);
+    this.logger.log('POST /lti/launch recibido.');
+    throw new NotImplementedException('LTI Launch requiere validación JWT/JWKS y mapeo real de recurso antes de habilitarse.');
   }
 }

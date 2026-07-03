@@ -123,17 +123,12 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
                   AND bd.pais IS NULL AND bd.sector IS NULL AND bd.nivel_educativo IS NULL AND bd.tipo_puesto IS NULL
                 LIMIT 1;
 
-                IF percentil IS NOT NULL THEN
-                    n_muestra := n_muestra;
-                    RETURN NEXT;
-                ELSE
-                    -- No hay baremo; devolver percentil 50 por defecto (mediana teórica)
-                    percentil := 50;
-                    n_muestra := 0;
-                    RETURN NEXT;
-                END IF;
-            END IF;
-        END;
+	                IF percentil IS NOT NULL THEN
+	                    n_muestra := n_muestra;
+	                    RETURN NEXT;
+	                END IF;
+	            END IF;
+	        END;
         $$ LANGUAGE plpgsql STABLE;
       `);
       this.logger.log('Función obtener_percentil_dinamico creada/verificada en PostgreSQL.');

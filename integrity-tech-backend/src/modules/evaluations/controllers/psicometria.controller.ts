@@ -373,7 +373,7 @@ export class PsicometriaController {
           });
         }
 
-        let percentilFinal = 50.0;
+        let percentilFinal: number | null = null;
         try {
           const baremo = await this.prisma.baremosDinamicos.findFirst({
             where: {
@@ -393,6 +393,11 @@ export class PsicometriaController {
           }
         } catch (dbErr) {
           this.logger.warn(`Error al obtener percentil retroactivo: ${dbErr.message}`);
+        }
+
+        if (percentilFinal === null) {
+          this.logger.warn(`Sin baremo real para resultado ${r.id} del test ${testId}; se omite actualización de percentil.`);
+          continue;
         }
 
         await this.prisma.resultadoTest.update({

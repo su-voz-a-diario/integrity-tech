@@ -136,16 +136,11 @@ describe('ThetaCalculatorService (Unit Tests)', () => {
     expect(result.error).toBeDefined();
   });
 
-  it('Debe usar fallback (theta=0, error=1, thetaT=50, thetaCi=100) si no hay parámetros', async () => {
+  it('Debe rechazar el cálculo si no hay parámetros calibrados reales', async () => {
     mockPrismaService.parametrosItems.findMany.mockResolvedValue([]);
 
-    const result = await service.calcularTheta('IT2_AC10', [
+    await expect(service.calcularTheta('IT2_AC10', [
       { itemId: 'Q1', response: 1 },
-    ]);
-
-    expect(result.theta).toBe(0.0);
-    expect(result.error).toBe(1.0);
-    expect(result.thetaT).toBe(50.0);
-    expect(result.thetaCi).toBe(100.0);
+    ])).rejects.toThrow('No existen parámetros calibrados reales para calcular theta del test IT2_AC10.');
   });
 });
