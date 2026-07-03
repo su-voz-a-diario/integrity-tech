@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuditModule } from '../audit/audit.module';
+import { IamModule } from '../iam';
 import { EditorialConsoleController } from './controllers/editorial-console.controller';
 import { EditorialConsoleService } from './services/editorial-console.service';
 import { PsychometricVersioningService } from './services/psychometric-versioning.service';
@@ -8,7 +9,7 @@ import { ScientificTraceService } from './services/scientific-trace.service';
 import { EvaluationGovernanceResolverService } from './services/evaluation-governance-resolver.service';
 
 @Module({
-  imports: [AuditModule],
+  imports: [AuditModule, IamModule],
   controllers: [EditorialConsoleController],
   providers: [
     EditorialConsoleService,
