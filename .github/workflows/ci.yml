@@ -146,7 +146,7 @@ jobs:
       REDIS_HOST: 127.0.0.1
       REDIS_PORT: 6379
       REDIS_URL: redis://127.0.0.1:6379
-      REDIS_KEY_PREFIX: integrity:e2e:
+      REDIS_KEY_PREFIX: "integrity:e2e:"
       RATE_LIMIT_STORE: redis
       RATE_LIMIT_REDIS_REQUIRED: "true"
       JWT_SECRET: e2e-jwt-secret-with-at-least-thirty-two-characters
