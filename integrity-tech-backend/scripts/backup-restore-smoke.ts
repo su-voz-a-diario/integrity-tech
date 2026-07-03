@@ -1,11 +1,5 @@
 import { execFileSync } from 'child_process';
 
-const sourceUrl = process.env.DATABASE_URL;
-
-if (!sourceUrl) {
-  throw new Error('DATABASE_URL is required for backup/restore smoke test');
-}
-
 const requiredBinaries = ['pg_dump', 'pg_restore', 'psql', 'createdb', 'dropdb'];
 
 type DatabaseConnectionParts = {
@@ -20,7 +14,7 @@ type DatabaseConnectionParts = {
 function run(command: string, args: string[], options: { input?: Buffer; env?: NodeJS.ProcessEnv } = {}) {
   return execFileSync(command, args, {
     input: options.input,
-    env: { ...process.env, ...(options.env || {}) },
+    env: options.env ?? process.env,
     maxBuffer: 128 * 1024 * 1024,
     stdio: options.input ? ['pipe', 'pipe', 'inherit'] : ['ignore', 'pipe', 'inherit'],
   });
@@ -34,7 +28,7 @@ function assertBinary(command: string) {
   }
 }
 
-function parseDatabaseUrl(value: string): DatabaseConnectionParts {
+export function parseDatabaseUrl(value: string): DatabaseConnectionParts {
   const url = new URL(value);
   const database = decodeURIComponent(url.pathname.replace(/^\//, ''));
   if (!database) throw new Error('DATABASE_URL must include a database name');
@@ -48,18 +42,21 @@ function parseDatabaseUrl(value: string): DatabaseConnectionParts {
   };
 }
 
-function postgresClientArgs(parts: DatabaseConnectionParts) {
+export function postgresClientArgs(parts: DatabaseConnectionParts) {
   const args = ['-h', parts.host];
   if (parts.port) args.push('-p', parts.port);
   if (parts.user) args.push('-U', parts.user);
   return args;
 }
 
-function postgresClientEnv(parts: DatabaseConnectionParts) {
-  return parts.password ? { PGPASSWORD: parts.password } : {};
+export function buildPostgresProcessEnv(parts: DatabaseConnectionParts): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    ...(parts.password ? { PGPASSWORD: parts.password } : {}),
+  };
 }
 
-function buildCleanPostgresUrl(parts: DatabaseConnectionParts, databaseName = parts.database) {
+export function buildCleanPostgresUrl(parts: DatabaseConnectionParts, databaseName = parts.database) {
   const url = new URL(`${parts.protocol}//${parts.host}`);
   if (parts.user) url.username = parts.user;
   if (parts.port) url.port = parts.port;
@@ -67,7 +64,7 @@ function buildCleanPostgresUrl(parts: DatabaseConnectionParts, databaseName = pa
   return url.toString();
 }
 
-function validateRestoredDatabase(restoredUrl: string) {
+function validateRestoredDatabase(restoredUrl: string, env: NodeJS.ProcessEnv) {
   const sql = `
     SELECT
       to_regclass('public.organizations') IS NOT NULL
@@ -78,22 +75,26 @@ function validateRestoredDatabase(restoredUrl: string) {
       AND EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pgcrypto')
       AS ok;
   `;
-  const output = run('psql', [restoredUrl, '-tAc', sql]).toString().trim();
+  const output = run('psql', [restoredUrl, '-tAc', sql], { env }).toString().trim();
   if (output !== 't') {
     throw new Error(`Restored database validation failed: ${output || '(empty result)'}`);
   }
 }
 
-async function main() {
+export async function runBackupRestoreSmoke(databaseUrl = process.env.DATABASE_URL) {
+  if (!databaseUrl) {
+    throw new Error('DATABASE_URL is required for backup/restore smoke test');
+  }
+
   for (const binary of requiredBinaries) assertBinary(binary);
 
-  const sourceParts = parseDatabaseUrl(sourceUrl);
+  const sourceParts = parseDatabaseUrl(databaseUrl);
   const originalName = sourceParts.database;
   const restoreName = `${originalName}_restore_smoke_${Date.now()}`;
   const sourcePostgresUrl = buildCleanPostgresUrl(sourceParts);
   const restoreUrl = buildCleanPostgresUrl(sourceParts, restoreName);
   const clientArgs = postgresClientArgs(sourceParts);
-  const clientEnv = postgresClientEnv(sourceParts);
+  const clientEnv = buildPostgresProcessEnv(sourceParts);
 
   console.log(`[backup-restore] Creating temporary database ${restoreName}`);
   run('createdb', [...clientArgs, restoreName], { env: clientEnv });
@@ -105,7 +106,7 @@ async function main() {
     console.log('[backup-restore] Restoring into temporary database');
     run('pg_restore', ['--no-owner', '--no-acl', '--dbname', restoreUrl], { input: dump, env: clientEnv });
 
-    validateRestoredDatabase(restoreUrl);
+    validateRestoredDatabase(restoreUrl, clientEnv);
     console.log('[backup-restore] Backup and restore smoke validation completed.');
   } finally {
     console.log(`[backup-restore] Dropping temporary database ${restoreName}`);
@@ -117,7 +118,9 @@ async function main() {
   }
 }
 
-main().catch((error) => {
-  console.error(`[backup-restore] ${error instanceof Error ? error.message : String(error)}`);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  runBackupRestoreSmoke().catch((error) => {
+    console.error(`[backup-restore] ${error instanceof Error ? error.message : String(error)}`);
+    process.exitCode = 1;
+  });
+}
