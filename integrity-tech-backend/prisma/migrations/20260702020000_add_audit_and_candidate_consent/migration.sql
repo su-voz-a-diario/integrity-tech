@@ -1,5 +1,5 @@
 CREATE TABLE "audit_events" (
-  "id" UUID NOT NULL DEFAULT generate_uuid_v7(),
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "organization_id" UUID NOT NULL,
   "actor_user_id" UUID,
   "actor_type" VARCHAR(50) NOT NULL,
@@ -34,7 +34,7 @@ ALTER TABLE "audit_events"
   ON DELETE SET NULL ON UPDATE CASCADE;
 
 CREATE TABLE "candidate_consents" (
-  "id" UUID NOT NULL DEFAULT generate_uuid_v7(),
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "organization_id" UUID NOT NULL,
   "user_id" UUID NOT NULL,
   "attempt_id" UUID NOT NULL,

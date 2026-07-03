@@ -176,7 +176,7 @@ def run_continuous_norming(test_id):
                 id, test_id, pais, nivel_educativo, tipo_puesto, 
                 p5, p10, p25, p50, p75, p90, p95, fecha_actualizacion
             ) VALUES (
-                generate_uuid_v7(), %s, %s, %s, %s, 
+                gen_random_uuid(), %s, %s, %s, %s, 
                 %s, %s, %s, %s, %s, %s, %s, NOW()
             );
         """

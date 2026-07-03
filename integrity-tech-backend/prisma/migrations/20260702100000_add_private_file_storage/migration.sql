@@ -1,5 +1,5 @@
 CREATE TABLE "private_files" (
-  "id" UUID NOT NULL DEFAULT generate_uuid_v7(),
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "organization_id" UUID NOT NULL,
   "owner_user_id" UUID,
   "attempt_id" UUID,

@@ -201,6 +201,17 @@ jobs:
         working-directory: integrity-tech-backend
         run: npm run seed:e2e
 
+      - name: Database smoke validation
+        working-directory: integrity-tech-backend
+        run: npm run smoke
+
+      - name: Install PostgreSQL client tools
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Backup and restore smoke validation
+        working-directory: integrity-tech-backend
+        run: npm run smoke:backup-restore
+
       - name: Install Playwright browser
         working-directory: integrity-tech-frontend
         run: npx playwright install --with-deps chromium

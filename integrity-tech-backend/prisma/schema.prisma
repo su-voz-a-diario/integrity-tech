@@ -12,7 +12,7 @@ generator client {
 // ============================================================================
 
 model Organization {
-  id        String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name      String   @db.VarChar(255)
   slug      String   @unique @db.VarChar(255)
   isActive  Boolean  @default(true) @map("is_active")
@@ -46,7 +46,7 @@ model Organization {
 }
 
 model User {
-  id             String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String   @map("organization_id") @db.Uuid
   email          String   @db.VarChar(255)
   passwordHash   String   @map("password_hash") @db.VarChar(255)
@@ -72,7 +72,7 @@ model User {
 }
 
 model UserSession {
-  id               String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   userId           String    @map("user_id") @db.Uuid
   organizationId   String    @map("organization_id") @db.Uuid
   refreshTokenHash String    @map("refresh_token_hash") @db.VarChar(128)
@@ -93,7 +93,7 @@ model UserSession {
 }
 
 model Role {
-  id              String           @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name            String           @unique @db.VarChar(50)
   description     String?
   createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz
@@ -105,7 +105,7 @@ model Role {
 }
 
 model Permission {
-  id              String           @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   code            String           @unique @db.VarChar(100)
   description     String?
   createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz
@@ -138,7 +138,7 @@ model UserRole {
 }
 
 model AuditEvent {
-  id             String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String?  @map("organization_id") @db.Uuid
   actorUserId    String?  @map("actor_user_id") @db.Uuid
   actorType      String   @map("actor_type") @db.VarChar(50)
@@ -164,7 +164,7 @@ model AuditEvent {
 // ============================================================================
 
 model RetentionPolicy {
-  id                  String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId      String   @map("organization_id") @db.Uuid
   dataType            String   @map("data_type") @db.VarChar(80)
   classification      String   @db.VarChar(50)
@@ -187,7 +187,7 @@ model RetentionPolicy {
 }
 
 model DataLifecycleRecord {
-  id                  String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId      String    @map("organization_id") @db.Uuid
   resourceType        String    @map("resource_type") @db.VarChar(80)
   resourceId          String    @map("resource_id") @db.VarChar(120)
@@ -212,7 +212,7 @@ model DataLifecycleRecord {
 }
 
 model DataExportJob {
-  id                 String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId     String    @map("organization_id") @db.Uuid
   requestedByUserId  String    @map("requested_by_user_id") @db.Uuid
   subjectType        String    @map("subject_type") @db.VarChar(80)
@@ -234,7 +234,7 @@ model DataExportJob {
 }
 
 model DataDeletionRequest {
-  id                 String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId     String    @map("organization_id") @db.Uuid
   requestedByUserId  String    @map("requested_by_user_id") @db.Uuid
   subjectType        String    @map("subject_type") @db.VarChar(80)
@@ -258,7 +258,7 @@ model DataDeletionRequest {
 }
 
 model DataDeletionItem {
-  id                String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   requestId         String    @map("request_id") @db.Uuid
   resourceType      String    @map("resource_type") @db.VarChar(80)
   resourceId        String    @map("resource_id") @db.VarChar(120)
@@ -275,7 +275,7 @@ model DataDeletionItem {
 }
 
 model CriticalAssetVersion {
-  id                 String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId     String    @map("organization_id") @db.Uuid
   assetType          String    @map("asset_type") @db.VarChar(80)
   assetKey           String    @map("asset_key") @db.VarChar(120)
@@ -298,7 +298,7 @@ model CriticalAssetVersion {
 }
 
 model BackupRecoveryEvent {
-  id             String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String?  @map("organization_id") @db.Uuid
   eventType      String   @map("event_type") @db.VarChar(80)
   scope          String   @db.VarChar(80)
@@ -316,7 +316,7 @@ model BackupRecoveryEvent {
 }
 
 model PrivateFile {
-  id              String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId  String    @map("organization_id") @db.Uuid
   ownerUserId     String?   @map("owner_user_id") @db.Uuid
   attemptId       String?   @map("attempt_id") @db.Uuid
@@ -348,7 +348,7 @@ model PrivateFile {
 // ============================================================================
 
 model PsychometricCategory {
-  id             String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String   @map("organization_id") @db.Uuid
   code           String   @db.VarChar(80)
   name           String   @db.VarChar(160)
@@ -365,7 +365,7 @@ model PsychometricCategory {
 }
 
 model Competency {
-  id             String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String   @map("organization_id") @db.Uuid
   code           String   @db.VarChar(80)
   name           String   @db.VarChar(160)
@@ -382,7 +382,7 @@ model Competency {
 }
 
 model PsychometricScale {
-  id             String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String   @map("organization_id") @db.Uuid
   code           String   @db.VarChar(80)
   name           String   @db.VarChar(160)
@@ -400,7 +400,7 @@ model PsychometricScale {
 }
 
 model PsychometricSubscale {
-  id        String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   scaleId   String   @map("scale_id") @db.Uuid
   code      String   @db.VarChar(80)
   name      String   @db.VarChar(160)
@@ -417,7 +417,7 @@ model PsychometricSubscale {
 }
 
 model Assessment {
-  id             String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String   @map("organization_id") @db.Uuid
   code           String   @db.VarChar(80)
   name           String   @db.VarChar(255)
@@ -436,7 +436,7 @@ model Assessment {
 }
 
 model AssessmentVersion {
-  id             String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   assessmentId   String    @map("assessment_id") @db.Uuid
   organizationId String    @map("organization_id") @db.Uuid
   version        String    @db.VarChar(50)
@@ -467,7 +467,7 @@ model AssessmentVersion {
 }
 
 model Item {
-  id             String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String   @map("organization_id") @db.Uuid
   itemCode       String   @map("item_code") @db.VarChar(120)
   categoryId     String?  @map("category_id") @db.Uuid
@@ -494,7 +494,7 @@ model Item {
 }
 
 model ItemVersion {
-  id                  String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   itemId              String    @map("item_id") @db.Uuid
   version             String    @db.VarChar(50)
   status              String    @default("DRAFT") @db.VarChar(50)
@@ -541,7 +541,7 @@ model AssessmentVersionItem {
 }
 
 model NormGroup {
-  id                  String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId      String   @map("organization_id") @db.Uuid
   assessmentVersionId String   @map("assessment_version_id") @db.Uuid
   code                String   @db.VarChar(120)
@@ -561,7 +561,7 @@ model NormGroup {
 }
 
 model NormGroupVersion {
-  id              String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   normGroupId     String    @map("norm_group_id") @db.Uuid
   version         String    @db.VarChar(50)
   status          String    @default("DRAFT") @db.VarChar(50)
@@ -587,7 +587,7 @@ model NormGroupVersion {
 }
 
 model ScoringModel {
-  id                  String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId      String   @map("organization_id") @db.Uuid
   assessmentVersionId String   @map("assessment_version_id") @db.Uuid
   code                String   @db.VarChar(120)
@@ -607,7 +607,7 @@ model ScoringModel {
 }
 
 model ScoringModelVersion {
-  id              String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   scoringModelId  String    @map("scoring_model_id") @db.Uuid
   version         String    @db.VarChar(50)
   status          String    @default("DRAFT") @db.VarChar(50)
@@ -632,7 +632,7 @@ model ScoringModelVersion {
 }
 
 model ReportTemplate {
-  id                  String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId      String   @map("organization_id") @db.Uuid
   assessmentVersionId String   @map("assessment_version_id") @db.Uuid
   code                String   @db.VarChar(120)
@@ -652,7 +652,7 @@ model ReportTemplate {
 }
 
 model ReportTemplateVersion {
-  id              String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id              String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   reportTemplateId String   @map("report_template_id") @db.Uuid
   version         String    @db.VarChar(50)
   status          String    @default("DRAFT") @db.VarChar(50)
@@ -677,7 +677,7 @@ model ReportTemplateVersion {
 }
 
 model ReportIssueRecord {
-  id                      String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id                      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId          String   @map("organization_id") @db.Uuid
   examAttemptId           String   @map("exam_attempt_id") @db.Uuid
   reportTemplateVersionId String   @map("report_template_version_id") @db.Uuid
@@ -698,7 +698,7 @@ model ReportIssueRecord {
 // ============================================================================
 
 model QuestionBank {
-  id             String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String   @map("organization_id") @db.Uuid // Referencia Lógica
   name           String   @db.VarChar(255)
   description    String?
@@ -712,7 +712,7 @@ model QuestionBank {
 }
 
 model Question {
-  id             String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   questionBankId String   @map("question_bank_id") @db.Uuid
   type           String   @db.VarChar(50)
   /// Estructura dinámica que soporta reactivos múltiples, verdadero/falso,
@@ -732,7 +732,7 @@ model Question {
 // ============================================================================
 
 model Exam {
-  id              String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId  String   @map("organization_id") @db.Uuid // Referencia Lógica
   title           String   @db.VarChar(255)
   description     String?
@@ -752,7 +752,7 @@ model Exam {
 }
 
 model ExamQuestion {
-  id         String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   examId     String   @map("exam_id") @db.Uuid
   questionId String   @map("question_id") @db.Uuid // Referencia Lógica
   points     Decimal  @default(1.00) @db.Decimal(5, 2)
@@ -770,7 +770,7 @@ model ExamQuestion {
 // ============================================================================
 
 model ExamAttempt {
-  id          String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String @map("organization_id") @db.Uuid
   examId      String    @map("exam_id") @db.Uuid // Referencia Lógica
   assessmentVersionId String? @map("assessment_version_id") @db.Uuid
@@ -805,7 +805,7 @@ model ExamAttempt {
 }
 
 model AnswerSubmission {
-  id            String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   examAttemptId String   @map("exam_attempt_id") @db.Uuid
   questionId    String   @map("question_id") @db.Uuid // Referencia Lógica
   itemVersionId String?  @map("item_version_id") @db.Uuid
@@ -824,7 +824,7 @@ model AnswerSubmission {
 }
 
 model CandidateConsent {
-  id             String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String   @map("organization_id") @db.Uuid
   userId         String   @map("user_id") @db.Uuid
   attemptId      String   @unique @map("attempt_id") @db.Uuid
@@ -842,7 +842,7 @@ model CandidateConsent {
 }
 
 model AttemptLog {
-  id            String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   examAttemptId String   @map("exam_attempt_id") @db.Uuid
   eventType     String   @map("event_type") @db.VarChar(100)
   riskLevel     String   @default("INFO") @map("risk_level") @db.VarChar(50) // Nivel de criticidad: INFO, WARNING, CRITICAL
@@ -856,7 +856,7 @@ model AttemptLog {
 }
 
 model LtiAttemptMapping {
-  id          String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   attemptId   String   @unique @map("attempt_id") @db.Uuid
   lmsUserId   String   @map("lms_user_id") @db.VarChar(255)
   lineitemUrl String   @map("lineitem_url") @db.Text
@@ -869,7 +869,7 @@ model LtiAttemptMapping {
 }
 
 model CandidateInvitation {
-  id             String    @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String    @map("organization_id") @db.Uuid
   createdByUserId String?  @map("created_by_user_id") @db.Uuid
   examId         String    @map("exam_id") @db.Uuid
@@ -889,7 +889,7 @@ model CandidateInvitation {
 }
 
 model PerfilPuesto {
-  id             String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId String   @map("organization_id") @db.Uuid
   nombre         String   @db.VarChar(100)
   wIntegridad    Decimal  @map("w_integridad") @db.Decimal(5, 4)
@@ -907,7 +907,7 @@ model PerfilPuesto {
 }
 
 model ResultadoTest {
-  id            String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   examAttemptId String   @map("exam_attempt_id") @db.Uuid
   scoringModelVersionId String? @map("scoring_model_version_id") @db.Uuid
   normGroupVersionId    String? @map("norm_group_version_id") @db.Uuid
@@ -936,7 +936,7 @@ model ResultadoTest {
 }
 
 model Baremo {
-  id                 String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId     String   @map("organization_id") @db.Uuid
   testId             String   @map("test_id") @db.VarChar(50)
   percentil          Decimal  @db.Decimal(5, 2)
@@ -1082,7 +1082,7 @@ model ParametrosItemsHistorial {
 }
 
 model ContinuousNorm {
-  id                 String   @id @default(dbgenerated("generate_uuid_v7()")) @db.Uuid
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   organizationId     String   @map("organization_id") @db.Uuid
   testId             String   @map("test_id") @db.VarChar(50)
   pais               String?  @db.VarChar(100)

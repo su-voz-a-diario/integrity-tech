@@ -18,7 +18,7 @@ export class ProctoringQueueProcessor {
       // PERSISTENCIA EN POSTGRESQL (OPERACIÓN INSERT SIMPLE)
       // query = `
       //   INSERT INTO attempt_logs (id, exam_attempt_id, event_type, timestamp, metadata)
-      //   VALUES (generate_uuid_v7(), $1, $2, $3, $4);
+      //   VALUES (gen_random_uuid(), $1, $2, $3, $4);
       // `;
       
       await this.persistLogToDatabase(attemptId, eventType, metadata, timestamp);

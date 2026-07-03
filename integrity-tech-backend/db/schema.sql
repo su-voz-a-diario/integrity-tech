@@ -4,42 +4,15 @@
 -- SGBD: PostgreSQL (13+)
 -- ============================================================================
 
--- Habilitar extensión pgcrypto para generación de bytes aleatorios si no está disponible
+-- Habilitar extensión pgcrypto para generación estándar de UUID
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
--- ============================================================================
--- 0. FUNCIÓN HELPER: GENERADOR DE UUIDv7 (Ordenado por tiempo en milisegundos)
--- ============================================================================
--- UUIDv7 contiene un timestamp de 48 bits en los primeros bits, haciéndolo secuencial.
--- Esto optimiza la inserción en índices B-Tree de PostgreSQL (evita Page Splitting).
-CREATE OR REPLACE FUNCTION generate_uuid_v7() 
-RETURNS uuid AS $$
-DECLARE
-  unix_time_ms bytea;
-  uuid_bytes bytea;
-BEGIN
-  -- 1. Obtener timestamp actual en milisegundos desde la época Unix (48 bits / 6 bytes)
-  unix_time_ms := decode(lpad(to_hex((extract(epoch from clock_timestamp()) * 1000)::bigint), 12, '0'), 'hex');
-  
-  -- 2. Concatenar con 10 bytes aleatorios (80 bits) para completar los 16 bytes (128 bits)
-  uuid_bytes := unix_time_ms || gen_random_bytes(10);
-  
-  -- 3. Establecer la versión (4 bits: 0111 -> 7) en el byte 6 (bits 48-51)
-  uuid_bytes := set_byte(uuid_bytes, 6, (get_byte(uuid_bytes, 6) & 15) | 112);
-  
-  -- 4. Establecer la variante (2 bits: 10xx -> RFC 4122) en el byte 8 (bits 64-65)
-  uuid_bytes := set_byte(uuid_bytes, 8, (get_byte(uuid_bytes, 8) & 63) | 128);
-  
-  RETURN encode(uuid_bytes, 'hex')::uuid;
-END;
-$$ LANGUAGE plpgsql;
 
 -- ============================================================================
 -- MÓDULO 1: IDENTIDAD, ORGANIZACIONES Y SEGURIDAD (Tenant & Auth Domain)
 -- ============================================================================
 
 CREATE TABLE organizations (
-    id UUID PRIMARY KEY DEFAULT generate_uuid_v7(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
     slug VARCHAR(255) UNIQUE NOT NULL,
     is_active BOOLEAN DEFAULT TRUE NOT NULL,
@@ -48,7 +21,7 @@ CREATE TABLE organizations (
 );
 
 CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT generate_uuid_v7(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE RESTRICT,
     email VARCHAR(255) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
@@ -61,14 +34,14 @@ CREATE TABLE users (
 );
 
 CREATE TABLE roles (
-    id UUID PRIMARY KEY DEFAULT generate_uuid_v7(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(50) UNIQUE NOT NULL,
     description TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 CREATE TABLE permissions (
-    id UUID PRIMARY KEY DEFAULT generate_uuid_v7(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     code VARCHAR(100) UNIQUE NOT NULL, -- Ej: 'exam:create', 'exam:attempt'
     description TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
@@ -91,7 +64,7 @@ CREATE TABLE user_roles (
 -- ============================================================================
 
 CREATE TABLE question_banks (
-    id UUID PRIMARY KEY DEFAULT generate_uuid_v7(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL, -- Referencia Lógica (Módulo Identidad)
     name VARCHAR(255) NOT NULL,
     description TEXT,
@@ -101,7 +74,7 @@ CREATE TABLE question_banks (
 );
 
 CREATE TABLE questions (
-    id UUID PRIMARY KEY DEFAULT generate_uuid_v7(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     question_bank_id UUID NOT NULL REFERENCES question_banks(id) ON DELETE CASCADE,
     type VARCHAR(50) NOT NULL, -- Ej: 'MULTIPLE_CHOICE', 'TRUE_FALSE', 'CODE_REACTIVE'
     content_jsonb JSONB NOT NULL, -- Estructura flexible para escalas Likert (1-5), opción múltiple y metadatos
@@ -116,7 +89,7 @@ CREATE TABLE questions (
 -- ============================================================================
 
 CREATE TABLE exams (
-    id UUID PRIMARY KEY DEFAULT generate_uuid_v7(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     organization_id UUID NOT NULL, -- Referencia Lógica (Módulo Identidad)
     title VARCHAR(255) NOT NULL,
     description TEXT,
@@ -138,7 +111,7 @@ CREATE TABLE exams (
 -- Mapeo de preguntas a exámenes. 
 -- Nota: question_id es una referencia lógica al banco de preguntas para permitir el desacoplamiento.
 CREATE TABLE exam_questions (
-    id UUID PRIMARY KEY DEFAULT generate_uuid_v7(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     exam_id UUID NOT NULL REFERENCES exams(id) ON DELETE CASCADE,
     question_id UUID NOT NULL, -- Referencia Lógica (Módulo Question Bank)
     points NUMERIC(5,2) DEFAULT 1.00 NOT NULL,
@@ -154,7 +127,7 @@ CREATE TABLE exam_questions (
 -- ============================================================================
 
 CREATE TABLE exam_attempts (
-    id UUID PRIMARY KEY DEFAULT generate_uuid_v7(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     exam_id UUID NOT NULL, -- Referencia Lógica (Módulo Exámenes)
     user_id UUID NOT NULL, -- Referencia Lógica (Módulo Identidad)
     status VARCHAR(50) DEFAULT 'IN_PROGRESS' NOT NULL,
@@ -175,7 +148,7 @@ CREATE TABLE exam_attempts (
 
 -- Registros de respuestas de alta velocidad de escritura
 CREATE TABLE answer_submissions (
-    id UUID PRIMARY KEY DEFAULT generate_uuid_v7(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     exam_attempt_id UUID NOT NULL REFERENCES exam_attempts(id) ON DELETE CASCADE,
     question_id UUID NOT NULL, -- Referencia Lógica (Módulo Question Bank)
     response JSONB NOT NULL, -- Payload dinámico con la respuesta del alumno
@@ -188,7 +161,7 @@ CREATE TABLE answer_submissions (
 
 -- Registros de telemetría y seguridad (Proctoring)
 CREATE TABLE attempt_logs (
-    id UUID PRIMARY KEY DEFAULT generate_uuid_v7(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     exam_attempt_id UUID NOT NULL REFERENCES exam_attempts(id) ON DELETE CASCADE,
     event_type VARCHAR(100) NOT NULL,
     risk_level VARCHAR(50) DEFAULT 'INFO' NOT NULL, -- INFO, WARNING, CRITICAL
@@ -233,7 +206,7 @@ CREATE INDEX idx_attempt_logs_attempt_id_time ON attempt_logs(exam_attempt_id, t
 
 -- Tabla de Mapeo LTI v1.3
 CREATE TABLE lti_attempts_mapping (
-    id UUID PRIMARY KEY DEFAULT generate_uuid_v7(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     attempt_id UUID UNIQUE NOT NULL,
     lms_user_id VARCHAR(255) NOT NULL,
     lineitem_url TEXT NOT NULL,
@@ -243,4 +216,3 @@ CREATE TABLE lti_attempts_mapping (
 );
 
 CREATE INDEX idx_lti_attempts_mapping_attempt_id ON lti_attempts_mapping(attempt_id);
-

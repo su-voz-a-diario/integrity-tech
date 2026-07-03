@@ -1,5 +1,5 @@
 CREATE TABLE "psychometric_categories" (
-  "id" UUID NOT NULL DEFAULT generate_uuid_v7(),
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "organization_id" UUID NOT NULL,
   "code" VARCHAR(80) NOT NULL,
   "name" VARCHAR(160) NOT NULL,
@@ -10,7 +10,7 @@ CREATE TABLE "psychometric_categories" (
 );
 
 CREATE TABLE "competencies" (
-  "id" UUID NOT NULL DEFAULT generate_uuid_v7(),
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "organization_id" UUID NOT NULL,
   "code" VARCHAR(80) NOT NULL,
   "name" VARCHAR(160) NOT NULL,
@@ -21,7 +21,7 @@ CREATE TABLE "competencies" (
 );
 
 CREATE TABLE "psychometric_scales" (
-  "id" UUID NOT NULL DEFAULT generate_uuid_v7(),
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "organization_id" UUID NOT NULL,
   "code" VARCHAR(80) NOT NULL,
   "name" VARCHAR(160) NOT NULL,
@@ -32,7 +32,7 @@ CREATE TABLE "psychometric_scales" (
 );
 
 CREATE TABLE "psychometric_subscales" (
-  "id" UUID NOT NULL DEFAULT generate_uuid_v7(),
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "scale_id" UUID NOT NULL,
   "code" VARCHAR(80) NOT NULL,
   "name" VARCHAR(160) NOT NULL,
@@ -43,7 +43,7 @@ CREATE TABLE "psychometric_subscales" (
 );
 
 CREATE TABLE "assessments" (
-  "id" UUID NOT NULL DEFAULT generate_uuid_v7(),
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "organization_id" UUID NOT NULL,
   "code" VARCHAR(80) NOT NULL,
   "name" VARCHAR(255) NOT NULL,
@@ -56,7 +56,7 @@ CREATE TABLE "assessments" (
 );
 
 CREATE TABLE "assessment_versions" (
-  "id" UUID NOT NULL DEFAULT generate_uuid_v7(),
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "assessment_id" UUID NOT NULL,
   "organization_id" UUID NOT NULL,
   "version" VARCHAR(50) NOT NULL,
@@ -75,7 +75,7 @@ CREATE TABLE "assessment_versions" (
 );
 
 CREATE TABLE "items" (
-  "id" UUID NOT NULL DEFAULT generate_uuid_v7(),
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "organization_id" UUID NOT NULL,
   "item_code" VARCHAR(120) NOT NULL,
   "category_id" UUID,
@@ -90,7 +90,7 @@ CREATE TABLE "items" (
 );
 
 CREATE TABLE "item_versions" (
-  "id" UUID NOT NULL DEFAULT generate_uuid_v7(),
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "item_id" UUID NOT NULL,
   "version" VARCHAR(50) NOT NULL,
   "status" VARCHAR(50) NOT NULL DEFAULT 'DRAFT',
@@ -123,7 +123,7 @@ CREATE TABLE "assessment_version_items" (
 );
 
 CREATE TABLE "norm_groups" (
-  "id" UUID NOT NULL DEFAULT generate_uuid_v7(),
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "organization_id" UUID NOT NULL,
   "assessment_version_id" UUID NOT NULL,
   "code" VARCHAR(120) NOT NULL,
@@ -136,7 +136,7 @@ CREATE TABLE "norm_groups" (
 );
 
 CREATE TABLE "norm_group_versions" (
-  "id" UUID NOT NULL DEFAULT generate_uuid_v7(),
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "norm_group_id" UUID NOT NULL,
   "version" VARCHAR(50) NOT NULL,
   "status" VARCHAR(50) NOT NULL DEFAULT 'DRAFT',
@@ -154,7 +154,7 @@ CREATE TABLE "norm_group_versions" (
 );
 
 CREATE TABLE "scoring_models" (
-  "id" UUID NOT NULL DEFAULT generate_uuid_v7(),
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "organization_id" UUID NOT NULL,
   "assessment_version_id" UUID NOT NULL,
   "code" VARCHAR(120) NOT NULL,
@@ -167,7 +167,7 @@ CREATE TABLE "scoring_models" (
 );
 
 CREATE TABLE "scoring_model_versions" (
-  "id" UUID NOT NULL DEFAULT generate_uuid_v7(),
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "scoring_model_id" UUID NOT NULL,
   "version" VARCHAR(50) NOT NULL,
   "status" VARCHAR(50) NOT NULL DEFAULT 'DRAFT',
@@ -184,7 +184,7 @@ CREATE TABLE "scoring_model_versions" (
 );
 
 CREATE TABLE "report_templates" (
-  "id" UUID NOT NULL DEFAULT generate_uuid_v7(),
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "organization_id" UUID NOT NULL,
   "assessment_version_id" UUID NOT NULL,
   "code" VARCHAR(120) NOT NULL,
@@ -197,7 +197,7 @@ CREATE TABLE "report_templates" (
 );
 
 CREATE TABLE "report_template_versions" (
-  "id" UUID NOT NULL DEFAULT generate_uuid_v7(),
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "report_template_id" UUID NOT NULL,
   "version" VARCHAR(50) NOT NULL,
   "status" VARCHAR(50) NOT NULL DEFAULT 'DRAFT',
@@ -214,7 +214,7 @@ CREATE TABLE "report_template_versions" (
 );
 
 CREATE TABLE "report_issue_records" (
-  "id" UUID NOT NULL DEFAULT generate_uuid_v7(),
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "organization_id" UUID NOT NULL,
   "exam_attempt_id" UUID NOT NULL,
   "report_template_version_id" UUID NOT NULL,

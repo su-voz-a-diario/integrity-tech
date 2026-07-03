@@ -1,5 +1,5 @@
 CREATE TABLE "retention_policies" (
-  "id" UUID NOT NULL DEFAULT generate_uuid_v7(),
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "organization_id" UUID NOT NULL,
   "data_type" VARCHAR(80) NOT NULL,
   "classification" VARCHAR(50) NOT NULL,
@@ -17,7 +17,7 @@ CREATE TABLE "retention_policies" (
 );
 
 CREATE TABLE "data_lifecycle_records" (
-  "id" UUID NOT NULL DEFAULT generate_uuid_v7(),
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "organization_id" UUID NOT NULL,
   "resource_type" VARCHAR(80) NOT NULL,
   "resource_id" VARCHAR(120) NOT NULL,
@@ -36,7 +36,7 @@ CREATE TABLE "data_lifecycle_records" (
 );
 
 CREATE TABLE "data_export_jobs" (
-  "id" UUID NOT NULL DEFAULT generate_uuid_v7(),
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "organization_id" UUID NOT NULL,
   "requested_by_user_id" UUID NOT NULL,
   "subject_type" VARCHAR(80) NOT NULL,
@@ -53,7 +53,7 @@ CREATE TABLE "data_export_jobs" (
 );
 
 CREATE TABLE "data_deletion_requests" (
-  "id" UUID NOT NULL DEFAULT generate_uuid_v7(),
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "organization_id" UUID NOT NULL,
   "requested_by_user_id" UUID NOT NULL,
   "subject_type" VARCHAR(80) NOT NULL,
@@ -71,7 +71,7 @@ CREATE TABLE "data_deletion_requests" (
 );
 
 CREATE TABLE "data_deletion_items" (
-  "id" UUID NOT NULL DEFAULT generate_uuid_v7(),
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "request_id" UUID NOT NULL,
   "resource_type" VARCHAR(80) NOT NULL,
   "resource_id" VARCHAR(120) NOT NULL,
@@ -84,7 +84,7 @@ CREATE TABLE "data_deletion_items" (
 );
 
 CREATE TABLE "critical_asset_versions" (
-  "id" UUID NOT NULL DEFAULT generate_uuid_v7(),
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "organization_id" UUID NOT NULL,
   "asset_type" VARCHAR(80) NOT NULL,
   "asset_key" VARCHAR(120) NOT NULL,
@@ -102,7 +102,7 @@ CREATE TABLE "critical_asset_versions" (
 );
 
 CREATE TABLE "backup_recovery_events" (
-  "id" UUID NOT NULL DEFAULT generate_uuid_v7(),
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "organization_id" UUID,
   "event_type" VARCHAR(80) NOT NULL,
   "scope" VARCHAR(80) NOT NULL,

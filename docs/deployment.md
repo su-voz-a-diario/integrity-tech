@@ -22,6 +22,13 @@ cd integrity-tech-backend
 DATABASE_URL=postgresql://postgres:localpassword123@localhost:5432/integrity_tech_db?schema=public npm run seed
 ```
 
+Run the reproducibility smoke check:
+
+```bash
+cd integrity-tech-backend
+DATABASE_URL=postgresql://postgres:localpassword123@localhost:5432/integrity_tech_db?schema=public npm run smoke
+```
+
 Verify:
 
 ```bash
@@ -56,6 +63,16 @@ DATABASE_URL=postgresql://integrity:staging-local-password-change-me@localhost:5
 ```
 
 Do not use `prisma migrate dev` in staging or production.
+
+The official database bootstrap is the Prisma migration chain. Do not apply `db/schema.sql` as a parallel bootstrap path.
+
+Existing databases that were created before the baseline migration must not run the baseline over already existing tables. Verify the schema first, then mark only the baseline as applied:
+
+```bash
+cd integrity-tech-backend
+DATABASE_URL=postgresql://... npx prisma migrate resolve --applied 20260701000000_baseline_initial_schema
+DATABASE_URL=postgresql://... npx prisma migrate deploy
+```
 
 ## Docker Builds
 
@@ -106,9 +123,12 @@ npx prisma migrate deploy
 ```
 
 4. Run `npx prisma validate`.
-5. Start one backend instance.
-6. Check `/health/ready`.
-7. Scale normally only after readiness is green.
+5. Seed only the approved dataset for the target environment, if required.
+6. Run `npm run smoke`.
+7. Run `npm run smoke:backup-restore` from an environment that has PostgreSQL client tools.
+8. Start one backend instance.
+9. Check `/health/ready`.
+10. Scale normally only after readiness is green.
 
 ## Migration Failure Mitigation
 
@@ -137,6 +157,10 @@ The GitHub Actions workflow performs:
 - frontend sync-engine tests
 - frontend build
 - frontend production dependency audit
+- clean PostgreSQL migration deploy from an empty database
+- E2E seed
+- database smoke validation
+- backup/restore smoke validation
 - Docker build backend
 - Docker build frontend
 

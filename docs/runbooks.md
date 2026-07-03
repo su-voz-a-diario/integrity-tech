@@ -101,6 +101,48 @@ Database rollback:
 - Restore backup only if data integrity or startup is broken and corrective migration is unsafe.
 - Never use `prisma migrate reset` outside local development.
 
+## Database Baseline And Reproducibility
+
+The authoritative database bootstrap is:
+
+```bash
+cd integrity-tech-backend
+npx prisma migrate deploy
+npx prisma generate
+npm run seed
+npm run smoke
+```
+
+For E2E/staging validation use the isolated E2E seed:
+
+```bash
+cd integrity-tech-backend
+npx prisma migrate deploy
+npm run seed:e2e
+npm run smoke
+```
+
+`db/schema.sql` is not part of the deployment path. If a clean environment requires manual SQL before Prisma migrations, treat it as a release blocker.
+
+For databases that already existed before `20260701000000_baseline_initial_schema`, do not apply the baseline over existing tables. After schema verification, mark it as applied:
+
+```bash
+cd integrity-tech-backend
+DATABASE_URL=postgresql://... npx prisma migrate resolve --applied 20260701000000_baseline_initial_schema
+DATABASE_URL=postgresql://... npx prisma migrate deploy
+```
+
+## Backup And Restore Smoke Test
+
+The backup/restore smoke test requires PostgreSQL client tools: `pg_dump`, `pg_restore`, `psql`, `createdb` and `dropdb`.
+
+```bash
+cd integrity-tech-backend
+DATABASE_URL=postgresql://postgres:localpassword123@localhost:5432/integrity_tech_db?schema=public npm run smoke:backup-restore
+```
+
+The script creates a temporary database on the same PostgreSQL server, restores a custom-format dump, validates core tables and `pgcrypto`, then drops the temporary database.
+
 ## Deployment Verification
 
 ```bash
@@ -111,11 +153,15 @@ curl http://localhost:3001/metrics
 ```
 
 Smoke test:
-1. Staff login.
-2. Create invitation.
-3. Verify invitation.
-4. Claim invitation.
-5. Load exam session.
-6. Submit answer.
-7. Finalize attempt.
-8. Open report.
+1. Run `npm run smoke` for DB, seed and governance checks.
+2. Set `SMOKE_API_BASE_URL=http://localhost:3001/api` to include the HTTP flow.
+3. Staff login.
+4. Create invitation.
+5. Verify invitation.
+6. Claim invitation.
+7. Accept candidate consent.
+8. Load exam session.
+9. Submit answers.
+10. Finalize attempt.
+11. Open report.
+12. Confirm audit events.

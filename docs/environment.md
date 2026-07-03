@@ -55,6 +55,14 @@ Observability:
 - `LOG_LEVEL`
 - `BUILD_DATE`
 
+Smoke validation:
+- `SMOKE_API_BASE_URL` enables the optional HTTP smoke flow, for example `http://localhost:3001/api`.
+- `SMOKE_STAFF_EMAIL` defaults to `recruiter-a@e2e.integrity.test`.
+- `SMOKE_ADMIN_EMAIL` defaults to `admin-a@e2e.integrity.test`.
+- `SMOKE_STAFF_PASSWORD` defaults to `E2E_STAFF_PASSWORD` when present.
+- `SMOKE_ORGANIZATION_SLUG` defaults to `e2e-org-a`.
+- `SMOKE_EXAM_ID` defaults to the E2E published exam id.
+
 Storage:
 - `STORAGE_PROVIDER` (`local-private` in development, `s3` in staging/production).
 - `STORAGE_LOCAL_PRIVATE_PATH` for development-only private files.

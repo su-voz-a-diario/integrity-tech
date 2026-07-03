@@ -1,5 +1,7 @@
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 CREATE TABLE "user_sessions" (
-  "id" UUID NOT NULL DEFAULT generate_uuid_v7(),
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "user_id" UUID NOT NULL,
   "organization_id" UUID NOT NULL,
   "refresh_token_hash" VARCHAR(128) NOT NULL,
