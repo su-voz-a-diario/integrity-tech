@@ -8,9 +8,18 @@ if (!sourceUrl) {
 
 const requiredBinaries = ['pg_dump', 'pg_restore', 'psql', 'createdb', 'dropdb'];
 
-function run(command: string, args: string[], options: { input?: Buffer } = {}) {
+type DatabaseConnectionParts = {
+  host: string;
+  port?: string;
+  user?: string;
+  password?: string;
+  database: string;
+};
+
+function run(command: string, args: string[], options: { input?: Buffer; env?: NodeJS.ProcessEnv } = {}) {
   return execFileSync(command, args, {
     input: options.input,
+    env: { ...process.env, ...(options.env || {}) },
     maxBuffer: 128 * 1024 * 1024,
     stdio: options.input ? ['pipe', 'pipe', 'inherit'] : ['ignore', 'pipe', 'inherit'],
   });
@@ -24,17 +33,34 @@ function assertBinary(command: string) {
   }
 }
 
+function parseDatabaseUrl(value: string): DatabaseConnectionParts {
+  const url = new URL(value);
+  const database = decodeURIComponent(url.pathname.replace(/^\//, ''));
+  if (!database) throw new Error('DATABASE_URL must include a database name');
+  return {
+    host: url.hostname,
+    port: url.port || undefined,
+    user: url.username ? decodeURIComponent(url.username) : undefined,
+    password: url.password ? decodeURIComponent(url.password) : undefined,
+    database,
+  };
+}
+
+function postgresClientArgs(parts: DatabaseConnectionParts) {
+  const args = ['-h', parts.host];
+  if (parts.port) args.push('-p', parts.port);
+  if (parts.user) args.push('-U', parts.user);
+  return args;
+}
+
+function postgresClientEnv(parts: DatabaseConnectionParts) {
+  return parts.password ? { PGPASSWORD: parts.password } : {};
+}
+
 function buildDatabaseUrl(databaseName: string) {
   const url = new URL(sourceUrl as string);
   url.pathname = `/${databaseName}`;
   return url.toString();
-}
-
-function sourceDatabaseName() {
-  const url = new URL(sourceUrl as string);
-  const name = url.pathname.replace(/^\//, '');
-  if (!name) throw new Error('DATABASE_URL must include a database name');
-  return name;
 }
 
 function validateRestoredDatabase(restoredUrl: string) {
@@ -57,13 +83,15 @@ function validateRestoredDatabase(restoredUrl: string) {
 async function main() {
   for (const binary of requiredBinaries) assertBinary(binary);
 
-  const originalName = sourceDatabaseName();
+  const sourceParts = parseDatabaseUrl(sourceUrl);
+  const originalName = sourceParts.database;
   const restoreName = `${originalName}_restore_smoke_${Date.now()}`;
-  const maintenanceUrl = buildDatabaseUrl('postgres');
   const restoreUrl = buildDatabaseUrl(restoreName);
+  const clientArgs = postgresClientArgs(sourceParts);
+  const clientEnv = postgresClientEnv(sourceParts);
 
   console.log(`[backup-restore] Creating temporary database ${restoreName}`);
-  run('createdb', ['--dbname', maintenanceUrl, restoreName]);
+  run('createdb', [...clientArgs, restoreName], { env: clientEnv });
 
   try {
     console.log('[backup-restore] Dumping source database');
@@ -77,7 +105,7 @@ async function main() {
   } finally {
     console.log(`[backup-restore] Dropping temporary database ${restoreName}`);
     try {
-      run('dropdb', ['--if-exists', '--dbname', maintenanceUrl, restoreName]);
+      run('dropdb', ['--if-exists', ...clientArgs, restoreName], { env: clientEnv });
     } catch (error) {
       console.error(`[backup-restore] Failed to drop temporary database ${restoreName}: ${String(error)}`);
     }
