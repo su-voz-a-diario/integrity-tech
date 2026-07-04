@@ -21,6 +21,13 @@ describe('EditorialConsoleService', () => {
         findFirst: jest.fn(),
         findMany: jest.fn().mockResolvedValue([]),
       },
+      item: {
+        create: jest.fn(),
+      },
+      psychometricCategory: { upsert: jest.fn() },
+      competency: { upsert: jest.fn() },
+      psychometricScale: { upsert: jest.fn() },
+      psychometricSubscale: { upsert: jest.fn() },
       assessment: {
         create: jest.fn(),
       },
@@ -50,6 +57,7 @@ describe('EditorialConsoleService', () => {
       publish: jest.fn().mockResolvedValue({ id: 'av-1', status: 'PUBLISHED' }),
       retire: jest.fn().mockResolvedValue({ id: 'av-1', status: 'RETIRED' }),
       createNewVersionFromPublished: jest.fn(),
+      createItemVersion: jest.fn(),
     };
     audit = {
       record: jest.fn().mockResolvedValue(undefined),
@@ -97,6 +105,43 @@ describe('EditorialConsoleService', () => {
       }),
     );
     expect(result.initialVersion.id).toBe('av-1');
+  });
+
+
+  it('creates item with initial draft item version in the current tenant', async () => {
+    prisma.psychometricCategory.upsert.mockResolvedValue({ id: 'cat-1' });
+    prisma.competency.upsert.mockResolvedValue({ id: 'comp-1' });
+    prisma.psychometricScale.upsert.mockResolvedValue({ id: 'scale-1' });
+    prisma.psychometricSubscale.upsert.mockResolvedValue({ id: 'subscale-1' });
+    prisma.item.create.mockResolvedValue({ id: 'item-1', itemCode: 'ITEM-1' });
+    versioning.createItemVersion.mockResolvedValue({ id: 'iv-1', version: '1.0.0', status: 'DRAFT' });
+
+    const result = await service.createItem(user, {
+      itemCode: 'ITEM-1',
+      stemJson: { prompt: 'Pregunta', type: 'LIKERT' },
+      category: 'Integridad',
+      competency: 'Honestidad',
+      scale: 'Integridad laboral',
+      subscale: 'Consistencia',
+    });
+
+    expect(prisma.item.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organizationId: user.organizationId,
+        itemCode: 'ITEM-1',
+        categoryId: 'cat-1',
+        competencyId: 'comp-1',
+        scaleId: 'scale-1',
+        subscaleId: 'subscale-1',
+        createdByUserId: user.userId,
+      }),
+    });
+    expect(versioning.createItemVersion).toHaveBeenCalledWith(expect.objectContaining({
+      organizationId: user.organizationId,
+      itemId: 'item-1',
+      stemJson: { prompt: 'Pregunta', type: 'LIKERT' },
+    }));
+    expect(result.itemVersion.id).toBe('iv-1');
   });
 
   it('sets assessment version items with tenant-scoped item versions', async () => {

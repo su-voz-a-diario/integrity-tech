@@ -4,6 +4,7 @@ import { JwtAuthGuard } from '../../../shared/guards/jwt-auth.guard';
 import { CurrentUser, Permissions, PermissionsGuard, PERMISSIONS, SessionUser } from '../../iam';
 import {
   CreateAssessmentDto,
+  CreateItemDto,
   CreateVersionFromPublishedDto,
   EditorialActionDto,
   SetAssessmentVersionItemsDto,
@@ -62,6 +63,13 @@ export class EditorialConsoleController {
     @Body() body: SetAssessmentVersionItemsDto,
   ) {
     return this.consoleService.setAssessmentVersionItems(user, assessmentVersionId, body);
+  }
+
+  @Post('items')
+  @Permissions(PERMISSIONS.PSYCHOMETRICS_WRITE)
+  @ApiOperation({ summary: 'Crear reactivo gobernado con versión inicial DRAFT' })
+  createItem(@CurrentUser() user: SessionUser, @Body() body: CreateItemDto) {
+    return this.consoleService.createItem(user, body);
   }
 
   @Get('items')

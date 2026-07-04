@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { AdminShell } from '../../../../../components/staff/AdminShell';
 
 type PageProps = { params: { versionId: string } };
 type Notice = { type: 'success' | 'error'; message: string } | null;
@@ -156,11 +157,11 @@ export default function ItemVersionDetailPage({ params }: PageProps) {
   const editable = detail && ['DRAFT', 'INTERNAL_REVIEW'].includes(detail.status);
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-6 text-slate-100 md:px-8">
-      <div className="mx-auto flex max-w-7xl flex-col gap-6">
+    <AdminShell active="Banco de Reactivos">
+      <div className="flex flex-col gap-6">
         <header className="flex flex-col gap-3 border-b border-slate-800 pb-5 md:flex-row md:items-end md:justify-between">
           <div>
-            <Link href="/staff/psychometrics" className="text-sm font-semibold text-indigo-300 hover:text-indigo-200">
+            <Link href="/staff/admin/item-bank" className="text-sm font-semibold text-indigo-300 hover:text-indigo-200">
               Volver a consola
             </Link>
             <h1 className="mt-2 text-2xl font-extrabold text-white">Detalle de versión de reactivo</h1>
@@ -229,7 +230,7 @@ export default function ItemVersionDetailPage({ params }: PageProps) {
           </div>
         )}
       </div>
-    </main>
+    </AdminShell>
   );
 }
 

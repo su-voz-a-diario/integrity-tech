@@ -30,7 +30,7 @@ export default function WelcomePage() {
       </div>
 
       {/* ACCESOS DIRECTOS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-xl w-full">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl w-full">
         
         {/* CARD ESTUDIANTE */}
         <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl flex flex-col items-start text-left gap-4 hover:border-indigo-500/30 hover:shadow-lg hover:shadow-indigo-500/5 transition-all">
@@ -48,6 +48,27 @@ export default function WelcomePage() {
             className="mt-2 w-full py-2 text-center rounded-lg bg-indigo-600 text-white text-xs font-semibold hover:bg-indigo-500 transition-colors"
           >
             Iniciar Evaluación (Clave)
+          </Link>
+        </div>
+
+
+
+        {/* CARD ADMINISTRACION */}
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl flex flex-col items-start text-left gap-4 hover:border-indigo-500/30 hover:shadow-lg hover:shadow-indigo-500/5 transition-all">
+          <div className="w-10 h-10 rounded-lg bg-indigo-500/10 flex items-center justify-center text-xl">
+            ⚙️
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-slate-100">Panel Administrativo</h3>
+            <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+              Gobierno de evaluaciones, banco de reactivos, publicaciones, auditoría y operación Enterprise para staff autorizado.
+            </p>
+          </div>
+          <Link
+            href="/staff/login"
+            className="mt-2 w-full py-2 text-center rounded-lg bg-slate-950 border border-slate-800 text-indigo-400 text-xs font-semibold hover:bg-slate-900 transition-all"
+          >
+            Acceder como Staff
           </Link>
         </div>
 

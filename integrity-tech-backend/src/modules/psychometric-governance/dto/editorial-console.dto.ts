@@ -22,6 +22,85 @@ export enum EditorialAction {
 
 
 
+
+export class CreateItemDto {
+  @ApiProperty({ description: 'Código único del reactivo dentro de la organización', maxLength: 120 })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  itemCode: string;
+
+  @ApiPropertyOptional({ description: 'Versión inicial del reactivo', example: '1.0.0', maxLength: 50 })
+  @IsString()
+  @MinLength(1)
+  @MaxLength(50)
+  @IsOptional()
+  version?: string;
+
+  @ApiProperty({ description: 'Contenido estructurado del reactivo' })
+  @IsObject()
+  @MaxJsonSize(8192)
+  stemJson: Record<string, unknown>;
+
+  @ApiPropertyOptional({ description: 'Clave de scoring protegida' })
+  @IsObject()
+  @IsOptional()
+  @MaxJsonSize(4096)
+  scoringKeyJson?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ description: 'Etiquetas del reactivo' })
+  @IsObject()
+  @IsOptional()
+  @MaxJsonSize(4096)
+  tags?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ description: 'Idioma del reactivo', maxLength: 10 })
+  @IsString()
+  @MaxLength(10)
+  @IsOptional()
+  language?: string;
+
+  @ApiPropertyOptional({ description: 'Dimensión/categoría', maxLength: 160 })
+  @IsString()
+  @MaxLength(160)
+  @IsOptional()
+  category?: string;
+
+  @ApiPropertyOptional({ description: 'Competencia asociada', maxLength: 160 })
+  @IsString()
+  @MaxLength(160)
+  @IsOptional()
+  competency?: string;
+
+  @ApiPropertyOptional({ description: 'Escala asociada', maxLength: 160 })
+  @IsString()
+  @MaxLength(160)
+  @IsOptional()
+  scale?: string;
+
+  @ApiPropertyOptional({ description: 'Subescala asociada', maxLength: 160 })
+  @IsString()
+  @MaxLength(160)
+  @IsOptional()
+  subscale?: string;
+
+  @ApiPropertyOptional({ description: 'Dificultad estimada' })
+  @IsNumber()
+  @IsOptional()
+  difficulty?: number;
+
+  @ApiPropertyOptional({ description: 'Discriminación estimada' })
+  @IsNumber()
+  @IsOptional()
+  discrimination?: number;
+
+  @ApiPropertyOptional({ description: 'Tiempo esperado en segundos', minimum: 1 })
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  expectedTimeSeconds?: number;
+}
+
 export class CreateAssessmentDto {
   @ApiProperty({ description: 'Código único de la evaluación dentro de la organización', maxLength: 100 })
   @IsString()

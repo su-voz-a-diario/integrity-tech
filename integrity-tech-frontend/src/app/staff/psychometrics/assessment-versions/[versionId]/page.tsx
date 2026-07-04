@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { AdminShell } from '../../../../../components/staff/AdminShell';
 
 type PageProps = { params: { versionId: string } };
 type Notice = { type: 'success' | 'error'; message: string } | null;
@@ -191,11 +192,11 @@ export default function AssessmentVersionDetailPage({ params }: PageProps) {
   const editable = detail && ['DRAFT', 'INTERNAL_REVIEW'].includes(detail.status);
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-6 text-slate-100 md:px-8">
-      <div className="mx-auto flex max-w-7xl flex-col gap-6">
+    <AdminShell active="Evaluaciones">
+      <div className="flex flex-col gap-6">
         <header className="flex flex-col gap-3 border-b border-slate-800 pb-5 md:flex-row md:items-end md:justify-between">
           <div>
-            <Link href="/staff/psychometrics" className="text-sm font-semibold text-indigo-300 hover:text-indigo-200">
+            <Link href="/staff/admin/evaluations" className="text-sm font-semibold text-indigo-300 hover:text-indigo-200">
               Volver a consola
             </Link>
             <h1 className="mt-2 text-2xl font-extrabold text-white">Detalle de versión de prueba</h1>
@@ -245,7 +246,7 @@ export default function AssessmentVersionDetailPage({ params }: PageProps) {
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                           <Link
-                            href={`/staff/psychometrics/item-versions/${link.itemVersion.id}`}
+                            href={`/staff/admin/item-bank/items/${link.itemVersion.id}`}
                             className="text-sm font-bold text-indigo-200 hover:text-indigo-100"
                           >
                             {link.itemVersion.item.itemCode} · v{link.itemVersion.version}
@@ -286,7 +287,7 @@ export default function AssessmentVersionDetailPage({ params }: PageProps) {
           </div>
         )}
       </div>
-    </main>
+    </AdminShell>
   );
 }
 

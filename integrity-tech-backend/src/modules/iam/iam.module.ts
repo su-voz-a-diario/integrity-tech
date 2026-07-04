@@ -6,6 +6,7 @@ import { IamFacade } from './iam.facade';
 import { IamLocalFacade } from './services/iam-local.facade';
 import { DevAuthController } from './controllers/dev-auth.controller';
 import { AuthController } from './controllers/auth.controller';
+import { AdminController } from './controllers/admin.controller';
 import { PasswordService } from './services/password.service';
 import { SessionService } from './services/session.service';
 import { OrganizationContextService } from './services/organization-context.service';
@@ -17,7 +18,7 @@ import { EncryptionService } from './services/encryption.service';
 
 @Module({
   imports: [forwardRef(() => AuditModule)],
-  controllers: [AuthController, DevAuthController],
+  controllers: [AuthController, DevAuthController, AdminController],
   providers: [
     UserService, // Privado para el módulo IamModule
     AuthService, // Privado para el módulo IamModule

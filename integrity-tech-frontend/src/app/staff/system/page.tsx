@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { AdminShell } from '../../../components/staff/AdminShell';
 
 type Dependency = {
   name: string;
@@ -56,8 +57,8 @@ export default function StaffSystemPage() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-6 text-slate-100 md:px-8">
-      <div className="mx-auto flex max-w-6xl flex-col gap-6">
+    <AdminShell active="Sistema">
+      <div className="flex max-w-6xl flex-col gap-6">
         <header className="flex flex-col gap-3 border-b border-slate-800 pb-5 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-indigo-300">Operación Enterprise</p>
@@ -114,7 +115,7 @@ export default function StaffSystemPage() {
           </dl>
         </section>
       </div>
-    </main>
+    </AdminShell>
   );
 }
 

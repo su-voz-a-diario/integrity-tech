@@ -4,6 +4,7 @@ import { AuditService } from '../../audit/services/audit.service';
 import { SessionUser } from '../../iam';
 import {
   CreateAssessmentDto,
+  CreateItemDto,
   CreateVersionFromPublishedDto,
   EditorialAction,
   EditorialActionDto,
@@ -60,6 +61,56 @@ export class EditorialConsoleService {
     });
 
     return { assessment, initialVersion };
+  }
+
+
+  async createItem(user: SessionUser, dto: CreateItemDto) {
+    const itemCode = dto.itemCode.trim();
+    if (!itemCode) throw new BadRequestException('El código del reactivo es obligatorio.');
+
+    const category = await this.findOrCreateCategory(user.organizationId, dto.category);
+    const competency = await this.findOrCreateCompetency(user.organizationId, dto.competency);
+    const scale = await this.findOrCreateScale(user.organizationId, dto.scale);
+    const subscale = await this.findOrCreateSubscale(scale?.id, dto.subscale);
+
+    const item = await (this.prisma as any).item.create({
+      data: {
+        organizationId: user.organizationId,
+        itemCode,
+        status: 'DRAFT',
+        categoryId: category?.id || null,
+        competencyId: competency?.id || null,
+        scaleId: scale?.id || null,
+        subscaleId: subscale?.id || null,
+        createdByUserId: user.userId,
+      },
+    });
+
+    const itemVersion = await this.versioning.createItemVersion({
+      organizationId: user.organizationId,
+      itemId: item.id,
+      version: dto.version?.trim() || '1.0.0',
+      language: dto.language?.trim() || 'es',
+      stemJson: dto.stemJson,
+      scoringKeyJson: dto.scoringKeyJson,
+      tags: dto.tags,
+      difficulty: dto.difficulty,
+      discrimination: dto.discrimination,
+      expectedTimeSeconds: dto.expectedTimeSeconds,
+      createdByUserId: user.userId,
+    });
+
+    await this.audit.record({
+      organizationId: user.organizationId,
+      actorUserId: user.userId,
+      actorType: 'STAFF',
+      action: 'psychometric.item.created',
+      resourceType: 'ITEM',
+      resourceId: item.id,
+      metadata: { itemCode, initialVersionId: itemVersion.id },
+    });
+
+    return { item, itemVersion };
   }
 
   async setAssessmentVersionItems(
@@ -474,6 +525,60 @@ export class EditorialConsoleService {
       actorUserId: user.userId,
       overrides: dto.overrides,
     });
+  }
+
+
+  private async findOrCreateCategory(organizationId: string, name?: string) {
+    const normalized = this.normalizeTaxonomyName(name);
+    if (!normalized) return null;
+    return (this.prisma as any).psychometricCategory.upsert({
+      where: { organizationId_code: { organizationId, code: normalized.code } },
+      update: { name: normalized.name },
+      create: { organizationId, code: normalized.code, name: normalized.name },
+    });
+  }
+
+  private async findOrCreateCompetency(organizationId: string, name?: string) {
+    const normalized = this.normalizeTaxonomyName(name);
+    if (!normalized) return null;
+    return (this.prisma as any).competency.upsert({
+      where: { organizationId_code: { organizationId, code: normalized.code } },
+      update: { name: normalized.name },
+      create: { organizationId, code: normalized.code, name: normalized.name },
+    });
+  }
+
+  private async findOrCreateScale(organizationId: string, name?: string) {
+    const normalized = this.normalizeTaxonomyName(name);
+    if (!normalized) return null;
+    return (this.prisma as any).psychometricScale.upsert({
+      where: { organizationId_code: { organizationId, code: normalized.code } },
+      update: { name: normalized.name },
+      create: { organizationId, code: normalized.code, name: normalized.name },
+    });
+  }
+
+  private async findOrCreateSubscale(scaleId?: string, name?: string) {
+    const normalized = this.normalizeTaxonomyName(name);
+    if (!scaleId || !normalized) return null;
+    return (this.prisma as any).psychometricSubscale.upsert({
+      where: { scaleId_code: { scaleId, code: normalized.code } },
+      update: { name: normalized.name },
+      create: { scaleId, code: normalized.code, name: normalized.name },
+    });
+  }
+
+  private normalizeTaxonomyName(name?: string) {
+    const trimmed = name?.trim();
+    if (!trimmed) return null;
+    const code = trimmed
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .toUpperCase()
+      .slice(0, 80);
+    return { name: trimmed, code: code || trimmed.slice(0, 80).toUpperCase() };
   }
 
   private async publishAssessmentVersionToExam(user: SessionUser, assessmentVersionId: string) {

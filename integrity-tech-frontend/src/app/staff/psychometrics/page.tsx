@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { AdminShell } from '../../../components/staff/AdminShell';
 import { apiClient, ApiClientError } from '../../../services/api-client';
 import type { EditorialAction, EditorialVersionModel } from '../../../generated/api/types';
 
@@ -262,8 +263,8 @@ export default function PsychometricsEditorialConsole() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-6 text-slate-100 md:px-8">
-      <div className="mx-auto flex max-w-7xl flex-col gap-6">
+    <AdminShell active="Evaluaciones">
+      <div className="flex flex-col gap-6">
         <header className="flex flex-col gap-3 border-b border-slate-800 pb-5 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-indigo-300">Gobierno psicométrico</p>
@@ -403,7 +404,7 @@ export default function PsychometricsEditorialConsole() {
           </div>
         )}
       </div>
-    </main>
+    </AdminShell>
   );
 }
 
@@ -460,8 +461,8 @@ function VersionPanel({
                   <Link
                     href={
                       model === 'assessmentVersion'
-                        ? `/staff/psychometrics/assessment-versions/${version.id}`
-                        : `/staff/psychometrics/item-versions/${version.id}`
+                        ? `/staff/admin/evaluations/versions/${version.id}`
+                        : `/staff/admin/item-bank/items/${version.id}`
                     }
                     className="rounded-md border border-indigo-500/40 bg-indigo-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-indigo-100 transition hover:border-indigo-300"
                   >
