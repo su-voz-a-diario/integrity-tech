@@ -123,7 +123,9 @@ export class PsychometricVersioningService {
     actorUserId?: string;
     reason?: string;
   }) {
-    const current = await (this.prisma as any)[input.model].findFirst({ where: { id: input.id } });
+    const current = await (this.prisma as any)[input.model].findFirst({
+      where: this.tenantWhereForVersion(input.organizationId, input.model, input.id),
+    });
     if (!current) throw new NotFoundException('Versión no disponible');
 
     this.workflow.assertCanTransition(current.status, input.toStatus);
@@ -188,6 +190,7 @@ export class PsychometricVersioningService {
   }
 
   async updateDraftVersion(input: {
+    organizationId: string;
     model:
       | 'assessmentVersion'
       | 'itemVersion'
@@ -197,7 +200,7 @@ export class PsychometricVersioningService {
     id: string;
     data: Record<string, unknown>;
   }) {
-    const current = await this.assertVersionMutable(input.model, input.id);
+    const current = await this.assertVersionMutable(input.model, input.id, input.organizationId);
     return (this.prisma as any)[input.model].update({
       where: { id: current.id },
       data: input.data,
@@ -217,7 +220,9 @@ export class PsychometricVersioningService {
     actorUserId?: string;
     overrides?: Record<string, unknown>;
   }) {
-    const source = await (this.prisma as any)[input.model].findFirst({ where: { id: input.sourceVersionId } });
+    const source = await (this.prisma as any)[input.model].findFirst({
+      where: this.tenantWhereForVersion(input.organizationId, input.model, input.sourceVersionId),
+    });
     if (!source) throw new NotFoundException('Versión fuente no disponible');
     if (!['PUBLISHED', 'ACTIVE'].includes(source.status)) {
       throw new BadRequestException('Solo se puede crear una nueva versión desde una versión publicada/activa.');
@@ -255,11 +260,21 @@ export class PsychometricVersioningService {
     return created;
   }
 
-  async assertVersionMutable(model: string, id: string) {
-    const current = await (this.prisma as any)[model].findFirst({ where: { id } });
+  async assertVersionMutable(model: string, id: string, organizationId?: string) {
+    const where = organizationId ? this.tenantWhereForVersion(organizationId, model, id) : { id };
+    const current = await (this.prisma as any)[model].findFirst({ where });
     if (!current) throw new NotFoundException('Versión no disponible');
     this.workflow.assertMutable(current.status);
     return current;
+  }
+
+  private tenantWhereForVersion(organizationId: string, model: string, versionId: string) {
+    if (model === 'assessmentVersion') return { id: versionId, organizationId };
+    if (model === 'itemVersion') return { id: versionId, item: { organizationId } };
+    if (model === 'normGroupVersion') return { id: versionId, normGroup: { organizationId } };
+    if (model === 'scoringModelVersion') return { id: versionId, scoringModel: { organizationId } };
+    if (model === 'reportTemplateVersion') return { id: versionId, reportTemplate: { organizationId } };
+    throw new BadRequestException('Tipo de versión no soportado.');
   }
 
   private hash(payload: unknown): string {

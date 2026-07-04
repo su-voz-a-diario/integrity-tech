@@ -61,12 +61,13 @@ export class PsicometriaController {
       throw new ConflictException('Ya hay una calibración en curso.');
     }
 
-    this.logger.log('Disparando calibración IRT offline...');
+    const organizationId = req.user.organizationId;
+    this.logger.log(`Disparando calibración IRT offline para organización ${organizationId}...`);
     
     // Spawn del script Python de forma asíncrona
     const { spawn } = require('child_process');
-    const pythonProcess = spawn('python3', ['scripts/calibrate.py'], {
-      env: { ...process.env },
+    const pythonProcess = spawn('python3', ['scripts/calibrate.py', organizationId], {
+      env: { ...process.env, ORGANIZATION_ID: organizationId },
     });
 
     pythonProcess.on('close', async () => {
@@ -453,7 +454,8 @@ export class PsicometriaController {
     const outputImagePath = '/Volumes/Almacenamiento/integrity-tech/integrity-tech-frontend/public/roc_curve.png';
 
     return new Promise((resolve, reject) => {
-      exec(`python3 scripts/analyze_validity.py "${tempJsonPath}" "${outputImagePath}"`, (error: any, stdout: string, stderr: string) => {
+      const organizationId = req.user.organizationId;
+      exec(`python3 scripts/analyze_validity.py "${tempJsonPath}" "${outputImagePath}" "${organizationId}"`, (error: any, stdout: string, stderr: string) => {
         try {
           if (fs.existsSync(tempJsonPath)) {
             fs.unlinkSync(tempJsonPath);
@@ -502,7 +504,7 @@ export class PsicometriaController {
   @Get('api/v1/psicometria/reporte/:attempt_id/narrativo')
   async getReporteNarrativo(@Req() req: any, @Param('attempt_id') attemptId: string) {
     await this.recordPsychometricsAudit(req, AUDIT_ACTIONS.PSYCHOMETRICS_READ, 'NarrativeReport', attemptId);
-    const content = await this.reportService.generateNarrativeReport(attemptId);
+    const content = await this.reportService.generateNarrativeReport(attemptId, req.user.organizationId);
     return {
       status: 'success',
       reporteMarkdown: content,
@@ -514,7 +516,7 @@ export class PsicometriaController {
   @Get('api/v1/psicometria/impacto-adverso/:test_id')
   async getImpactoAdverso(@Req() req: any, @Param('test_id') testId: string) {
     await this.recordPsychometricsAudit(req, AUDIT_ACTIONS.PSYCHOMETRICS_READ, 'AdverseImpact', testId);
-    return this.adverseImpactService.calculateAdverseImpact(testId);
+    return this.adverseImpactService.calculateAdverseImpact(testId, req.user.organizationId);
   }
 
   @ApiOperation({ summary: 'Calcular el ROI del talento mediante modelo BCG (Brogden-Cronbach-Gleser)' })
@@ -539,6 +541,7 @@ export class PsicometriaController {
     });
     return this.catService.selectNextItem(
       body.testId,
+      req.user.organizationId,
       body.answeredItemIds,
       body.currentTheta,
       body.provisionalSe
@@ -573,6 +576,7 @@ export class PsicometriaController {
     });
     const p = await this.continuousNormingService.getPercentileContinuous(
       testId,
+      req.user.organizationId,
       parseFloat(theta),
       pais,
       nivelEducativo,

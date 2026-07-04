@@ -20,8 +20,15 @@ DB_URL = os.environ.get('DATABASE_URL', 'postgresql://postgres:localpassword123@
 if "?" in DB_URL:
     DB_URL = DB_URL.split("?")[0]
 
-def run_validity_analysis(performance_data_json_path, output_image_path):
-    print("[IRT Validity] Iniciando análisis de validez predictiva...")
+def resolve_organization_id(cli_value=None):
+    organization_id = os.environ.get('ORGANIZATION_ID') or cli_value
+    if not organization_id:
+        print('[IRT Validity Error] organizationId es obligatorio. No se permite ejecutar análisis de validez global.')
+        sys.exit(1)
+    return organization_id
+
+def run_validity_analysis(performance_data_json_path, output_image_path, organization_id):
+    print(f"[IRT Validity] Iniciando análisis de validez predictiva para organización {organization_id}...")
     
     # 1. Cargar datos de desempeño cargados por el usuario
     if not os.path.exists(performance_data_json_path):
@@ -72,8 +79,11 @@ def run_validity_analysis(performance_data_json_path, output_image_path):
             FROM resultados_test rt
             INNER JOIN exam_attempts att ON rt.exam_attempt_id = att.id
             INNER JOIN users u ON att.user_id = u.id
-            WHERE rt.theta IS NOT NULL AND att.status = 'COMPLETED';
-        """)
+            WHERE rt.theta IS NOT NULL
+              AND att.status = 'COMPLETED'
+              AND att.organization_id = %s
+              AND u.organization_id = att.organization_id;
+        """, (organization_id,))
         db_rows = cur.fetchall()
         
         if len(db_rows) == 0:
@@ -192,8 +202,9 @@ def run_validity_analysis(performance_data_json_path, output_image_path):
         conn.close()
 
 if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("Uso: python3 analyze_validity.py <path_datos_desempeno_json> <path_salida_roc_png>")
+    if len(sys.argv) < 4:
+        print("Uso: python3 analyze_validity.py <path_datos_desempeno_json> <path_salida_roc_png> <organizationId>")
         sys.exit(1)
-        
-    run_validity_analysis(sys.argv[1], sys.argv[2])
+
+    organization_id = resolve_organization_id(sys.argv[3])
+    run_validity_analysis(sys.argv[1], sys.argv[2], organization_id)

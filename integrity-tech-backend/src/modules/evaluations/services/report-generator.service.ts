@@ -11,20 +11,20 @@ export class ReportGeneratorService {
   /**
    * Genera un informe narrativo psicométrico y conductual en español para un intento de examen.
    */
-  async generateNarrativeReport(attemptId: string): Promise<string> {
-    const attempt = await this.prisma.examAttempt.findUnique({
-      where: { id: attemptId },
+  async generateNarrativeReport(attemptId: string, organizationId: string): Promise<string> {
+    const attempt = await this.prisma.examAttempt.findFirst({
+      where: { id: attemptId, organizationId },
       include: {
         resultadosTest: true,
       },
     });
 
     if (!attempt) {
-      throw new NotFoundException(`No se encontró el intento de examen con ID: ${attemptId}`);
+      throw new NotFoundException('Reporte narrativo no disponible.');
     }
 
-    const user = await this.prisma.user.findUnique({
-      where: { id: attempt.userId },
+    const user = await this.prisma.user.findFirst({
+      where: { id: attempt.userId, organizationId },
     });
 
     const resultados = attempt.resultadosTest;

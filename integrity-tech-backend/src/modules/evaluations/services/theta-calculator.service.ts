@@ -224,17 +224,19 @@ export class ThetaCalculatorService implements OnModuleInit {
     
     // Aplicar coeficientes de equiparación psicométrica (Test Equating)
     let equatedTheta = thetaEstRaw;
-    try {
-      const coef = await this.prisma.equatingCoefficients.findFirst({
-        where: { testId },
-        orderBy: { fechaCreacion: 'desc' },
-      });
-      if (coef) {
-        equatedTheta = Number(coef.coeficienteA) * thetaEstRaw + Number(coef.coeficienteB);
-        this.logger.log(`Aplicada equiparación (Test Equating) para ${testId}: theta ajustado de ${thetaEstRaw.toFixed(3)} a ${equatedTheta.toFixed(3)} (A=${coef.coeficienteA}, B=${coef.coeficienteB})`);
+    if (organizationId) {
+      try {
+        const coef = await this.prisma.equatingCoefficients.findFirst({
+          where: { organizationId, testId },
+          orderBy: { fechaCreacion: 'desc' },
+        });
+        if (coef) {
+          equatedTheta = Number(coef.coeficienteA) * thetaEstRaw + Number(coef.coeficienteB);
+          this.logger.log(`Aplicada equiparación (Test Equating) para ${testId}: theta ajustado de ${thetaEstRaw.toFixed(3)} a ${equatedTheta.toFixed(3)} (A=${coef.coeficienteA}, B=${coef.coeficienteB})`);
+        }
+      } catch (err) {
+        this.logger.warn(`Error al consultar equating_coefficients para ${testId}: ${err.message}`);
       }
-    } catch (err) {
-      this.logger.warn(`Error al consultar equating_coefficients para ${testId}: ${err.message}`);
     }
 
     const thetaEst = Math.min(4.0, Math.max(-4.0, equatedTheta));

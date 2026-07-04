@@ -66,6 +66,31 @@ describe('ThetaCalculatorService (Unit Tests)', () => {
     expect(result.thetaCi).toBe(Math.round((100.0 + 15.0 * result.theta) * 1000) / 1000);
   });
 
+
+  it('consulta coeficientes de equating exclusivamente dentro de la organización', async () => {
+    mockPrismaService.parametrosItems.findMany.mockResolvedValue([
+      { itemId: 'Q1', modelo: '2PL', parametroA: 1.5, parametroB: -1.0, activo: true, organizationId: 'org-1' },
+      { itemId: 'Q2', modelo: '2PL', parametroA: 1.0, parametroB: 0.0, activo: true, organizationId: 'org-1' },
+    ]);
+    mockPrismaService.equatingCoefficients.findFirst.mockResolvedValue({
+      organizationId: 'org-1',
+      testId: 'IT2_AC10',
+      coeficienteA: 1,
+      coeficienteB: 0,
+    });
+    (service as any).parameterCache.clear();
+
+    await service.calcularTheta('IT2_AC10', [
+      { itemId: 'Q1', response: 1 },
+      { itemId: 'Q2', response: 0 },
+    ], 'org-1');
+
+    expect(mockPrismaService.equatingCoefficients.findFirst).toHaveBeenCalledWith({
+      where: { organizationId: 'org-1', testId: 'IT2_AC10' },
+      orderBy: { fechaCreacion: 'desc' },
+    });
+  });
+
   it('Debe ignorar ítems inactivos (activo: false)', async () => {
     mockPrismaService.parametrosItems.findMany.mockResolvedValue([
       { itemId: 'Q1', modelo: '2PL', parametroA: 1.5, parametroB: -1.0, activo: true },

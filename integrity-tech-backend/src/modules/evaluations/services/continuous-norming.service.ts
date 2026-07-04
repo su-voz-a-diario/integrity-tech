@@ -1,4 +1,4 @@
-import { Injectable, Logger, ConflictException } from '@nestjs/common';
+import { Injectable, Logger, ConflictException, NotFoundException } from '@nestjs/common';
 import { exec } from 'child_process';
 import * as path from 'path';
 import { PrismaService } from '../../../shared/database/prisma.service';
@@ -14,6 +14,7 @@ export class ContinuousNormingService {
    */
   async getPercentileContinuous(
     testId: string,
+    organizationId: string,
     theta: number,
     pais?: string,
     nivelEducativo?: string,
@@ -35,6 +36,7 @@ export class ContinuousNormingService {
     for (const query of searchQueries) {
       row = await this.prisma.continuousNorm.findFirst({
         where: {
+          organizationId,
           testId,
           pais: query.pais,
           nivelEducativo: query.nivelEducativo,
@@ -47,13 +49,13 @@ export class ContinuousNormingService {
     if (!row) {
       // Intentar obtener cualquier fila de este test como último recurso para evitar fallos
       row = await this.prisma.continuousNorm.findFirst({
-        where: { testId },
+        where: { organizationId, testId },
       });
     }
 
     if (!row) {
       this.logger.warn(`No se encontraron curvas de baremación continua para el test ${testId}`);
-      return null;
+      throw new NotFoundException('Baremo continuo no disponible para esta organización.');
     }
 
     // 2. Extraer los percentiles de la curva (P5..P95)

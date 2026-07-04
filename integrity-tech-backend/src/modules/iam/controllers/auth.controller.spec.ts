@@ -28,6 +28,7 @@ describe('AuthController', () => {
     prisma = {
       user: {
         findFirst: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
       },
       organization: {
         findUnique: jest.fn(),
@@ -66,6 +67,24 @@ describe('AuthController', () => {
         action: 'auth.login.success',
         organizationId: 'org-1',
         actorUserId: 'user-1',
+      }),
+    );
+  });
+
+
+  it('rejects ambiguous multi-tenant email without organization slug', async () => {
+    prisma.user.findMany.mockResolvedValue([{ id: 'user-1' }, { id: 'user-2' }]);
+
+    await expect(
+      controller.login({ email: 'shared@integrity.demo', password: 'IntegrityDemo123!' }, mockRequest()),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+
+    expect(prisma.user.findFirst).not.toHaveBeenCalled();
+    expect(auditService.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: null,
+        action: 'auth.login.failed',
+        metadata: expect.objectContaining({ reason: 'ambiguous_tenant' }),
       }),
     );
   });

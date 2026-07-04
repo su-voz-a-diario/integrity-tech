@@ -15,11 +15,11 @@ describe('CatService (CAT Adaptativo Unit Tests)', () => {
     catSession: {
       create: jest.fn(),
       update: jest.fn(),
-      findUnique: jest.fn(),
+      findFirst: jest.fn(),
     },
     catItem: {
       findMany: jest.fn(),
-      findUnique: jest.fn(),
+      findFirst: jest.fn(),
     },
     catItemExposure: {
       upsert: jest.fn(),
@@ -30,7 +30,7 @@ describe('CatService (CAT Adaptativo Unit Tests)', () => {
       count: jest.fn(),
     },
     user: {
-      findUnique: jest.fn(),
+      findFirst: jest.fn(),
     },
   };
 
@@ -65,6 +65,7 @@ describe('CatService (CAT Adaptativo Unit Tests)', () => {
       exposureControl: false,
     });
 
+    mockPrismaService.user.findFirst.mockResolvedValue({ id: userId });
     mockPrismaService.catItem.findMany.mockResolvedValue([
       { id: 'item-1', bankId: 'bank-111', itemCode: 'I1', type: 'cognitive', difficulty: 0.0, discrimination: 1.5, guessing: 0.0, content: {}, isActive: true },
       { id: 'item-2', bankId: 'bank-111', itemCode: 'I2', type: 'cognitive', difficulty: 1.0, discrimination: 1.0, guessing: 0.0, content: {}, isActive: true },
@@ -81,9 +82,34 @@ describe('CatService (CAT Adaptativo Unit Tests)', () => {
 
     const session = await service.startSession(configId, userId, orgId);
 
+    expect(mockPrismaService.user.findFirst).toHaveBeenCalledWith({
+      where: { id: userId, organizationId: orgId, isActive: true },
+      select: { id: true },
+    });
     expect(session).toBeDefined();
     expect(session.id).toBe('session-999');
     expect(session.firstItem.id).toBe('item-1'); // Mayor discriminación
+  });
+
+
+  it('debe rechazar crear sesión CAT para un usuario de otro tenant', async () => {
+    mockPrismaService.catConfig.findFirst.mockResolvedValue({
+      id: 'config-123',
+      bankId: 'bank-111',
+      organizationId: 'org-789',
+      firstItemMethod: 'PRIOR_MEDIUM',
+      exposureControl: false,
+    });
+    mockPrismaService.user.findFirst.mockResolvedValue(null);
+
+    await expect(service.startSession('config-123', 'user-other-tenant', 'org-789'))
+      .rejects.toThrow('No tienes permisos para iniciar una sesión CAT para este usuario.');
+
+    expect(mockPrismaService.user.findFirst).toHaveBeenCalledWith({
+      where: { id: 'user-other-tenant', organizationId: 'org-789', isActive: true },
+      select: { id: true },
+    });
+    expect(mockPrismaService.catSession.create).not.toHaveBeenCalled();
   });
 
   it('debe procesar respuesta del reactivo adaptativo activo y actualizar el estado', async () => {
@@ -91,7 +117,7 @@ describe('CatService (CAT Adaptativo Unit Tests)', () => {
     const orgId = 'org-789';
     const itemId = 'item-1';
 
-    mockPrismaService.catSession.findUnique.mockResolvedValue({
+    mockPrismaService.catSession.findFirst.mockResolvedValue({
       id: sessionId,
       userId: 'user-456',
       bankId: 'bank-111',
@@ -112,7 +138,7 @@ describe('CatService (CAT Adaptativo Unit Tests)', () => {
       },
     });
 
-    mockPrismaService.catItem.findUnique.mockResolvedValue({
+    mockPrismaService.catItem.findFirst.mockResolvedValue({
       id: itemId,
       itemCode: 'I1',
       type: 'cognitive',
@@ -138,7 +164,7 @@ describe('CatService (CAT Adaptativo Unit Tests)', () => {
     const sessionId = 'session-999';
     const orgId = 'org-789';
 
-    mockPrismaService.catSession.findUnique.mockResolvedValue({
+    mockPrismaService.catSession.findFirst.mockResolvedValue({
       id: sessionId,
       currentItemId: 'item-1',
       status: 'IN_PROGRESS',
@@ -150,4 +176,52 @@ describe('CatService (CAT Adaptativo Unit Tests)', () => {
     await expect(service.processResponse(sessionId, orgId, 'item-99', 'A', 3500))
       .rejects.toThrow('El reactivo enviado no coincide con el reactivo activo de la sesión.');
   });
+
+  it('debe buscar configuración CAT dentro de la organización al seleccionar siguiente ítem legacy', async () => {
+    const orgId = 'org-789';
+
+    mockPrismaService.catConfig.findFirst.mockResolvedValue({
+      id: 'config-123',
+      bankId: 'bank-111',
+      organizationId: orgId,
+      minItems: 5,
+      maxItems: 15,
+      stoppingSe: 0.35,
+      exposureControl: false,
+      maxExposureRate: 0.2,
+    });
+    mockPrismaService.catItem.findMany.mockResolvedValue([
+      { id: 'item-2', bankId: 'bank-111', itemCode: 'I2', type: 'cognitive', difficulty: 1.0, discrimination: 1.0, guessing: 0.0, content: {}, isActive: true },
+    ]);
+
+    await service.selectNextItem('IT2_AC10', orgId, ['item-1'], 0.5, 0.4);
+
+    expect(mockPrismaService.catConfig.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ organizationId: orgId }),
+      }),
+    );
+    expect(mockPrismaService.catItem.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ bank: { organizationId: orgId } }),
+      }),
+    );
+  });
+
+  it('debe devolver 404 si la sesión CAT no pertenece a la organización', async () => {
+    mockPrismaService.catSession.findFirst.mockResolvedValue(null);
+
+    await expect(service.processResponse('session-other-tenant', 'org-789', 'item-1', 'A', 3500))
+      .rejects.toThrow('Sesión CAT no disponible.');
+
+    expect(mockPrismaService.catSession.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: 'session-other-tenant',
+          config: { organizationId: 'org-789' },
+        },
+      }),
+    );
+  });
+
 });

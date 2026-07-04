@@ -12,10 +12,14 @@ export class AdverseImpactService {
    * comparando las tasas de selección (porcentaje arriba del percentil 50 de la población) 
    * entre diferentes grupos demográficos (por país).
    */
-  async calculateAdverseImpact(testId: string): Promise<any> {
+  async calculateAdverseImpact(testId: string, organizationId: string): Promise<any> {
     // 1. Obtener todos los resultados de este test
     const resultados = await this.prisma.resultadoTest.findMany({
-      where: { testId, irtCalculated: true },
+      where: {
+        testId,
+        irtCalculated: true,
+        attempt: { organizationId },
+      },
       include: {
         attempt: true,
       },
@@ -32,7 +36,7 @@ export class AdverseImpactService {
     // 2. Consultar los usuarios asociados para obtener sus países
     const userIds = Array.from(new Set(resultados.map(r => r.attempt.userId)));
     const users = await this.prisma.user.findMany({
-      where: { id: { in: userIds } },
+      where: { id: { in: userIds }, organizationId },
       select: { id: true, pais: true },
     });
 
@@ -112,7 +116,7 @@ export class AdverseImpactService {
 
     // 7. Cargar flags de DIF asociados para complementar el análisis
     const difFlags = await this.prisma.parametrosItems.findMany({
-      where: { testId, flagDif: true },
+      where: { organizationId, testId, flagDif: true },
       select: { itemId: true },
     });
 

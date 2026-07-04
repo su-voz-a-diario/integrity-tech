@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { CatItem } from '@prisma/client';
 
@@ -24,13 +24,14 @@ export class ItemSelectorService {
     const items = await this.prisma.catItem.findMany({
       where: {
         bankId,
+        bank: { organizationId },
         isActive: true,
         id: { notIn: excludeItemIds },
       },
     });
 
     if (items.length === 0) {
-      throw new Error('No hay reactivos disponibles en el banco de ítems.');
+      throw new NotFoundException('No hay reactivos disponibles en el banco de ítems para esta organización.');
     }
 
     // 2. Calcular la información de Fisher para cada reactivo en el nivel theta actual

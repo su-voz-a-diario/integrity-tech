@@ -11,8 +11,16 @@ DB_URL = os.environ.get('DATABASE_URL', 'postgresql://postgres:localpassword123@
 if "?" in DB_URL:
     DB_URL = DB_URL.split("?")[0]
 
+def resolve_organization_id():
+    organization_id = os.environ.get('ORGANIZATION_ID') or (sys.argv[1] if len(sys.argv) > 1 else None)
+    if not organization_id:
+        print('[IRT DIF Error] organizationId es obligatorio. No se permite ejecutar análisis DIF global.')
+        sys.exit(1)
+    return organization_id
+
 def run_dif_analysis():
-    print("[IRT DIF] Iniciando análisis de Funcionamiento Diferencial del Ítem (DIF)...")
+    organization_id = resolve_organization_id()
+    print(f"[IRT DIF] Iniciando análisis de Funcionamiento Diferencial del Ítem (DIF) para organización {organization_id}...")
 
     try:
         import psycopg2
@@ -33,7 +41,7 @@ def run_dif_analysis():
         test_ids = ['IT2_I', 'IT2_P10', 'IT2_AC10', 'IT2_CB10']
         
         # Obtener lista de ítems configurados en DB
-        cur.execute("SELECT test_id, item_id FROM parametros_items;")
+        cur.execute("SELECT test_id, item_id FROM parametros_items WHERE organization_id = %s;", (organization_id,))
         items = cur.fetchall()
 
         if len(items) == 0:

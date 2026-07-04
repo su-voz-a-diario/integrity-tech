@@ -8,8 +8,16 @@ DB_URL = os.environ.get('DATABASE_URL', 'postgresql://postgres:localpassword123@
 if "?" in DB_URL:
     DB_URL = DB_URL.split("?")[0]
 
-def run_equating(test_id):
-    print(f"[IRT Equating] Iniciando equiparación de test para {test_id}...")
+def resolve_organization_id(cli_value=None):
+    organization_id = os.environ.get('ORGANIZATION_ID') or cli_value
+    if not organization_id:
+        print('[IRT Equating Error] organizationId es obligatorio. No se permite ejecutar Equating global.')
+        sys.exit(1)
+    return organization_id
+
+def run_equating(test_id, organization_id=None):
+    organization_id = resolve_organization_id(organization_id)
+    print(f"[IRT Equating] Iniciando equiparación de test para {test_id} en organización {organization_id}...")
     try:
         conn = psycopg2.connect(DB_URL)
         cur = conn.cursor()
@@ -22,8 +30,10 @@ def run_equating(test_id):
         cur.execute("""
             SELECT item_id, modelo, parametro_b, parametro_c1, parametro_c2, parametro_c3, parametro_c4
             FROM parametros_items
-            WHERE test_id = %s AND activo = TRUE;
-        """, (test_id,))
+            WHERE organization_id = %s
+              AND test_id = %s
+              AND activo = TRUE;
+        """, (organization_id, test_id))
         new_rows = cur.fetchall()
         if not new_rows:
             print("[IRT Equating Info] No se encontraron ítems nuevos para equiparación.")
@@ -35,15 +45,16 @@ def run_equating(test_id):
         cur.execute("""
             SELECT DISTINCT fecha_calibracion
             FROM parametros_items_historial
-            WHERE test_id = %s
+            WHERE organization_id = %s
+              AND test_id = %s
             ORDER BY fecha_calibracion DESC
             LIMIT 1;
-        """, (test_id,))
+        """, (organization_id, test_id))
         date_row = cur.fetchone()
         if not date_row:
             print("[IRT Equating Info] No hay calibraciones históricas previas. Se establece escala base por defecto (A=1.0, B=0.0).")
             # Guardar coeficientes de identidad
-            save_coefficients(cur, test_id, "None", "v1", 1.0, 0.0)
+            save_coefficients(cur, organization_id, test_id, "None", "v1", 1.0, 0.0)
             conn.commit()
             conn.close()
             return
@@ -53,8 +64,10 @@ def run_equating(test_id):
         cur.execute("""
             SELECT item_id, modelo, parametro_b, parametro_c1, parametro_c2, parametro_c3, parametro_c4
             FROM parametros_items_historial
-            WHERE test_id = %s AND fecha_calibracion = %s;
-        """, (test_id, last_calib_date))
+            WHERE organization_id = %s
+              AND test_id = %s
+              AND fecha_calibracion = %s;
+        """, (organization_id, test_id, last_calib_date))
         base_rows = cur.fetchall()
 
         # 3. Mapear parámetros y buscar intersección (reactivos ancla comunes)
@@ -85,7 +98,7 @@ def run_equating(test_id):
 
         if len(anchor_item_ids) < 2:
             print("[IRT Equating Info] Menos de 2 reactivos ancla. Usando coeficientes identidad por defecto.")
-            save_coefficients(cur, test_id, last_calib_date.strftime("%Y-%m-%d %H:%M:%S"), "current", 1.0, 0.0)
+            save_coefficients(cur, organization_id, test_id, last_calib_date.strftime("%Y-%m-%d %H:%M:%S"), "current", 1.0, 0.0)
             conn.commit()
             conn.close()
             return
@@ -109,7 +122,7 @@ def run_equating(test_id):
         version_destino = "current"
 
         print(f"[IRT Equating Result] Coeficientes calculados: A={A:.6f}, B={B:.6f}")
-        save_coefficients(cur, test_id, version_origen, version_destino, A, B)
+        save_coefficients(cur, organization_id, test_id, version_origen, version_destino, A, B)
         conn.commit()
         conn.close()
 
@@ -119,14 +132,17 @@ def run_equating(test_id):
         conn.close()
         sys.exit(1)
 
-def save_coefficients(cur, test_id, version_origen, version_destino, A, B):
+def save_coefficients(cur, organization_id, test_id, version_origen, version_destino, A, B):
     # Guardar en equating_coefficients
     cur.execute("""
-        INSERT INTO equating_coefficients (test_id, version_origen, version_destino, metodo, coeficiente_a, coeficiente_b, fecha_creacion)
-        VALUES (%s, %s, %s, 'mean_sigma', %s, %s, NOW());
-    """, (test_id, version_origen, version_destino, A, B))
+        INSERT INTO equating_coefficients (organization_id, test_id, version_origen, version_destino, metodo, coeficiente_a, coeficiente_b, fecha_creacion)
+        VALUES (%s, %s, %s, %s, 'mean_sigma', %s, %s, NOW());
+    """, (organization_id, test_id, version_origen, version_destino, A, B))
     print("[IRT Equating] Coeficientes guardados correctamente en la base de datos.")
 
 if __name__ == '__main__':
-    test_id = sys.argv[1] if len(sys.argv) > 1 else 'IT2_AC10'
-    run_equating(test_id)
+    if len(sys.argv) < 3:
+        print('Uso: python3 equating.py <test_id> <organizationId>')
+        sys.exit(1)
+
+    run_equating(sys.argv[1], sys.argv[2])

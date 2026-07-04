@@ -42,44 +42,14 @@ export class CronCalibrationService {
     this.logger.log('Iniciando verificación nocturna de calibración psicométrica...');
 
     try {
-      // 1. Obtener la fecha del último parámetro calibrado
-      const lastParam = await this.prisma.parametrosItems.findFirst({
-        orderBy: { fechaCalibracion: 'desc' },
-      });
-      const lastCalibratedDate = lastParam?.fechaCalibracion || new Date(0);
-
-      // 2. Contar cuántos intentos reales se han completado desde la última fecha
-      const newAttemptsCount = await this.prisma.examAttempt.count({
-        where: {
-          status: 'COMPLETED',
-          submittedAt: { gt: lastCalibratedDate },
-        },
+      const organizations = await this.prisma.organization.findMany({
+        where: { isActive: true },
+        select: { id: true },
+        orderBy: { createdAt: 'asc' },
       });
 
-      this.logger.log(`Nuevos intentos completados desde la última calibración: ${newAttemptsCount} / 500 requeridos.`);
-
-      // 3. Ejecutar calibración y baremación si superamos el umbral (o si no hay parámetros)
-      if (newAttemptsCount >= 500 || !lastParam) {
-        this.logger.log('Umbral de muestra alcanzado. Iniciando recalibración de parámetros de ítems (IRT)...');
-        this.thetaService.clearCache();
-        
-        // Ejecutar script de calibración offline
-        const { stdout: calOut, stderr: calErr } = await execPromise('python3 scripts/calibrate.py');
-        if (calErr) this.logger.error(`[Calibración StdErr] ${calErr}`);
-        this.logger.log(`[Calibración StdOut] ${calOut.trim()}`);
-
-        // Ejecutar script de análisis DIF
-        this.logger.log('Iniciando análisis de sesgo demográfico (DIF)...');
-        const { stdout: difOut, stderr: difErr } = await execPromise('python3 scripts/analyze_dif.py');
-        if (difErr) this.logger.error(`[DIF StdErr] ${difErr}`);
-        this.logger.log(`[DIF StdOut] ${difOut.trim()}`);
-
-        // 4. Regenerar baremos dinámicos empíricos de forma nativa en la base de datos
-        this.logger.log('Ejecutando procedimiento de reconstrucción de baremos dinámicos en PostgreSQL...');
-        await this.prisma.$executeRawUnsafe('SELECT regenerar_baremos_dinamicos();');
-        this.logger.log('Baremos dinámicos empíricos recalculados exitosamente.');
-      } else {
-        this.logger.log('Muestra insuficiente para realizar recalibración IRT. Manteniendo parámetros vigentes.');
+      for (const organization of organizations) {
+        await this.runNocturnalCalibrationForOrganization(organization.id);
       }
 
     } catch (err) {
@@ -90,6 +60,114 @@ export class CronCalibrationService {
     }
   }
 
+
+  private async runNocturnalCalibrationForOrganization(organizationId: string) {
+    const lastParam = await this.prisma.parametrosItems.findFirst({
+      where: { organizationId },
+      orderBy: { fechaCalibracion: 'desc' },
+    });
+    const lastCalibratedDate = lastParam?.fechaCalibracion || new Date(0);
+
+    const newAttemptsCount = await this.prisma.examAttempt.count({
+      where: {
+        organizationId,
+        status: 'COMPLETED',
+        submittedAt: { gt: lastCalibratedDate },
+      },
+    });
+
+    this.logger.log(`Organización ${organizationId}: nuevos intentos completados desde última calibración: ${newAttemptsCount} / 500 requeridos.`);
+
+    if (newAttemptsCount < 500 && lastParam) {
+      this.logger.log(`Organización ${organizationId}: muestra insuficiente para recalibración IRT. Manteniendo parámetros vigentes.`);
+      return;
+    }
+
+    this.logger.log(`Organización ${organizationId}: umbral alcanzado. Iniciando recalibración IRT...`);
+    this.thetaService.clearCache();
+
+    const env = { ...process.env, ORGANIZATION_ID: organizationId };
+    const { stdout: calOut, stderr: calErr } = await execPromise(`python3 scripts/calibrate.py ${organizationId}`, { env });
+    if (calErr) this.logger.error(`[Calibración StdErr][${organizationId}] ${calErr}`);
+    this.logger.log(`[Calibración StdOut][${organizationId}] ${calOut.trim()}`);
+
+    this.logger.log(`Organización ${organizationId}: iniciando análisis DIF...`);
+    const { stdout: difOut, stderr: difErr } = await execPromise(`python3 scripts/analyze_dif.py ${organizationId}`, { env });
+    if (difErr) this.logger.error(`[DIF StdErr][${organizationId}] ${difErr}`);
+    this.logger.log(`[DIF StdOut][${organizationId}] ${difOut.trim()}`);
+
+    this.logger.log(`Organización ${organizationId}: reconstruyendo baremos dinámicos tenant-scoped...`);
+    await this.regenerateDynamicNormsForOrganization(organizationId);
+    this.logger.log(`Organización ${organizationId}: baremos dinámicos recalculados exitosamente.`);
+  }
+
+  private async regenerateDynamicNormsForOrganization(organizationId: string) {
+    await this.prisma.$executeRawUnsafe(
+      `SELECT set_config('app.calibration_organization_id', $1, false);`,
+      organizationId,
+    );
+    await this.prisma.$executeRawUnsafe(`
+      DO $$
+      DECLARE
+          r_comb RECORD;
+          v_percentil INTEGER;
+          v_theta_val DOUBLE PRECISION;
+          v_theta_min DOUBLE PRECISION;
+          v_theta_max DOUBLE PRECISION;
+          v_organization_id UUID := current_setting('app.calibration_organization_id')::UUID;
+      BEGIN
+          DELETE FROM baremos_dinamicos
+          WHERE organization_id = v_organization_id
+            AND n_muestra >= 100;
+
+          FOR r_comb IN
+              SELECT att.organization_id, r.test_id, u.pais, u.sector, u.nivel_educativo, u.tipo_puesto, COUNT(*)::INTEGER as cnt
+              FROM resultados_test r
+              INNER JOIN exam_attempts att ON r.exam_attempt_id = att.id
+              INNER JOIN users u ON att.user_id = u.id AND u.organization_id = att.organization_id
+              WHERE att.organization_id = v_organization_id
+                AND r.theta IS NOT NULL
+                AND r.irt_calculated = true
+              GROUP BY GROUPING SETS (
+                  (att.organization_id, r.test_id, u.pais, u.sector, u.nivel_educativo, u.tipo_puesto),
+                  (att.organization_id, r.test_id, u.pais, u.sector, u.nivel_educativo),
+                  (att.organization_id, r.test_id, u.pais, u.sector),
+                  (att.organization_id, r.test_id, u.pais),
+                  (att.organization_id, r.test_id)
+              )
+              HAVING COUNT(*) >= 100
+          LOOP
+              v_theta_min := -999.0;
+              FOR v_percentil IN 1..99 LOOP
+                  SELECT PERCENTILE_CONT(v_percentil / 100.0) WITHIN GROUP (ORDER BY r.theta)
+                  INTO v_theta_val
+                  FROM resultados_test r
+                  INNER JOIN exam_attempts att ON r.exam_attempt_id = att.id
+                  INNER JOIN users u ON att.user_id = u.id AND u.organization_id = att.organization_id
+                  WHERE att.organization_id = v_organization_id
+                    AND r.test_id = r_comb.test_id
+                    AND r.theta IS NOT NULL
+                    AND r.irt_calculated = true
+                    AND (r_comb.pais IS NULL OR u.pais = r_comb.pais)
+                    AND (r_comb.sector IS NULL OR u.sector = r_comb.sector)
+                    AND (r_comb.nivel_educativo IS NULL OR u.nivel_educativo = r_comb.nivel_educativo)
+                    AND (r_comb.tipo_puesto IS NULL OR u.tipo_puesto = r_comb.tipo_puesto);
+
+                  v_theta_max := COALESCE(v_theta_val, -4.0 + (v_percentil * 0.08));
+
+                  INSERT INTO baremos_dinamicos (organization_id, test_id, pais, sector, nivel_educativo, tipo_puesto, theta_min, theta_max, percentil, n_muestra, fecha_creacion)
+                  VALUES (r_comb.organization_id, r_comb.test_id, r_comb.pais, r_comb.sector, r_comb.nivel_educativo, r_comb.tipo_puesto, v_theta_min, v_theta_max, v_percentil, r_comb.cnt, NOW());
+
+                  v_theta_min := v_theta_max;
+              END LOOP;
+
+              INSERT INTO baremos_dinamicos (organization_id, test_id, pais, sector, nivel_educativo, tipo_puesto, theta_min, theta_max, percentil, n_muestra, fecha_creacion)
+              VALUES (r_comb.organization_id, r_comb.test_id, r_comb.pais, r_comb.sector, r_comb.nivel_educativo, r_comb.tipo_puesto, v_theta_min, 999.0, 100, r_comb.cnt, NOW());
+          END LOOP;
+      END $$;
+    `);
+  }
+
   /**
    * Monitoreo diario de calidad psicométrica y detección de corrimiento de habilidad (Drift)
    */
@@ -97,16 +175,18 @@ export class CronCalibrationService {
   async monitorPsychometricQuality() {
     this.logger.log('Iniciando monitoreo de calidad psicométrica (detección de drift de theta)...');
     try {
-      // Obtener estadísticas agregadas por test de los últimos 30 días
+      // Obtener estadísticas agregadas por organización y test de los últimos 30 días
       const stats: any[] = await this.prisma.$queryRawUnsafe(`
-        SELECT test_id,
-               AVG(theta) AS mean_theta,
-               STDDEV(theta) AS sd_theta,
+        SELECT att.organization_id,
+               r.test_id,
+               AVG(r.theta) AS mean_theta,
+               STDDEV(r.theta) AS sd_theta,
                COUNT(*)::INTEGER AS n
-        FROM resultados_test
-        WHERE irt_calculated = TRUE
-          AND fecha_calculo >= NOW() - INTERVAL '30 days'
-        GROUP BY test_id;
+        FROM resultados_test r
+        INNER JOIN exam_attempts att ON r.exam_attempt_id = att.id
+        WHERE r.irt_calculated = TRUE
+          AND r.fecha_calculo >= NOW() - INTERVAL '30 days'
+        GROUP BY att.organization_id, r.test_id;
       `);
 
       for (const row of stats) {
@@ -121,22 +201,19 @@ export class CronCalibrationService {
           this.logger.warn(`[PSICOMETRÍA DRIFT ALERTA] El test ${row.test_id} presenta un desvío significativo de habilidad media (${mean.toFixed(3)}). Se recomienda recalibrar.`);
         }
 
-        const organization = await this.prisma.organization.findFirst({
-          orderBy: { createdAt: 'asc' },
-          select: { id: true },
-        });
-        if (!organization) {
-          throw new Error('No existe organización activa para registrar calidad psicométrica.');
+        const organizationId = row.organization_id;
+        if (!organizationId) {
+          throw new Error('No existe organización asociada para registrar calidad psicométrica.');
         }
 
         // Calcular la fiabilidad marginal de la escala (basada en IRT)
-        const relMarginal = await this.thetaService.computeMarginalReliability(row.test_id, organization.id);
+        const relMarginal = await this.thetaService.computeMarginalReliability(row.test_id, organizationId);
         this.logger.log(`[Monitoreo IRT] Test: ${row.test_id} | Fiabilidad Marginal (IRT): ${relMarginal.toFixed(3)}`);
 
         // Registrar en el historial de calidad psicométrica
         await this.prisma.psychometricQualityLog.create({
           data: {
-            organizationId: organization.id,
+            organizationId,
             testId: row.test_id,
             nAttempts: n,
             meanTheta: mean,

@@ -29,6 +29,19 @@ export class AuthController {
   @RateLimit({ scope: 'auth-login', limit: 5, windowMs: 60_000 })
   async login(@Body() body: LoginDto, @Req() req: Request) {
     const email = body.email.trim().toLowerCase();
+    if (!body.organizationSlug) {
+      const matchingUsers = await this.prisma.user.findMany({
+        where: { email, isActive: true, organization: { isActive: true } },
+        select: { id: true },
+        take: 2,
+      });
+      if (matchingUsers.length > 1) {
+        const metadata = this.extractRequestMetadata(req);
+        await this.recordLoginFailure(undefined, undefined, metadata, email, 'ambiguous_tenant');
+        throw new UnauthorizedException('Credenciales inválidas.');
+      }
+    }
+
     const user = await this.prisma.user.findFirst({
       where: {
         email,

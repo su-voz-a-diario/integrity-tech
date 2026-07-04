@@ -33,7 +33,7 @@ describe('Psychometric governance foundation', () => {
       new PsychometricWorkflowService(),
     );
 
-    await expect(service.assertVersionMutable('assessmentVersion', 'av-1')).rejects.toThrow(
+    await expect(service.assertVersionMutable('assessmentVersion', 'av-1', 'org-1')).rejects.toThrow(
       'Los artefactos publicados son inmutables',
     );
   });
@@ -50,9 +50,36 @@ describe('Psychometric governance foundation', () => {
       new PsychometricWorkflowService(),
     );
 
-    await expect(service.assertVersionMutable('itemVersion', 'iv-1')).rejects.toThrow(
+    await expect(service.assertVersionMutable('itemVersion', 'iv-1', 'org-1')).rejects.toThrow(
       'Los artefactos publicados son inmutables',
     );
+  });
+
+
+  it('scopes version transitions by organization internally', async () => {
+    const prisma = {
+      assessmentVersion: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+    };
+    const service = new PsychometricVersioningService(
+      prisma as any,
+      audit as any,
+      new PsychometricWorkflowService(),
+    );
+
+    await expect(
+      service.publish({
+        organizationId: 'org-1',
+        model: 'assessmentVersion',
+        id: 'av-other-tenant',
+        actorUserId: 'staff-1',
+      }),
+    ).rejects.toThrow('Versión no disponible');
+
+    expect(prisma.assessmentVersion.findFirst).toHaveBeenCalledWith({
+      where: { id: 'av-other-tenant', organizationId: 'org-1' },
+    });
   });
 
   it('creates item versions with content hash and draft status', async () => {

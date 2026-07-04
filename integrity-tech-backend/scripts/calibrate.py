@@ -23,23 +23,31 @@ DB_URL = os.environ.get('DATABASE_URL', 'postgresql://postgres:localpassword123@
 if "?" in DB_URL:
     DB_URL = DB_URL.split("?")[0]
 
-def archive_existing_parameters(cur):
+def resolve_organization_id():
+    organization_id = os.environ.get('ORGANIZATION_ID') or (sys.argv[1] if len(sys.argv) > 1 else None)
+    if not organization_id:
+        print('[IRT Calibrate Error] organizationId es obligatorio. No se permite ejecutar calibración global.')
+        sys.exit(1)
+    return organization_id
+
+def archive_existing_parameters(cur, organization_id):
     print("[IRT Calibrate] Archivando parámetros vigentes en la tabla de historial...")
     try:
         cur.execute("""
             INSERT INTO parametros_items_historial (
-                test_id, item_id, modelo, parametro_a, parametro_b, 
+                organization_id, test_id, item_id, modelo, parametro_a, parametro_b, 
                 parametro_c1, parametro_c2, parametro_c3, parametro_c4, 
                 error_estandar, p_value_ajuste, rmsea_item, flag_dif, 
                 fecha_calibracion, fecha_archivado
             )
             SELECT 
-                test_id, item_id, modelo, parametro_a, parametro_b, 
+                organization_id, test_id, item_id, modelo, parametro_a, parametro_b, 
                 parametro_c1, parametro_c2, parametro_c3, parametro_c4, 
                 error_estandar, p_value_ajuste, rmsea_item, flag_dif, 
                 fecha_calibracion, NOW()
-            FROM parametros_items;
-        """)
+            FROM parametros_items
+            WHERE organization_id = %s;
+        """, (organization_id,))
         print("[IRT Calibrate] Parámetros archivados con éxito.")
     except Exception as err:
         print(f"[IRT Calibrate Warning] No se pudo archivar parámetros (puede ser la primera calibración): {err}")
@@ -48,28 +56,28 @@ def fail_without_writing(message):
     print(f"[IRT Calibrate Error] {message}")
     raise RuntimeError(message)
 
-def store_params_2pl(cur, test_id, item_id, a, b, p_val, rmsea):
+def store_params_2pl(cur, organization_id, test_id, item_id, a, b, p_val, rmsea):
     cur.execute("""
-        INSERT INTO parametros_items (test_id, item_id, modelo, parametro_a, parametro_b, error_estandar, p_value_ajuste, rmsea_item, activo, fecha_calibracion)
-        VALUES (%s, %s, '2PL', %s, %s, 0.15, %s, %s, TRUE, NOW())
-        ON CONFLICT (test_id, item_id) DO UPDATE SET
+        INSERT INTO parametros_items (organization_id, test_id, item_id, modelo, parametro_a, parametro_b, error_estandar, p_value_ajuste, rmsea_item, activo, fecha_calibracion)
+        VALUES (%s, %s, %s, '2PL', %s, %s, 0.15, %s, %s, TRUE, NOW())
+        ON CONFLICT (organization_id, test_id, item_id) DO UPDATE SET
             parametro_a = EXCLUDED.parametro_a,
             parametro_b = EXCLUDED.parametro_b,
             p_value_ajuste = EXCLUDED.p_value_ajuste,
             rmsea_item = EXCLUDED.rmsea_item,
             activo = TRUE,
             fecha_calibracion = NOW();
-    """, (test_id, item_id, float(a), float(b), float(p_val), float(rmsea)))
+    """, (organization_id, test_id, item_id, float(a), float(b), float(p_val), float(rmsea)))
 
-def store_params_grm(cur, test_id, item_id, a, thresholds, p_val, rmsea):
+def store_params_grm(cur, organization_id, test_id, item_id, a, thresholds, p_val, rmsea):
     c = [None] * 4
     for i, val in enumerate(thresholds[:4]):
         c[i] = float(val)
 
     cur.execute("""
-        INSERT INTO parametros_items (test_id, item_id, modelo, parametro_a, parametro_c1, parametro_c2, parametro_c3, parametro_c4, error_estandar, p_value_ajuste, rmsea_item, activo, fecha_calibracion)
-        VALUES (%s, %s, 'GRM', %s, %s, %s, %s, %s, 0.12, %s, %s, TRUE, NOW())
-        ON CONFLICT (test_id, item_id) DO UPDATE SET
+        INSERT INTO parametros_items (organization_id, test_id, item_id, modelo, parametro_a, parametro_c1, parametro_c2, parametro_c3, parametro_c4, error_estandar, p_value_ajuste, rmsea_item, activo, fecha_calibracion)
+        VALUES (%s, %s, %s, 'GRM', %s, %s, %s, %s, %s, 0.12, %s, %s, TRUE, NOW())
+        ON CONFLICT (organization_id, test_id, item_id) DO UPDATE SET
             parametro_a = EXCLUDED.parametro_a,
             parametro_c1 = EXCLUDED.parametro_c1,
             parametro_c2 = EXCLUDED.parametro_c2,
@@ -79,7 +87,7 @@ def store_params_grm(cur, test_id, item_id, a, thresholds, p_val, rmsea):
             rmsea_item = EXCLUDED.rmsea_item,
             activo = TRUE,
             fecha_calibracion = NOW();
-    """, (test_id, item_id, float(a), c[0], c[1], c[2], c[3], float(p_val), float(rmsea)))
+    """, (organization_id, test_id, item_id, float(a), c[0], c[1], c[2], c[3], float(p_val), float(rmsea)))
 
 def estimate_theta_eap_python(responses, a_params, b_params, model='2PL'):
     quad_nodes = np.linspace(-3.0, 3.0, 31)
@@ -203,7 +211,8 @@ def calculate_item_fit(responses, thetas, a, b, model='2PL'):
     return p_values, rmseas
 
 def run_calibration():
-    print("[IRT Calibrate] Iniciando proceso de calibración psicométrica...")
+    organization_id = resolve_organization_id()
+    print(f"[IRT Calibrate] Iniciando proceso de calibración psicométrica para organización {organization_id}...")
     
     try:
         import psycopg2
@@ -237,8 +246,9 @@ def run_calibration():
             FROM answer_submissions sub
             INNER JOIN questions q ON sub.question_id = q.id
             INNER JOIN exam_attempts att ON sub.exam_attempt_id = att.id
-            WHERE att.status = 'COMPLETED';
-        """)
+            WHERE att.status = 'COMPLETED'
+              AND att.organization_id = %s;
+        """, (organization_id,))
         db_rows = cur.fetchall()
         print(f"[IRT Calibrate] Recuperadas {len(db_rows)} respuestas completadas desde la base de datos.")
 
@@ -276,7 +286,7 @@ def run_calibration():
                 )
 
         # 1. Archivar los parámetros actuales solo después de validar datos reales suficientes.
-        archive_existing_parameters(cur)
+        archive_existing_parameters(cur, organization_id)
 
         # Procesar cada test
         for test_id, model in tests.items():
@@ -324,7 +334,7 @@ def run_calibration():
 
                 # Guardar en base de datos
                 for idx, item_id in enumerate(item_ids):
-                    store_params_2pl(cur, test_id, item_id, a_estimated[idx], b_estimated[idx], p_values[idx], rmseas[idx])
+                    store_params_2pl(cur, organization_id, test_id, item_id, a_estimated[idx], b_estimated[idx], p_values[idx], rmseas[idx])
             
             else: # GRM
                 try:
@@ -345,7 +355,7 @@ def run_calibration():
 
                 # Guardar en base de datos
                 for idx, item_id in enumerate(item_ids):
-                    store_params_grm(cur, test_id, item_id, a_estimated[idx], thresholds_estimated[idx], p_values[idx], rmseas[idx])
+                    store_params_grm(cur, organization_id, test_id, item_id, a_estimated[idx], thresholds_estimated[idx], p_values[idx], rmseas[idx])
 
         conn.commit()
         print("[IRT Calibrate] Calibración psicométrica completada y guardada con éxito.")
@@ -355,7 +365,7 @@ def run_calibration():
             import equating
             print("[IRT Calibrate] Iniciando equiparación automática para colocar escalas en métrica base...")
             for t_id in ['IT2_I', 'IT2_P10', 'IT2_AC10', 'IT2_CB10']:
-                equating.run_equating(t_id)
+                equating.run_equating(t_id, organization_id)
         except Exception as eq_err:
             print(f"[IRT Calibrate Warning] Error en la equiparación automática: {eq_err}")
 

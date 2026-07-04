@@ -127,6 +127,7 @@ describe('EditorialConsoleService', () => {
     });
 
     expect(versioning.updateDraftVersion).toHaveBeenCalledWith({
+      organizationId: user.organizationId,
       model: 'assessmentVersion',
       id: 'av-1',
       data: { title: 'Nuevo título' },

@@ -38,6 +38,7 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
     },
     examAttempt: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       count: jest.fn(),
     },
     question: {
@@ -45,6 +46,7 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
     },
     user: {
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       findMany: jest.fn(),
     },
     perfilPuesto: {
@@ -66,6 +68,7 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
     },
     catItem: {
       findMany: jest.fn(),
+      findFirst: jest.fn(),
     },
     equatingCoefficients: {
       findFirst: jest.fn(),
@@ -215,6 +218,7 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
 
     dbMocks.user.findUnique.mockResolvedValue({
       id: 'user-uuid',
+      organizationId: 'org-uuid',
       pais: 'Colombia',
       sector: 'Banca',
       nivelEducativo: 'Universitario',
@@ -292,13 +296,14 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
     expect(lzResult.aberrante).toBe(false);
 
     // 2. CAT
-    const catResult = await catService.selectNextItem('IT2_AC10', ['Q1'], 0.5, 0.4);
+    const catResult = await catService.selectNextItem('IT2_AC10', 'org-uuid', ['Q1'], 0.5, 0.4);
     expect(catResult.nextItemId).toBe('Q2');
     expect(catResult.shouldStop).toBe(false);
 
     // 3. NLG Report
-    dbMocks.examAttempt.findUnique.mockResolvedValue({
+    dbMocks.examAttempt.findFirst.mockResolvedValue({
       id: 'attempt-uuid',
+      organizationId: 'org-uuid',
       userId: 'user-uuid',
       createdAt: new Date(),
       score: 85.0,
@@ -306,13 +311,14 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
         { testId: 'IT2_AC10', theta: 0.5, percentil: 75.0, thetaT: 55.0, thetaCi: 107.5, aberrante: false, personFitLz: -0.2 }
       ]
     });
-    dbMocks.user.findUnique.mockResolvedValue({
+    dbMocks.user.findFirst.mockResolvedValue({
       id: 'user-uuid',
+      organizationId: 'org-uuid',
       firstName: 'Ricardo',
       lastName: 'Garcia',
       email: 'ricardo@test.com'
     });
-    const nlgReport = await reportService.generateNarrativeReport('attempt-uuid');
+    const nlgReport = await reportService.generateNarrativeReport('attempt-uuid', 'org-uuid');
     expect(nlgReport).toContain('Reporte Psicométrico');
     expect(nlgReport).toContain('Ricardo');
 
@@ -333,7 +339,7 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
       { id: 'user-1', pais: 'Colombia' },
       { id: 'user-2', pais: 'México' }
     ]);
-    const adverseResult = await adverseService.calculateAdverseImpact('IT2_AC10');
+    const adverseResult = await adverseService.calculateAdverseImpact('IT2_AC10', 'org-uuid');
     expect(adverseResult.testId).toBe('IT2_AC10');
 
     // 5. Talent ROI (BCG Model)
@@ -367,6 +373,7 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
 
     const normPercentile = await continuousNormingService.getPercentileContinuous(
       'IT2_AC10',
+      'org-uuid',
       0.25,
       'Colombia',
       'Universitario',

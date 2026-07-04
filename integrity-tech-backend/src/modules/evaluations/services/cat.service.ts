@@ -1,4 +1,4 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { CatSession, CatItem, CatConfig } from '@prisma/client';
 import { ItemSelectorService } from './item-selector.service';
@@ -20,16 +20,18 @@ export class CatService {
    */
   async selectNextItem(
     testId: string,
+    organizationId: string,
     answeredItemIds: string[] = [],
     currentTheta = 0,
     provisionalSe?: number,
   ): Promise<{ nextItemId: string; shouldStop: boolean; provisionalSe?: number; item: CatItem }> {
     const config = await this.prisma.catConfig.findFirst({
       where: {
+        organizationId,
         OR: [
           { bankId: testId },
-          { bank: { id: testId } },
-          { bank: { name: testId } },
+          { bank: { id: testId, organizationId } },
+          { bank: { name: testId, organizationId } },
         ],
       },
       include: { bank: true },
@@ -77,6 +79,14 @@ export class CatService {
       throw new NotFoundException(`Configuración CAT no encontrada: ${configId}`);
     }
 
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, organizationId, isActive: true },
+      select: { id: true },
+    });
+    if (!user) {
+      throw new ForbiddenException('No tienes permisos para iniciar una sesión CAT para este usuario.');
+    }
+
     // Calcular theta inicial según la configuración prior del puesto
     const initialTheta = await this.getInitialTheta(config, userId);
 
@@ -117,8 +127,11 @@ export class CatService {
     response: string,
     responseTimeMs: number,
   ): Promise<{ completed: boolean; nextItem?: CatItem; finalTheta?: number; finalSe?: number }> {
-    const session = await this.prisma.catSession.findUnique({
-      where: { id: sessionId },
+    const session = await this.prisma.catSession.findFirst({
+      where: {
+        id: sessionId,
+        config: { organizationId },
+      },
       include: {
         config: true,
         responses: { orderBy: { position: 'asc' } },
@@ -126,7 +139,7 @@ export class CatService {
     });
 
     if (!session) {
-      throw new NotFoundException(`Sesión CAT no encontrada: ${sessionId}`);
+      throw new NotFoundException('Sesión CAT no disponible.');
     }
 
     if (session.status !== 'IN_PROGRESS') {
@@ -138,11 +151,14 @@ export class CatService {
       throw new BadRequestException('El reactivo enviado no coincide con el reactivo activo de la sesión.');
     }
 
-    const currentItem = await this.prisma.catItem.findUnique({
-      where: { id: itemId },
+    const currentItem = await this.prisma.catItem.findFirst({
+      where: {
+        id: itemId,
+        bank: { organizationId },
+      },
     });
     if (!currentItem) {
-      throw new NotFoundException(`Reactivo no encontrado: ${itemId}`);
+      throw new NotFoundException('Reactivo no disponible.');
     }
 
     const config = session.config;
@@ -273,8 +289,8 @@ export class CatService {
   private async getInitialTheta(config: CatConfig, userId: string): Promise<number> {
     if (config.firstItemMethod === 'PRIOR_JOB_PROFILE') {
       // Intentar resolver perfil
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
+      const user = await this.prisma.user.findFirst({
+        where: { id: userId, organizationId: config.organizationId },
         select: { tipoPuesto: true },
       });
       if (user?.tipoPuesto) {
@@ -283,8 +299,8 @@ export class CatService {
         }
       }
     } else if (config.firstItemMethod === 'PRIOR_EDUCATION') {
-      const user = await this.prisma.user.findUnique({
-        where: { id: userId },
+      const user = await this.prisma.user.findFirst({
+        where: { id: userId, organizationId: config.organizationId },
         select: { nivelEducativo: true },
       });
       if (user?.nivelEducativo) {

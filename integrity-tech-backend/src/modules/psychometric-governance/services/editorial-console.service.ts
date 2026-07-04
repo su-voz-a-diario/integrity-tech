@@ -269,6 +269,7 @@ export class EditorialConsoleService {
       throw new BadRequestException('Solo se pueden editar versiones en DRAFT o INTERNAL_REVIEW.');
     }
     const updated = await this.versioning.updateDraftVersion({
+      organizationId: user.organizationId,
       model: dto.model,
       id: dto.versionId,
       data: dto.data,

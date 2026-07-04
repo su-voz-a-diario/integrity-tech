@@ -150,11 +150,15 @@ class TestPsychometricScripts(unittest.TestCase):
         ]
         
         # Ejecutar equating
-        equating.run_equating('IT2_AC10')
+        equating.run_equating('IT2_AC10', 'org-1')
         
-        # Verificar que se guardaron los coeficientes en equating_coefficients
+        # Verificar que se guardaron los coeficientes en equating_coefficients con tenant explícito
         self.assertTrue(any("INSERT INTO equating_coefficients" in call[0][0]
+                            and "organization_id" in call[0][0]
                             for call in self.mock_cur.execute.call_args_list))
+        self.assertTrue(any(call[0][1][0] == 'org-1'
+                            for call in self.mock_cur.execute.call_args_list
+                            if "INSERT INTO equating_coefficients" in call[0][0]))
 
 if __name__ == '__main__':
     unittest.main()
