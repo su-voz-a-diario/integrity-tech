@@ -41,7 +41,6 @@ describe('ResponseService psychometric governance integration', () => {
     governanceResolver = {
       resolveItemVersionForAnswer: jest.fn().mockResolvedValue({
         itemVersionId: '00000000-0000-7000-8000-000000000902',
-        legacy: false,
       }),
     };
     service = new ResponseService(prisma, queueProducer, {} as any, auditService, governanceResolver, storage);

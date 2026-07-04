@@ -3,9 +3,11 @@ import { PrismaService } from '../../../shared/database/prisma.service';
 import { AuditService } from '../../audit/services/audit.service';
 import { SessionUser } from '../../iam';
 import {
+  CreateAssessmentDto,
   CreateVersionFromPublishedDto,
   EditorialAction,
   EditorialActionDto,
+  SetAssessmentVersionItemsDto,
   UpdateDraftVersionDto,
 } from '../dto/editorial-console.dto';
 import { PsychometricVersioningService } from './psychometric-versioning.service';
@@ -17,6 +19,115 @@ export class EditorialConsoleService {
     private readonly versioning: PsychometricVersioningService,
     private readonly audit: AuditService,
   ) {}
+
+  async createAssessment(user: SessionUser, dto: CreateAssessmentDto) {
+    const code = dto.code.trim();
+    const name = dto.name.trim();
+    if (!code || !name) throw new BadRequestException('Código y nombre de evaluación son obligatorios.');
+
+    const assessment = await (this.prisma as any).assessment.create({
+      data: {
+        organizationId: user.organizationId,
+        code,
+        name,
+        description: dto.description?.trim() || null,
+        status: 'DRAFT',
+        createdByUserId: user.userId,
+      },
+    });
+
+    const initialVersion = await this.versioning.createAssessmentVersion({
+      organizationId: user.organizationId,
+      assessmentId: assessment.id,
+      version: '1.0.0',
+      title: name,
+      description: dto.description?.trim() || undefined,
+      blueprintJson: {
+        source: 'staff_editorial_console',
+        assessmentCode: code,
+      },
+      createdByUserId: user.userId,
+    });
+
+    await this.audit.record({
+      organizationId: user.organizationId,
+      actorUserId: user.userId,
+      actorType: 'STAFF',
+      action: 'psychometric.assessment.created',
+      resourceType: 'ASSESSMENT',
+      resourceId: assessment.id,
+      metadata: { code, initialVersionId: initialVersion.id },
+    });
+
+    return { assessment, initialVersion };
+  }
+
+  async setAssessmentVersionItems(
+    user: SessionUser,
+    assessmentVersionId: string,
+    dto: SetAssessmentVersionItemsDto,
+  ) {
+    const version = await (this.prisma as any).assessmentVersion.findFirst({
+      where: { id: assessmentVersionId, organizationId: user.organizationId },
+      select: { id: true, status: true },
+    });
+    if (!version) throw new NotFoundException('Versión de prueba no disponible.');
+    if (!['DRAFT', 'INTERNAL_REVIEW'].includes(version.status)) {
+      throw new BadRequestException('Solo se pueden vincular reactivos en versiones DRAFT o INTERNAL_REVIEW.');
+    }
+
+    const uniqueItems = Array.from(new Map((dto.items || []).map((item, index) => [
+      item.itemVersionId,
+      {
+        itemVersionId: item.itemVersionId,
+        sortOrder: item.sortOrder ?? index,
+        weight: item.weight ?? 1,
+        role: item.role?.trim() || 'SCORED',
+      },
+    ])).values());
+
+    if (uniqueItems.length > 0) {
+      const found = await (this.prisma as any).itemVersion.findMany({
+        where: {
+          id: { in: uniqueItems.map((item) => item.itemVersionId) },
+          item: { organizationId: user.organizationId },
+        },
+        select: { id: true },
+      });
+      if (found.length !== uniqueItems.length) {
+        throw new NotFoundException('Uno o más reactivos no están disponibles para esta organización.');
+      }
+    }
+
+    await this.prisma.$transaction([
+      (this.prisma as any).assessmentVersionItem.deleteMany({
+        where: { assessmentVersionId, assessmentVersion: { organizationId: user.organizationId } },
+      }),
+      ...uniqueItems.map((item) =>
+        (this.prisma as any).assessmentVersionItem.create({
+          data: {
+            assessmentVersionId,
+            itemVersionId: item.itemVersionId,
+            sortOrder: item.sortOrder,
+            weight: item.weight,
+            role: item.role,
+          },
+        }),
+      ),
+    ]);
+
+    await this.audit.record({
+      organizationId: user.organizationId,
+      actorUserId: user.userId,
+      actorType: 'STAFF',
+      action: 'psychometric.assessment_version.items_set',
+      resourceType: 'assessmentVersion',
+      resourceId: assessmentVersionId,
+      metadata: { itemVersionIds: uniqueItems.map((item) => item.itemVersionId) },
+    });
+
+    return this.getAssessmentVersionDetail(user, assessmentVersionId);
+  }
 
   listAssessments(user: SessionUser) {
     return (this.prisma as any).assessment.findMany({
@@ -314,15 +425,20 @@ export class EditorialConsoleService {
           actorUserId: user.userId,
           reason: dto.reason,
         });
-      case EditorialAction.Publish:
+      case EditorialAction.Publish: {
         await this.assertReadyForPublish(user, dto.model, dto.versionId);
-        return this.versioning.publish({
+        const published = await this.versioning.publish({
           organizationId: user.organizationId,
           model: dto.model,
           id: dto.versionId,
           actorUserId: user.userId,
           reason: dto.reason,
         });
+        if (dto.model === 'assessmentVersion') {
+          await this.publishAssessmentVersionToExam(user, dto.versionId);
+        }
+        return published;
+      }
       case EditorialAction.Retire:
         return this.versioning.retire({
           organizationId: user.organizationId,
@@ -357,6 +473,58 @@ export class EditorialConsoleService {
       newVersion: dto.newVersion,
       actorUserId: user.userId,
       overrides: dto.overrides,
+    });
+  }
+
+  private async publishAssessmentVersionToExam(user: SessionUser, assessmentVersionId: string) {
+    const version = await (this.prisma as any).assessmentVersion.findFirst({
+      where: { id: assessmentVersionId, organizationId: user.organizationId, status: 'PUBLISHED' },
+      include: {
+        assessment: true,
+        itemLinks: {
+          orderBy: { sortOrder: 'asc' },
+          include: { itemVersion: true },
+        },
+      },
+    });
+    if (!version) throw new NotFoundException('Versión publicada no disponible.');
+
+    const examId = version.assessment.id;
+    const existingExam = await (this.prisma as any).exam.findFirst({
+      where: { id: examId, organizationId: user.organizationId },
+      select: { id: true },
+    });
+
+    if (existingExam) {
+      await (this.prisma as any).exam.update({
+        where: { id: examId },
+        data: {
+          title: version.title || version.assessment.name,
+          description: version.description || version.assessment.description || null,
+          isPublished: true,
+        },
+      });
+    } else {
+      await (this.prisma as any).exam.create({
+        data: {
+          id: examId,
+          organizationId: user.organizationId,
+          title: version.title || version.assessment.name,
+          description: version.description || version.assessment.description || null,
+          isPublished: true,
+          createdBy: user.userId,
+        },
+      });
+    }
+
+    await this.audit.record({
+      organizationId: user.organizationId,
+      actorUserId: user.userId,
+      actorType: 'STAFF',
+      action: 'psychometric.assessment_version.published_to_exam',
+      resourceType: 'exam',
+      resourceId: examId,
+      metadata: { assessmentVersionId, assessmentId: version.assessment.id },
     });
   }
 
@@ -404,7 +572,9 @@ export class EditorialConsoleService {
       }
       if (!item?.competencyId) warnings.push(`El reactivo ${label} no tiene competencia asociada.`);
       if (!item?.scaleId) warnings.push(`El reactivo ${label} no tiene escala asociada.`);
-      if (!itemVersion.stemJson) blockingIssues.push(`El reactivo ${label} no tiene contenido.`);
+      if (!itemVersion.stemJson) {
+        blockingIssues.push(`El reactivo ${label} no tiene contenido.`);
+      }
     }
 
     return { ready: blockingIssues.length === 0, blockingIssues, warnings };

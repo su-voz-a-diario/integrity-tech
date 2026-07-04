@@ -318,20 +318,8 @@ export class PsicometriaController {
     for (const r of resultados) {
       const submissions = await this.prisma.answerSubmission.findMany({
         where: { examAttemptId: r.examAttemptId },
+        include: { itemVersion: true },
       });
-
-      const questionIds = submissions.map(s => s.questionId);
-      const questions = await this.prisma.question.findMany({
-        where: {
-          id: { in: questionIds },
-          questionBank: { organizationId: req.user.organizationId },
-        },
-      });
-
-      const questionsMap = new Map<string, any>();
-      for (const q of questions) {
-        questionsMap.set(q.id, q);
-      }
 
       const mapping = {
         'INTEGRIDAD': 'IT2_I',
@@ -342,15 +330,16 @@ export class PsicometriaController {
 
       const patterns: { itemId: string; response: number }[] = [];
       for (const sub of submissions) {
-        const question = questionsMap.get(sub.questionId);
-        const content = question?.contentJsonb as any;
-        const dimension = content?.dimension || 'GENERAL';
+        const stem = sub.itemVersion?.stemJson as any;
+        if (!stem) continue;
+        const content = stem?.content || stem || {};
+        const dimension = content?.dimension || stem?.dimension || 'GENERAL';
         const mappedTestId = mapping[dimension.toUpperCase()] || dimension;
         if (mappedTestId === testId) {
-          const numericResponse = Number(sub.response);
+          const numericResponse = Number((sub.response as any)?.value ?? sub.response);
           if (!isNaN(numericResponse)) {
             patterns.push({
-              itemId: sub.questionId,
+              itemId: sub.itemVersionId || sub.questionId,
               response: numericResponse,
             });
           }

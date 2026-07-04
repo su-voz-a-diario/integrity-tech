@@ -142,11 +142,11 @@ export class ScientificTraceService {
     scoringModelVersionId?: string | null;
     normGroupVersionId?: string | null;
     reportTemplateVersionId?: string | null;
-  }): 'VERSIONED' | 'PARTIAL' | 'LEGACY_UNVERSIONED' {
+  }): 'VERSIONED' | 'PARTIAL' | 'UNVERSIONED' {
     const hasAssessmentAndItems = Boolean(trace.assessmentVersionId) && trace.itemVersionIds.length > 0;
     const hasResultVersions = Boolean(trace.scoringModelVersionId || trace.normGroupVersionId || trace.reportTemplateVersionId);
     if (hasAssessmentAndItems && hasResultVersions) return 'VERSIONED';
     if (hasAssessmentAndItems || hasResultVersions) return 'PARTIAL';
-    return 'LEGACY_UNVERSIONED';
+    return 'UNVERSIONED';
   }
 }

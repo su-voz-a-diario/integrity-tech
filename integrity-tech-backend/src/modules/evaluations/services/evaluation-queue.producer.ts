@@ -26,7 +26,7 @@ export class EvaluationQueueProducer {
     // En producción, aquí inyectamos el repositorio o puerto local para verificar:
     // a) Que el intento exista y su estado sea 'IN_PROGRESS'.
     // b) Que el tiempo actual no supere started_at + duration_minutes.
-    // c) Que la pregunta pertenezca al examen del intento.
+    // c) Que el ItemVersion pertenezca a la AssessmentVersion del intento.
     const isAttemptValid = await this.verifyActiveAttempt(dto.attemptId, dto.questionId);
     if (!isAttemptValid) {
       throw new BadRequestException('El intento de examen no es válido o ya ha finalizado.');
@@ -98,45 +98,33 @@ export class EvaluationQueueProducer {
   }
 
   /**
-   * Simulación de verificación lógica rápida del estado del intento (Pre-Encolamiento).
-   * En producción, esto consulta a Redis Cache o PostgreSQL de forma ultra-rápida.
+   * Verificación rápida del estado del intento y pertenencia del ItemVersion a la AssessmentVersion.
    */
   private async verifyActiveAttempt(attemptId: string, questionId: string): Promise<boolean> {
     this.logger.debug(`Verificando validez del intento ${attemptId} para pregunta ${questionId}`);
     const attempt = await this.prisma.examAttempt.findUnique({
       where: { id: attemptId },
-      select: { examId: true, status: true, submittedAt: true, assessmentVersionId: true },
+      select: { status: true, submittedAt: true, assessmentVersionId: true, organizationId: true },
     });
 
-    if (!attempt) return false;
-    if (attempt.status === 'COMPLETED') return this.isWithinLateAnswerWindow(attempt.submittedAt);
-    if (attempt.status === 'SUBMITTED') return this.isWithinLateAnswerWindow(attempt.submittedAt);
-    if (attempt.status !== 'IN_PROGRESS') return false;
+    if (!attempt?.assessmentVersionId) return false;
+    const isOpen = attempt.status === 'IN_PROGRESS';
+    const acceptsLateAnswer = ['SUBMITTED', 'COMPLETED'].includes(attempt.status) && this.isWithinLateAnswerWindow(attempt.submittedAt);
+    if (!isOpen && !acceptsLateAnswer) return false;
 
-    if (attempt.assessmentVersionId) {
-      const governedQuestion = await (this.prisma as any).assessmentVersionItem.findFirst({
-        where: {
-          assessmentVersionId: attempt.assessmentVersionId,
-          itemVersion: {
-            item: {
-              itemCode: `QUESTION_${questionId}`,
-            },
-          },
-        },
-        select: { itemVersionId: true },
-      });
-      return !!governedQuestion;
-    }
-
-    const examQuestion = await this.prisma.examQuestion.findFirst({
+    const governedQuestion = await (this.prisma as any).assessmentVersionItem.findFirst({
       where: {
-        examId: attempt.examId,
-        questionId,
+        assessmentVersionId: attempt.assessmentVersionId,
+        itemVersionId: questionId,
+        itemVersion: {
+          status: { in: ['ACTIVE', 'PUBLISHED'] },
+          item: { organizationId: attempt.organizationId },
+        },
       },
-      select: { id: true },
+      select: { itemVersionId: true },
     });
 
-    return !!examQuestion;
+    return !!governedQuestion;
   }
 
   private isWithinLateAnswerWindow(submittedAt: Date | null): boolean {

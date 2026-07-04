@@ -62,7 +62,7 @@ export class ResponseService {
         attemptId,
         questionId: body.questionId,
         itemVersionId: resolvedItem.itemVersionId,
-        governanceMode: resolvedItem.legacy ? 'LEGACY_UNVERSIONED' : 'VERSIONED',
+        governanceMode: 'VERSIONED',
         jobId: result.jobId,
       },
     });

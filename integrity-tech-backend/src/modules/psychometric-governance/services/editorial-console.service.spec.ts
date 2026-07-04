@@ -19,6 +19,10 @@ describe('EditorialConsoleService', () => {
     prisma = {
       itemVersion: {
         findFirst: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      assessment: {
+        create: jest.fn(),
       },
       user: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -29,9 +33,20 @@ describe('EditorialConsoleService', () => {
       assessmentVersion: {
         findFirst: jest.fn().mockResolvedValue({ id: 'av-1' }),
       },
+      assessmentVersionItem: {
+        deleteMany: jest.fn(),
+        create: jest.fn(),
+      },
+      exam: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn(),
+        update: jest.fn(),
+      },
+      $transaction: jest.fn().mockResolvedValue([]),
     };
     versioning = {
       updateDraftVersion: jest.fn(),
+      createAssessmentVersion: jest.fn(),
       publish: jest.fn().mockResolvedValue({ id: 'av-1', status: 'PUBLISHED' }),
       retire: jest.fn().mockResolvedValue({ id: 'av-1', status: 'RETIRED' }),
       createNewVersionFromPublished: jest.fn(),
@@ -56,6 +71,63 @@ describe('EditorialConsoleService', () => {
     expect(result.sensitiveFieldsRedacted).toBe(true);
   });
 
+  it('creates assessment with initial draft version', async () => {
+    prisma.assessment.create.mockResolvedValue({ id: 'assessment-1', code: 'INTEGRITY', name: 'Integrity Test' });
+    versioning.createAssessmentVersion.mockResolvedValue({ id: 'av-1', version: '1.0.0', status: 'DRAFT' });
+
+    const result = await service.createAssessment(user, {
+      code: 'INTEGRITY',
+      name: 'Integrity Test',
+      description: 'Evaluación base',
+    });
+
+    expect(prisma.assessment.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organizationId: user.organizationId,
+        code: 'INTEGRITY',
+        name: 'Integrity Test',
+        createdByUserId: user.userId,
+      }),
+    });
+    expect(versioning.createAssessmentVersion).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: user.organizationId,
+        assessmentId: 'assessment-1',
+        version: '1.0.0',
+      }),
+    );
+    expect(result.initialVersion.id).toBe('av-1');
+  });
+
+  it('sets assessment version items with tenant-scoped item versions', async () => {
+    prisma.itemVersion.findMany.mockResolvedValue([{ id: 'iv-1' }]);
+    prisma.assessmentVersion.findFirst
+      .mockResolvedValueOnce({ id: 'av-1', status: 'DRAFT' })
+      .mockResolvedValueOnce({
+        id: 'av-1',
+        createdByUserId: null,
+        approvedByUserId: null,
+        itemLinks: [],
+      })
+      .mockResolvedValueOnce({ id: 'av-1' })
+      .mockResolvedValueOnce({ id: 'av-1', itemLinks: [] });
+
+    await service.setAssessmentVersionItems(user, 'av-1', {
+      items: [{ itemVersionId: 'iv-1', sortOrder: 0, weight: 1, role: 'SCORED' }],
+    });
+
+    expect(prisma.itemVersion.findMany).toHaveBeenCalledWith({
+      where: { id: { in: ['iv-1'] }, item: { organizationId: user.organizationId } },
+      select: { id: true },
+    });
+    expect(prisma.assessmentVersionItem.deleteMany).toHaveBeenCalledWith({
+      where: { assessmentVersionId: 'av-1', assessmentVersion: { organizationId: user.organizationId } },
+    });
+    expect(prisma.assessmentVersionItem.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ assessmentVersionId: 'av-1', itemVersionId: 'iv-1' }),
+    });
+  });
+
   it('publishes through versioning service and audit is generated there', async () => {
     prisma.assessmentVersion.findFirst
       .mockResolvedValueOnce({ id: 'av-1' })
@@ -72,6 +144,20 @@ describe('EditorialConsoleService', () => {
             },
           },
         ],
+      })
+      .mockResolvedValueOnce({
+        id: 'av-1',
+        status: 'PUBLISHED',
+        title: 'Integrity Test',
+        description: 'Evaluación',
+        assessment: { id: 'assessment-1', name: 'Integrity Test', description: 'Evaluación' },
+        itemLinks: [
+          {
+            sortOrder: 0,
+            weight: 1,
+            itemVersion: { stemJson: { prompt: 'Pregunta' } },
+          },
+        ],
       });
 
     await service.executeWorkflowAction(user, {
@@ -86,6 +172,17 @@ describe('EditorialConsoleService', () => {
       id: 'av-1',
       actorUserId: user.userId,
       reason: undefined,
+    });
+    expect(prisma.exam.findFirst).toHaveBeenCalledWith({
+      where: { id: 'assessment-1', organizationId: user.organizationId },
+      select: { id: true },
+    });
+    expect(prisma.exam.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        id: 'assessment-1',
+        organizationId: user.organizationId,
+        isPublished: true,
+      }),
     });
   });
 

@@ -31,7 +31,7 @@ describe('ReportService audit events', () => {
     };
     const scientificTrace = {
       buildAttemptTrace: jest.fn().mockResolvedValue({
-        mode: 'LEGACY_UNVERSIONED',
+        mode: 'UNVERSIONED',
         itemVersionIds: [],
         generatedAt: new Date().toISOString(),
       }),

@@ -222,6 +222,45 @@ export default function PsychometricsEditorialConsole() {
     }
   };
 
+  const createAssessment = async () => {
+    const name = window.prompt('Nombre de la nueva evaluación:') || '';
+    if (!name.trim()) {
+      setNotice({ type: 'error', message: 'El nombre de la evaluación es obligatorio.' });
+      return;
+    }
+
+    const defaultCode = name
+      .trim()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .toUpperCase()
+      .slice(0, 80);
+    const code = window.prompt('Código único de la evaluación:', defaultCode) || '';
+    if (!code.trim()) {
+      setNotice({ type: 'error', message: 'El código de la evaluación es obligatorio.' });
+      return;
+    }
+
+    const description = window.prompt('Descripción breve de la evaluación:') || '';
+
+    setIsBusy(true);
+    try {
+      const created = await apiFetch<{ assessment: Assessment }>('/api/psychometric-governance/assessments', {
+        method: 'POST',
+        body: JSON.stringify({ name: name.trim(), code: code.trim(), description: description.trim() || undefined }),
+      });
+      setNotice({ type: 'success', message: 'Evaluación creada con versión inicial DRAFT.' });
+      await loadData();
+      setSelectedAssessmentId(created.assessment.id);
+    } catch (error: any) {
+      setNotice({ type: 'error', message: error.message || 'No se pudo crear la evaluación.' });
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-6 text-slate-100 md:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
@@ -233,13 +272,22 @@ export default function PsychometricsEditorialConsole() {
               Administración mínima de pruebas, reactivos, versiones y publicación controlada.
             </p>
           </div>
-          <button
-            onClick={loadData}
-            disabled={isLoading || isBusy}
-            className="rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-indigo-400 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            Actualizar
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={createAssessment}
+              disabled={isLoading || isBusy}
+              className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-100 transition hover:border-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Nueva evaluación
+            </button>
+            <button
+              onClick={loadData}
+              disabled={isLoading || isBusy}
+              className="rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:border-indigo-400 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Actualizar
+            </button>
+          </div>
         </header>
 
         {notice && (

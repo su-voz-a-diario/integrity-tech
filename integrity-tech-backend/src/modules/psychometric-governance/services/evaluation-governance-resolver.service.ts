@@ -9,7 +9,7 @@ export class EvaluationGovernanceResolverService {
     const assessment = await (this.prisma as any).assessment.findFirst({
       where: {
         organizationId,
-        code: this.assessmentCodeForExam(examId),
+        id: examId,
       },
       include: {
         versions: {
@@ -23,7 +23,7 @@ export class EvaluationGovernanceResolverService {
     const version = assessment?.versions?.[0];
     if (!version) {
       throw new BadRequestException(
-        'La evaluación no tiene una versión psicométrica publicada. Ejecuta el backfill de gobernanza antes de invitar candidatos.',
+        'La evaluación no tiene una versión psicométrica publicada.',
       );
     }
 
@@ -34,36 +34,23 @@ export class EvaluationGovernanceResolverService {
     attemptId: string;
     organizationId: string;
     questionId: string;
-  }): Promise<{ itemVersionId: string | null; legacy: boolean }> {
+  }): Promise<{ itemVersionId: string }> {
     const attempt = await this.prisma.examAttempt.findFirst({
       where: { id: input.attemptId, organizationId: input.organizationId },
-      select: { id: true, examId: true, assessmentVersionId: true },
+      select: { id: true, assessmentVersionId: true },
     });
 
-    if (!attempt) {
-      throw new BadRequestException('Intento de examen no válido.');
-    }
-
-    if (!attempt.assessmentVersionId) {
-      const legacyQuestion = await this.prisma.examQuestion.findFirst({
-        where: { examId: attempt.examId, questionId: input.questionId },
-        select: { id: true },
-      });
-      if (!legacyQuestion) {
-        throw new BadRequestException('La pregunta no pertenece al intento.');
-      }
-      return { itemVersionId: null, legacy: true };
+    if (!attempt?.assessmentVersionId) {
+      throw new BadRequestException('Intento de examen no válido para evaluación versionada.');
     }
 
     const linkedItem = await (this.prisma as any).assessmentVersionItem.findFirst({
       where: {
         assessmentVersionId: attempt.assessmentVersionId,
+        itemVersionId: input.questionId,
         itemVersion: {
           status: { in: ['ACTIVE', 'PUBLISHED'] },
-          item: {
-            organizationId: input.organizationId,
-            itemCode: this.itemCodeForQuestion(input.questionId),
-          },
+          item: { organizationId: input.organizationId },
         },
       },
       select: { itemVersionId: true },
@@ -73,7 +60,7 @@ export class EvaluationGovernanceResolverService {
       throw new BadRequestException('El reactivo no pertenece a la versión publicada del intento.');
     }
 
-    return { itemVersionId: linkedItem.itemVersionId, legacy: false };
+    return { itemVersionId: linkedItem.itemVersionId };
   }
 
   async validateItemVersionBelongsToAttempt(input: {
@@ -83,30 +70,21 @@ export class EvaluationGovernanceResolverService {
   }) {
     const attempt = await this.prisma.examAttempt.findUnique({
       where: { id: input.attemptId },
-      select: { assessmentVersionId: true, organizationId: true, examId: true },
+      select: { assessmentVersionId: true, organizationId: true },
     });
 
-    if (!attempt) return false;
-    if (!attempt.assessmentVersionId) {
-      const legacyQuestion = await this.prisma.examQuestion.findFirst({
-        where: { examId: attempt.examId, questionId: input.questionId },
-        select: { id: true },
-      });
-      return !!legacyQuestion && !input.itemVersionId;
-    }
+    if (!attempt?.assessmentVersionId) return false;
 
-    if (!input.itemVersionId) return false;
+    const itemVersionId = input.itemVersionId || input.questionId;
+    if (itemVersionId !== input.questionId) return false;
 
     const link = await (this.prisma as any).assessmentVersionItem.findFirst({
       where: {
         assessmentVersionId: attempt.assessmentVersionId,
-        itemVersionId: input.itemVersionId,
+        itemVersionId,
         itemVersion: {
           status: { in: ['ACTIVE', 'PUBLISHED'] },
-          item: {
-            organizationId: attempt.organizationId,
-            itemCode: this.itemCodeForQuestion(input.questionId),
-          },
+          item: { organizationId: attempt.organizationId },
         },
       },
       select: { itemVersionId: true },
@@ -169,13 +147,5 @@ export class EvaluationGovernanceResolverService {
       normGroupVersionId: normGroupVersion?.id || null,
       reportTemplateVersionId: reportTemplateVersion?.id || null,
     };
-  }
-
-  assessmentCodeForExam(examId: string) {
-    return `EXAM_${examId}`;
-  }
-
-  itemCodeForQuestion(questionId: string) {
-    return `QUESTION_${questionId}`;
   }
 }

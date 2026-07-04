@@ -27,21 +27,21 @@ export class AnswersQueueProcessor {
     this.logger.log(`[Worker] Procesando respuesta. Job: ${job.id} | Intento: ${attemptId} | Tiempo de respuesta: ${tiempoMs || 0}ms`);
 
     try {
-      // 1. OBTENER INFORMACIÓN DE LA PREGUNTA (Desde DB / Caché)
-      const question = await this.prisma.question.findUnique({
-        where: { id: questionId },
-        select: { type: true, contentJsonb: true, defaultPoints: true },
+      const resolvedItemVersionId = itemVersionId || questionId;
+      const itemVersion = await (this.prisma as any).itemVersion.findFirst({
+        where: { id: resolvedItemVersionId },
+        select: { id: true, stemJson: true, scoringKeyJson: true },
       });
       this.metrics?.recordQueueJob('answers-queue', 'save-answer', 'completed');
 
-      if (!question) {
-        throw new Error(`Pregunta con ID ${questionId} no encontrada.`);
+      if (!itemVersion) {
+        throw new Error(`Reactivo con ID ${resolvedItemVersionId} no encontrado.`);
       }
 
       const belongsToAttempt = await this.governanceResolver.validateItemVersionBelongsToAttempt({
         attemptId,
         questionId,
-        itemVersionId: itemVersionId || null,
+        itemVersionId: resolvedItemVersionId,
       });
 
       if (!belongsToAttempt) {
@@ -49,13 +49,13 @@ export class AnswersQueueProcessor {
       }
 
       // 2. APLICAR EL PATRÓN ESTRATEGIA PARA OBTENER CALIFICACIÓN
-      const strategy = GradingStrategyFactory.getStrategy(question.type);
+      const stem = itemVersion.stemJson as any;
+      const strategy = GradingStrategyFactory.getStrategy(stem?.type || 'UNKNOWN');
+      const content = stem?.content || stem || {};
+      const correctConfig = itemVersion.scoringKeyJson || content.correctConfig || {};
+      const questionPoints = Number(stem?.defaultPoints || 1);
       
-      // El campo contentJsonb del JSONB contiene las claves correctas (ej. correctOptionId o correctAnswers)
-      const content = question.contentJsonb as any;
-      const questionPoints = Number(question.defaultPoints);
-      
-      const { isCorrect, pointsEarned } = strategy.grade(response, content.correctConfig || {}, questionPoints);
+      const { isCorrect, pointsEarned } = strategy.grade(response, correctConfig, questionPoints);
 
       // 3. GUARDAR EN POSTGRESQL (UPSERT IDEMPOTENTE)
       await this.prisma.answerSubmission.upsert({
@@ -67,7 +67,7 @@ export class AnswersQueueProcessor {
         },
         update: {
           response,
-          itemVersionId: itemVersionId || null,
+          itemVersionId: resolvedItemVersionId,
           isCorrect,
           pointsEarned,
           tiempoMs,
@@ -76,7 +76,7 @@ export class AnswersQueueProcessor {
         create: {
           examAttemptId: attemptId,
           questionId,
-          itemVersionId: itemVersionId || null,
+          itemVersionId: resolvedItemVersionId,
           response,
           isCorrect,
           pointsEarned,
@@ -124,7 +124,7 @@ export class AnswersQueueProcessor {
         throw new Error(`Intento ${attemptId} no encontrado para consolidación.`);
       }
 
-      // 2. RECUPERAR RESPUESTAS Y PREGUNTAS ASOCIADAS
+      // 2. RECUPERAR RESPUESTAS E ITEMVERSIONS ASOCIADOS
       const submissions = await tx.answerSubmission.findMany({
         where: { examAttemptId: attemptId },
         select: {
@@ -134,32 +134,29 @@ export class AnswersQueueProcessor {
         },
       });
 
-      const questionIds = submissions.map((s) => s.questionId);
-      const questions = await tx.question.findMany({
-        where: { id: { in: questionIds } },
-        select: {
-          id: true,
-          defaultPoints: true,
-          contentJsonb: true,
-        },
+      const itemVersionIds = submissions.map((s) => s.itemVersionId || s.questionId);
+      const itemVersions = await (tx as any).itemVersion.findMany({
+        where: { id: { in: itemVersionIds } },
+        select: { id: true, stemJson: true },
       });
 
       // 3. AGRUPACIÓN Y CÁLCULO POR DIMENSIONES PSICOMÉTRICAS
-      const questionsMap = new Map(questions.map((q) => [q.id, q]));
+      const itemVersionsMap = new Map<string, any>(itemVersions.map((item: any) => [item.id, item]));
       const dimensionsMap: Record<string, { earned: number; max: number }> = {};
       let totalScore = 0;
 
       for (const sub of submissions) {
-        const question = questionsMap.get(sub.questionId);
-        if (!question) continue;
+        const itemVersion = itemVersionsMap.get(sub.itemVersionId || sub.questionId);
+        if (!itemVersion) continue;
 
+        const stem = itemVersion.stemJson as any;
+        const content = stem?.content || stem || {};
         const points = Number(sub.pointsEarned);
-        const maxPoints = Number(question.defaultPoints);
+        const maxPoints = Number(stem?.defaultPoints || 1);
         totalScore += points;
 
-        // Obtener la dimensión declarada en el JSONB de la pregunta (por defecto 'GENERAL')
-        const content = question.contentJsonb as any;
-        const dimension = content?.dimension || 'GENERAL';
+        // Obtener la dimensión declarada en el ItemVersion (por defecto 'GENERAL')
+        const dimension = content?.dimension || stem?.dimension || 'GENERAL';
 
         if (!dimensionsMap[dimension]) {
           dimensionsMap[dimension] = { earned: 0, max: 0 };

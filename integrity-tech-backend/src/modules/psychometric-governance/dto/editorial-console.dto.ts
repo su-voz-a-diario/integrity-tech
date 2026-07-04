@@ -1,4 +1,5 @@
-import { IsEnum, IsObject, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ArrayMaxSize, IsArray, IsEnum, IsInt, IsNumber, IsObject, IsOptional, IsString, IsUUID, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { MaxJsonSize } from '../../../shared/validators/json-size.validator';
 
@@ -17,6 +18,61 @@ export enum EditorialAction {
   Publish = 'publish',
   Retire = 'retire',
   ReturnToDraft = 'return_to_draft',
+}
+
+
+
+export class CreateAssessmentDto {
+  @ApiProperty({ description: 'Código único de la evaluación dentro de la organización', maxLength: 100 })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(100)
+  code: string;
+
+  @ApiProperty({ description: 'Nombre público de la evaluación', maxLength: 255 })
+  @IsString()
+  @MinLength(3)
+  @MaxLength(255)
+  name: string;
+
+  @ApiPropertyOptional({ description: 'Descripción breve de la evaluación', maxLength: 1000 })
+  @IsString()
+  @MaxLength(1000)
+  @IsOptional()
+  description?: string;
+}
+
+export class AssessmentVersionItemLinkDto {
+  @ApiProperty({ description: 'ID de la versión de reactivo gobernada' })
+  @IsUUID()
+  itemVersionId: string;
+
+  @ApiPropertyOptional({ description: 'Orden dentro de la evaluación', minimum: 0 })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  sortOrder?: number;
+
+  @ApiPropertyOptional({ description: 'Peso del reactivo dentro de la evaluación', minimum: 0 })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  weight?: number;
+
+  @ApiPropertyOptional({ description: 'Rol del reactivo dentro de la evaluación', maxLength: 50 })
+  @IsString()
+  @MaxLength(50)
+  @IsOptional()
+  role?: string;
+}
+
+export class SetAssessmentVersionItemsDto {
+  @ApiProperty({ type: [AssessmentVersionItemLinkDto], description: 'Reactivos vinculados a la versión de evaluación' })
+  @IsArray()
+  @ArrayMaxSize(500)
+  @ValidateNested({ each: true })
+  @Type(() => AssessmentVersionItemLinkDto)
+  items: AssessmentVersionItemLinkDto[];
 }
 
 export class EditorialActionDto {

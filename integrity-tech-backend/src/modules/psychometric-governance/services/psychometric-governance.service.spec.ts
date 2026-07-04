@@ -160,7 +160,7 @@ describe('Psychometric governance foundation', () => {
 
     const result = await service.validateItemVersionBelongsToAttempt({
       attemptId: 'attempt-1',
-      questionId: 'question-1',
+      questionId: 'item-version-1',
       itemVersionId: 'item-version-1',
     });
 
@@ -368,6 +368,29 @@ describe('Psychometric governance foundation', () => {
         where: expect.objectContaining({
           itemVersion: { status: { in: ['ACTIVE', 'PUBLISHED'] } },
         }),
+      }),
+    );
+  });
+
+  it('resolves published assessment version by shared assessment/exam id', async () => {
+    const prisma = {
+      assessment: {
+        findFirst: jest.fn().mockResolvedValue({ versions: [{ id: 'av-1', status: 'PUBLISHED' }] }),
+      },
+    };
+    const service = new EvaluationGovernanceResolverService(prisma as any);
+
+    await expect(service.resolvePublishedAssessmentVersionForExam('exam-1', 'org-1')).resolves.toEqual({
+      id: 'av-1',
+      status: 'PUBLISHED',
+    });
+
+    expect(prisma.assessment.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organizationId: 'org-1',
+          id: 'exam-1',
+        },
       }),
     );
   });

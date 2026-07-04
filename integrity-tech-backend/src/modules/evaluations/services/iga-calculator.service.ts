@@ -115,17 +115,8 @@ export class IgaCalculatorService {
       
       const submissions = await this.prisma.answerSubmission.findMany({
         where: { examAttemptId: attemptId },
+        include: { itemVersion: true },
       });
-
-      const questionIds = submissions.map(s => s.questionId);
-      const questions = await this.prisma.question.findMany({
-        where: { id: { in: questionIds } },
-      });
-
-      const questionsMap = new Map<string, any>();
-      for (const q of questions) {
-        questionsMap.set(q.id, q);
-      }
 
       const mapping = {
         'INTEGRIDAD': 'IT2_I',
@@ -137,17 +128,18 @@ export class IgaCalculatorService {
       // Agrupar respuestas por testId
       const responsesByTest: Record<string, { itemId: string; response: number }[]> = {};
       for (const sub of submissions) {
-        const question = questionsMap.get(sub.questionId);
-        const content = question?.contentJsonb as any;
-        const dimension = content?.dimension || 'GENERAL';
+        const stem = sub.itemVersion?.stemJson as any;
+        if (!stem) continue;
+        const content = stem?.content || stem || {};
+        const dimension = content?.dimension || stem?.dimension || 'GENERAL';
         const testId = mapping[dimension.toUpperCase()] || dimension;
         if (!responsesByTest[testId]) {
           responsesByTest[testId] = [];
         }
-        const numericResponse = Number(sub.response);
+        const numericResponse = Number((sub.response as any)?.value ?? sub.response);
         if (!isNaN(numericResponse)) {
           responsesByTest[testId].push({
-            itemId: sub.questionId,
+            itemId: sub.itemVersionId || sub.questionId,
             response: numericResponse,
           });
         }

@@ -20,7 +20,7 @@ export const EDITORIAL_TRANSITIONS: Record<EditorialStatus, EditorialStatus[]> =
 export const PUBLISHED_STATUSES = new Set<string>(['PUBLISHED', 'ACTIVE']);
 
 export interface GovernanceTrace {
-  mode: 'VERSIONED' | 'PARTIAL' | 'LEGACY_UNVERSIONED';
+  mode: 'VERSIONED' | 'PARTIAL' | 'UNVERSIONED';
   assessmentVersionId?: string | null;
   itemVersionIds: string[];
   normGroupVersionId?: string | null;

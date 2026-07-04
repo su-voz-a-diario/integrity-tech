@@ -12,6 +12,7 @@ describe('Evaluation SessionService consent gate', () => {
     organizationId: user.organizationId,
     userId: user.userId,
     status: 'IN_PROGRESS',
+    assessmentVersionId: '00000000-0000-7000-8000-000000000901',
     startedAt: new Date('2026-07-02T00:00:00.000Z'),
     submittedAt: null,
   };
@@ -24,29 +25,7 @@ describe('Evaluation SessionService consent gate', () => {
   let service: SessionService;
 
   beforeEach(() => {
-    prisma = {
-      examQuestion: {
-        findMany: jest.fn().mockResolvedValue([
-          {
-            questionId: '00000000-0000-7000-8000-000000000201',
-            points: 2,
-          },
-        ]),
-      },
-      question: {
-        findMany: jest.fn().mockResolvedValue([
-          {
-            id: '00000000-0000-7000-8000-000000000201',
-            type: 'MULTIPLE_CHOICE',
-            defaultPoints: 2,
-            contentJsonb: {
-              text: 'Pregunta',
-              correctConfig: { optionId: 'a' },
-            },
-          },
-        ]),
-      },
-    };
+    prisma = {};
     attempts = {
       findAttemptInTenant: jest.fn().mockResolvedValue(attempt),
       findExamInTenant: jest.fn().mockResolvedValue({
@@ -62,7 +41,23 @@ describe('Evaluation SessionService consent gate', () => {
       record: jest.fn().mockResolvedValue(undefined),
     };
     governanceResolver = {
-      findGovernedSessionItems: jest.fn(),
+      findGovernedSessionItems: jest.fn().mockResolvedValue([
+        {
+          itemVersionId: '00000000-0000-7000-8000-000000000902',
+          weight: 2,
+          itemVersion: {
+            stemJson: {
+              type: 'MULTIPLE_CHOICE',
+              defaultPoints: 2,
+              content: {
+                text: 'Pregunta gobernada',
+                correctConfig: { optionId: 'a' },
+              },
+            },
+            item: { id: '00000000-0000-7000-8000-000000000802', itemCode: 'ITEM-1' },
+          },
+        },
+      ]),
     };
     service = new SessionService(prisma, attempts, consentService, auditService, governanceResolver);
   });
@@ -73,7 +68,7 @@ describe('Evaluation SessionService consent gate', () => {
     await expect(service.getAttemptSession(attempt.id, user)).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('loads real questions without correct answers after consent', async () => {
+  it('loads versioned item questions without correct answers after consent', async () => {
     consentService.hasConsent.mockResolvedValue(true);
 
     const result = await service.getAttemptSession(attempt.id, user);
@@ -101,7 +96,6 @@ describe('Evaluation SessionService consent gate', () => {
         weight: 2,
         itemVersion: {
           stemJson: {
-            legacyQuestionId: '00000000-0000-7000-8000-000000000201',
             type: 'MULTIPLE_CHOICE',
             defaultPoints: 2,
             content: {
@@ -109,6 +103,7 @@ describe('Evaluation SessionService consent gate', () => {
               correctConfig: { optionId: 'a' },
             },
           },
+          item: { id: '00000000-0000-7000-8000-000000000802', itemCode: 'ITEM-1' },
         },
       },
     ]);
@@ -117,12 +112,12 @@ describe('Evaluation SessionService consent gate', () => {
 
     expect(result.questions[0]).toEqual(
       expect.objectContaining({
-        id: '00000000-0000-7000-8000-000000000201',
+        id: '00000000-0000-7000-8000-000000000902',
         itemVersionId: '00000000-0000-7000-8000-000000000902',
         type: 'MULTIPLE_CHOICE',
       }),
     );
     expect((result.questions[0] as any).content.correctConfig).toBeUndefined();
-    expect(prisma.examQuestion.findMany).not.toHaveBeenCalled();
+    expect(governanceResolver.findGovernedSessionItems).toHaveBeenCalledWith('00000000-0000-7000-8000-000000000901');
   });
 });

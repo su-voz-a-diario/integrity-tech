@@ -273,10 +273,11 @@ export class InvitationService {
       where: {
         id: examId,
         organizationId: user.organizationId,
+        isPublished: true,
       },
     });
     if (!exam) {
-      throw new NotFoundException('La evaluación solicitada no existe para esta organización.');
+      throw new NotFoundException('La evaluación solicitada no existe o no está publicada para esta organización.');
     }
 
     return exam;

@@ -41,9 +41,11 @@ export class SessionService {
       throw new NotFoundException('Evaluación no encontrada.');
     }
 
-    const safeQuestions = attempt.assessmentVersionId
-      ? await this.getGovernedQuestions(attempt.assessmentVersionId)
-      : await this.getLegacyQuestions(exam.id, organizationId);
+    if (!attempt.assessmentVersionId) {
+      throw new BadRequestException('El intento no tiene una versión psicométrica publicada asociada.');
+    }
+
+    const safeQuestions = await this.getGovernedQuestions(attempt.assessmentVersionId);
 
     await this.auditService.record({
       organizationId,
@@ -57,7 +59,7 @@ export class SessionService {
       metadata: {
         examId: exam.id,
         assessmentVersionId: attempt.assessmentVersionId || null,
-        mode: attempt.assessmentVersionId ? 'VERSIONED' : 'LEGACY_UNVERSIONED',
+        mode: 'VERSIONED',
         questionCount: safeQuestions.length,
       },
     });
@@ -84,50 +86,19 @@ export class SessionService {
 
   private async getGovernedQuestions(assessmentVersionId: string) {
     const governedItems = await this.governanceResolver.findGovernedSessionItems(assessmentVersionId);
-    return governedItems
-      .map((link) => {
-        const stem = link.itemVersion.stemJson as any;
-        const legacyQuestionId = stem?.legacyQuestionId;
-        if (!legacyQuestionId) return null;
-        return {
-          id: legacyQuestionId,
-          itemVersionId: link.itemVersionId,
-          type: stem?.type || 'UNKNOWN',
-          defaultPoints: Number(link.weight || stem?.defaultPoints || 1),
-          content: this.stripCorrectConfig(stem?.content || stem),
-        };
-      })
-      .filter(Boolean);
-  }
-
-  private async getLegacyQuestions(examId: string, organizationId: string) {
-    const examQuestions = await this.prisma.examQuestion.findMany({
-      where: { examId },
-      orderBy: { sortOrder: 'asc' },
+    return governedItems.map((link) => {
+      const stem = link.itemVersion.stemJson as any;
+      return {
+        id: link.itemVersionId,
+        itemVersionId: link.itemVersionId,
+        type: stem?.type || 'UNKNOWN',
+        defaultPoints: Number(link.weight || stem?.defaultPoints || 1),
+        content: this.stripCorrectConfig(stem?.content || stem),
+        item: {
+          id: link.itemVersion.item?.id,
+          code: link.itemVersion.item?.itemCode,
+        },
+      };
     });
-
-    const questions = await this.prisma.question.findMany({
-      where: {
-        id: { in: examQuestions.map((q) => q.questionId) },
-        questionBank: { organizationId },
-      },
-    });
-    const questionMap = new Map(questions.map((q) => [q.id, q]));
-
-    return examQuestions
-      .map((examQuestion) => {
-        const question = questionMap.get(examQuestion.questionId);
-        if (!question) return null;
-        const content = this.stripCorrectConfig(question.contentJsonb as any);
-        return {
-          id: question.id,
-          itemVersionId: null,
-          type: question.type,
-          defaultPoints: Number(examQuestion.points || question.defaultPoints),
-          content,
-          governanceMode: 'LEGACY_UNVERSIONED',
-        };
-      })
-      .filter(Boolean);
   }
 }

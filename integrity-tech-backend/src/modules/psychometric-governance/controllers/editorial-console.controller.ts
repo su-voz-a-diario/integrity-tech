@@ -1,10 +1,12 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Put, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../../shared/guards/jwt-auth.guard';
 import { CurrentUser, Permissions, PermissionsGuard, PERMISSIONS, SessionUser } from '../../iam';
 import {
+  CreateAssessmentDto,
   CreateVersionFromPublishedDto,
   EditorialActionDto,
+  SetAssessmentVersionItemsDto,
   UpdateDraftVersionDto,
 } from '../dto/editorial-console.dto';
 import { EditorialConsoleService } from '../services/editorial-console.service';
@@ -15,6 +17,13 @@ import { EditorialConsoleService } from '../services/editorial-console.service';
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 export class EditorialConsoleController {
   constructor(private readonly consoleService: EditorialConsoleService) {}
+
+  @Post('assessments')
+  @Permissions(PERMISSIONS.PSYCHOMETRICS_WRITE)
+  @ApiOperation({ summary: 'Crear evaluación gobernada con versión inicial DRAFT' })
+  createAssessment(@CurrentUser() user: SessionUser, @Body() body: CreateAssessmentDto) {
+    return this.consoleService.createAssessment(user, body);
+  }
 
   @Get('assessments')
   @Permissions(PERMISSIONS.PSYCHOMETRICS_READ)
@@ -42,6 +51,17 @@ export class EditorialConsoleController {
   @ApiOperation({ summary: 'Ver detalle profundo de versión de prueba' })
   getAssessmentVersionDetail(@CurrentUser() user: SessionUser, @Param('assessmentVersionId') assessmentVersionId: string) {
     return this.consoleService.getAssessmentVersionDetail(user, assessmentVersionId);
+  }
+
+  @Put('assessment-versions/:assessmentVersionId/items')
+  @Permissions(PERMISSIONS.PSYCHOMETRICS_WRITE)
+  @ApiOperation({ summary: 'Vincular reactivos a una versión editable de evaluación' })
+  setAssessmentVersionItems(
+    @CurrentUser() user: SessionUser,
+    @Param('assessmentVersionId') assessmentVersionId: string,
+    @Body() body: SetAssessmentVersionItemsDto,
+  ) {
+    return this.consoleService.setAssessmentVersionItems(user, assessmentVersionId, body);
   }
 
   @Get('items')

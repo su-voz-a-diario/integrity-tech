@@ -101,7 +101,7 @@ describe('Integrity Tech - Integración Psicométrica IRT e IGA (Ciclo Completo)
           provide: ScientificTraceService,
           useValue: {
             attachTraceToResults: jest.fn().mockResolvedValue({
-              mode: 'LEGACY_UNVERSIONED',
+              mode: 'UNVERSIONED',
               itemVersionIds: [],
               generatedAt: new Date().toISOString(),
             }),

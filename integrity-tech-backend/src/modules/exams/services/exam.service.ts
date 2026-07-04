@@ -28,16 +28,34 @@ export class ExamService {
       },
     });
 
-    return exams.map((exam) => ({
-      id: exam.id,
-      title: exam.title,
-      nombre: exam.title,
-      description: exam.description,
-      descripcion: exam.description,
-      publicationStatus: exam.isPublished ? 'PUBLISHED' : 'DRAFT',
-      isPublished: exam.isPublished,
-      organizationId: exam.organizationId,
-    }));
+    if (exams.length === 0) return [];
+
+    const publishedGovernance = await (this.prisma as any).assessment.findMany({
+      where: {
+        organizationId,
+        id: { in: exams.map((exam) => exam.id) },
+        versions: { some: { status: 'PUBLISHED' } },
+      },
+      select: { id: true, code: true },
+    });
+
+    const governedExamIds = new Set<string>();
+    for (const assessment of publishedGovernance) {
+      governedExamIds.add(assessment.id);
+    }
+
+    return exams
+      .filter((exam) => governedExamIds.has(exam.id))
+      .map((exam) => ({
+        id: exam.id,
+        title: exam.title,
+        nombre: exam.title,
+        description: exam.description,
+        descripcion: exam.description,
+        publicationStatus: exam.isPublished ? 'PUBLISHED' : 'DRAFT',
+        isPublished: exam.isPublished,
+        organizationId: exam.organizationId,
+      }));
   }
 
   /**
@@ -117,4 +135,5 @@ export class ExamService {
       startedAt: attempt.startedAt.toISOString(),
     };
   }
+
 }
