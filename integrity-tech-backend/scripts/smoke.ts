@@ -67,15 +67,21 @@ async function validateSeedData() {
   });
   assertCondition(exam, `Missing published smoke exam: ${examId}`);
 
-  const assessmentVersion = await prisma.assessmentVersion.findFirst({
+  const assessment = await (prisma as any).assessment.findFirst({
+    where: { id: exam.id, organizationId: organization.id },
+  });
+  assertCondition(assessment, `Missing assessment linked to smoke exam: ${exam.id}`);
+
+  const assessmentVersion = await (prisma as any).assessmentVersion.findFirst({
     where: {
+      assessmentId: assessment.id,
       organizationId: organization.id,
       status: 'PUBLISHED',
       itemLinks: { some: {} },
     },
     include: { itemLinks: true },
   });
-  assertCondition(assessmentVersion, 'Missing published assessment version with item links');
+  assertCondition(assessmentVersion, `Missing published assessment version with item links for smoke exam: ${exam.id}`);
 }
 
 async function requestJson(path: string, options: RequestInit = {}) {

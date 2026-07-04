@@ -24,8 +24,8 @@ const IDS = {
   examB: '00000000-0000-7000-8000-00000000e502',
   perfilA: '00000000-0000-7000-8000-00000000e601',
   perfilB: '00000000-0000-7000-8000-00000000e602',
-  assessmentA: '00000000-0000-7000-8000-00000000e701',
-  assessmentB: '00000000-0000-7000-8000-00000000e702',
+  assessmentA: '00000000-0000-7000-8000-00000000e501',
+  assessmentB: '00000000-0000-7000-8000-00000000e502',
   assessmentVersionA: '00000000-0000-7000-8000-00000000e801',
   assessmentVersionB: '00000000-0000-7000-8000-00000000e802',
   itemA1: '00000000-0000-7000-8000-00000000e901',
@@ -152,55 +152,13 @@ async function ensureOrganization(id: string, slug: string, name: string) {
   });
 }
 
-async function ensureLegacyAssessmentData(input: {
+async function ensureAssessmentDeliveryData(input: {
   organizationId: string;
   adminId: string;
-  bankId: string;
   examId: string;
   perfilId: string;
-  questions: Array<{
-    id: string;
-    type: string;
-    points: number;
-    content: any;
-  }>;
   title: string;
 }) {
-  const bank = await prisma.questionBank.upsert({
-    where: { id: input.bankId },
-    update: {
-      organizationId: input.organizationId,
-      name: `${input.title} Banco`,
-      createdBy: input.adminId,
-    },
-    create: {
-      id: input.bankId,
-      organizationId: input.organizationId,
-      name: `${input.title} Banco`,
-      description: 'Banco aislado para pruebas E2E.',
-      createdBy: input.adminId,
-    },
-  });
-
-  for (const question of input.questions) {
-    await prisma.question.upsert({
-      where: { id: question.id },
-      update: {
-        questionBankId: bank.id,
-        type: question.type,
-        contentJsonb: question.content,
-        defaultPoints: question.points,
-      },
-      create: {
-        id: question.id,
-        questionBankId: bank.id,
-        type: question.type,
-        contentJsonb: question.content,
-        defaultPoints: question.points,
-      },
-    });
-  }
-
   const exam = await prisma.exam.upsert({
     where: { id: input.examId },
     update: {
@@ -221,13 +179,6 @@ async function ensureLegacyAssessmentData(input: {
     },
   });
 
-  for (const [index, question] of input.questions.entries()) {
-    await prisma.examQuestion.upsert({
-      where: { unique_question_per_exam: { examId: exam.id, questionId: question.id } },
-      update: { points: question.points, sortOrder: index },
-      create: { examId: exam.id, questionId: question.id, points: question.points, sortOrder: index },
-    });
-  }
 
   await prisma.perfilPuesto.upsert({
     where: { id: input.perfilId },
@@ -250,7 +201,6 @@ async function ensurePsychometricGovernance(input: {
   organizationId: string;
   adminId: string;
   examId: string;
-  assessmentId: string;
   assessmentVersionId: string;
   questions: Array<{ id: string; type: string; points: number; content: any; itemId: string; itemVersionId: string }>;
   normGroupId: string;
@@ -261,12 +211,19 @@ async function ensurePsychometricGovernance(input: {
   reportVersionId: string;
   title: string;
 }) {
-  const assessmentCode = `EXAM_${input.examId}`;
-  const assessment = await (prisma as any).assessment.findUnique({
-    where: { organizationId_code: { organizationId: input.organizationId, code: assessmentCode } },
-  }) || await (prisma as any).assessment.create({
-    data: {
-      id: input.assessmentId,
+  const assessmentCode = `E2E_ASSESSMENT_${input.examId}`;
+  const assessment = await (prisma as any).assessment.upsert({
+    where: { id: input.examId },
+    update: {
+      organizationId: input.organizationId,
+      code: assessmentCode,
+      name: input.title,
+      description: 'Assessment gobernado para E2E.',
+      status: 'PUBLISHED',
+      createdByUserId: input.adminId,
+    },
+    create: {
+      id: input.examId,
       organizationId: input.organizationId,
       code: assessmentCode,
       name: input.title,
@@ -276,10 +233,21 @@ async function ensurePsychometricGovernance(input: {
     },
   });
 
-  const assessmentVersion = await (prisma as any).assessmentVersion.findUnique({
-    where: { assessmentId_version: { assessmentId: assessment.id, version: 'e2e-v1' } },
-  }) || await (prisma as any).assessmentVersion.create({
-    data: {
+  const assessmentVersion = await (prisma as any).assessmentVersion.upsert({
+    where: { id: input.assessmentVersionId },
+    update: {
+      assessmentId: assessment.id,
+      organizationId: input.organizationId,
+      status: 'PUBLISHED',
+      title: input.title,
+      description: 'Versión publicada para pruebas E2E.',
+      blueprintJson: { source: 'seed-e2e', assessmentId: assessment.id, itemCount: input.questions.length },
+      contentHash: hashPayload({ assessmentId: assessment.id, version: 'e2e-v1' }),
+      publishedAt: new Date(),
+      createdByUserId: input.adminId,
+      approvedByUserId: input.adminId,
+    },
+    create: {
       id: input.assessmentVersionId,
       assessmentId: assessment.id,
       organizationId: input.organizationId,
@@ -287,8 +255,8 @@ async function ensurePsychometricGovernance(input: {
       status: 'PUBLISHED',
       title: input.title,
       description: 'Versión publicada para pruebas E2E.',
-      blueprintJson: { source: 'seed-e2e', examId: input.examId, itemCount: input.questions.length },
-      contentHash: hashPayload({ assessmentCode, version: 'e2e-v1' }),
+      blueprintJson: { source: 'seed-e2e', assessmentId: assessment.id, itemCount: input.questions.length },
+      contentHash: hashPayload({ assessmentId: assessment.id, version: 'e2e-v1' }),
       publishedAt: new Date(),
       createdByUserId: input.adminId,
       approvedByUserId: input.adminId,
@@ -296,7 +264,7 @@ async function ensurePsychometricGovernance(input: {
   });
 
   for (const [index, question] of input.questions.entries()) {
-    const itemCode = `QUESTION_${question.id}`;
+    const itemCode = `E2E_ITEM_${question.itemId}`;
     const item = await (prisma as any).item.findUnique({
       where: { organizationId_itemCode: { organizationId: input.organizationId, itemCode } },
     }) || await (prisma as any).item.create({
@@ -310,7 +278,6 @@ async function ensurePsychometricGovernance(input: {
     });
 
     const stem = {
-      legacyQuestionId: question.id,
       type: question.type,
       defaultPoints: question.points,
       content: question.content,
@@ -394,7 +361,7 @@ async function ensurePsychometricGovernance(input: {
       assessmentVersionId: assessmentVersion.id,
       code: `SCORING_${input.examId}`,
       name: 'Scoring E2E',
-      modelType: 'LEGACY_COMPATIBLE',
+      modelType: 'ASSESSMENT_VERSION_SCORING',
     },
   });
 
@@ -406,7 +373,7 @@ async function ensurePsychometricGovernance(input: {
       scoringModelId: scoringModel.id,
       version: 'e2e-v1',
       status: 'PUBLISHED',
-      algorithmKey: 'legacy-compatible-e2e',
+      algorithmKey: 'assessment-version-e2e',
       parametersJson: { mode: 'e2e' },
       contentHash: hashPayload({ scoring: input.examId }),
       effectiveFrom: new Date(),
@@ -547,22 +514,18 @@ async function main() {
     },
   ];
 
-  await ensureLegacyAssessmentData({
+  await ensureAssessmentDeliveryData({
     organizationId: orgA.id,
     adminId: IDS.adminA,
-    bankId: IDS.bankA,
     examId: IDS.examA,
     perfilId: IDS.perfilA,
-    questions: questionsA,
     title: 'Evaluación E2E Enterprise A',
   });
-  await ensureLegacyAssessmentData({
+  await ensureAssessmentDeliveryData({
     organizationId: orgB.id,
     adminId: IDS.adminB,
-    bankId: IDS.bankB,
     examId: IDS.examB,
     perfilId: IDS.perfilB,
-    questions: questionsB,
     title: 'Evaluación E2E Enterprise B',
   });
 
@@ -570,7 +533,6 @@ async function main() {
     organizationId: orgA.id,
     adminId: IDS.adminA,
     examId: IDS.examA,
-    assessmentId: IDS.assessmentA,
     assessmentVersionId: IDS.assessmentVersionA,
     questions: questionsA,
     normGroupId: IDS.normGroupA,
@@ -585,7 +547,6 @@ async function main() {
     organizationId: orgB.id,
     adminId: IDS.adminB,
     examId: IDS.examB,
-    assessmentId: IDS.assessmentB,
     assessmentVersionId: IDS.assessmentVersionB,
     questions: questionsB,
     normGroupId: IDS.normGroupB,
