@@ -67,7 +67,6 @@ export default defineConfig({
       env: {
         BACKEND_URL: backendURL,
         NEXT_PUBLIC_API_BASE_URL: `${backendURL}/api`,
-        NEXT_PUBLIC_ENABLE_DEMO_MOCKS: 'false',
         NEXT_PUBLIC_APP_ENV: 'e2e',
         NEXT_PUBLIC_BUILD_DATE: 'e2e',
       },

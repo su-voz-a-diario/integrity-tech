@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/database/prisma.service';
+import { EvaluationBusinessRules, REPORT_GENERATOR_RULES } from './evaluation-business-rules';
 
 @Injectable()
 export class ReportGeneratorService {
@@ -59,13 +60,13 @@ export class ReportGeneratorService {
     for (const r of resultados) {
       if (r.engagement !== null && r.engagement !== undefined) {
         const eng = Number(r.engagement);
-        if (eng < 0.8) {
+        if (eng < REPORT_GENERATOR_RULES.lowEngagementThreshold) {
           reportMarkdown += `> [!WARNING]
 > **Alerta de Bajo Compromiso (Engagement) en ${this.mapTestId(r.testId)}:**
 > El candidato mostró un bajo nivel de compromiso (${(eng * 100).toFixed(0)}% de los ítems respondidos con esfuerzo). Una proporción significativa de reactivos fue contestada con adivinación rápida (rapid guessing). Los resultados deben interpretarse con suma cautela.
 
 `;
-        } else if (eng >= 0.95) {
+        } else if (eng >= REPORT_GENERATOR_RULES.highEngagementThreshold) {
           reportMarkdown += `> [!NOTE]
 > **Nivel de Atención Fiel en ${this.mapTestId(r.testId)}:**
 > El candidato mantuvo un alto nivel de atención y esfuerzo sostenido durante toda la prueba (${(eng * 100).toFixed(0)}% de reactivos respondidos con esfuerzo genuino).
@@ -89,11 +90,7 @@ export class ReportGeneratorService {
       const theta = Number(r.theta);
       const percentile = r.percentil !== null && r.percentil !== undefined ? Number(r.percentil).toFixed(0) : 'N/D';
       
-      let interpretableScale = '';
-      if (theta < -1.5) interpretableScale = 'Básico / Crítico';
-      else if (theta < 0.5) interpretableScale = 'En desarrollo';
-      else if (theta < 1.5) interpretableScale = 'Competente';
-      else interpretableScale = 'Sobresaliente / Experto';
+      const interpretableScale = EvaluationBusinessRules.narrativeCategoryForTheta(theta);
 
       reportMarkdown += `### Sección: ${scaleName}\n`;
       reportMarkdown += `* **Nivel de Habilidad Latente ($\theta$):** \`${theta.toFixed(2)}\` (Escala estándar: T-score: \`${r.thetaT?.toFixed(1) || 'N/D'}\`, CI: \`${r.thetaCi?.toFixed(1) || 'N/D'}\`)\n`;
@@ -110,73 +107,16 @@ export class ReportGeneratorService {
     // 3. Recomendación de contratación/desarrollo final basado en el IGA
     const IGA = Number(attempt.score);
     reportMarkdown += `## Recomendación Final de Selección\n`;
-    if (IGA >= 80.0) {
-      reportMarkdown += `El perfil del candidato demuestra una compatibilidad **altamente sobresaliente** con las exigencias del puesto. Sus habilidades cognitivas combinadas con su nivel de integridad denotan un alto potencial de desempeño y un riesgo conductual extremadamente bajo. **Recomendación: Altamente Apto.**`;
-    } else if (IGA >= 60.0) {
-      reportMarkdown += `El candidato cumple de manera sólida con el estándar del perfil. Muestra niveles estables de integridad y competencia, con pequeños márgenes de mejora en áreas particulares. **Recomendación: Apto con reservas de onboarding.**`;
-    } else {
-      reportMarkdown += `El candidato se encuentra por debajo del perfil conductual idóneo establecido para el puesto. Su nivel general de adecuación indica posibles dificultades de adaptación o áreas de riesgo que requieren mayor escrutinio. **Recomendación: No apto para perfiles críticos.**`;
-    }
+    reportMarkdown += EvaluationBusinessRules.finalNarrativeRecommendation(IGA);
 
     return reportMarkdown;
   }
 
   private mapTestId(testId: string): string {
-    const names = {
-      'IT2_I': 'Integridad y Valores',
-      'IT2_P10': 'Personalidad Organizacional',
-      'IT2_AC10': 'Habilidad Cognitiva General',
-      'IT2_CB10': 'Competencias de Liderazgo',
-    };
-    return names[testId] || testId;
+    return EvaluationBusinessRules.testScaleName(testId);
   }
 
   private getNarrativeParagraph(testId: string, theta: number): string {
-    if (testId === 'IT2_I') {
-      if (theta < -1.5) {
-        return 'El evaluado demuestra una baja adhesión a las normas y principios éticos institucionales. Podría tender a racionalizar comportamientos de riesgo y priorizar intereses individuales sobre las políticas de cumplimiento de la empresa.';
-      } else if (theta < 0.5) {
-        return 'Muestra una adhesión a valores éticos en rango promedio. Se comporta de acuerdo a las normas cuando el entorno es claro y supervisado, pero puede exhibir vulnerabilidades ante presiones situacionales fuertes.';
-      } else if (theta < 1.5) {
-        return 'Manifiesta una sólida y consistente orientación ética. Se apega fielmente a los códigos de conducta corporativos, valora la transparencia en la comunicación y toma decisiones velando por el cumplimiento ético.';
-      } else {
-        return 'Excepcional orientación hacia la honestidad e integridad moral. Actúa activamente como promotor de los valores corporativos y demuestra un compromiso férreo contra las conductas inapropiadas o corruptas.';
-      }
-    }
-
-    if (testId === 'IT2_P10') {
-      if (theta < -1.5) {
-        return 'Registra niveles bajos de estabilidad y organización. Suele reaccionar de forma impulsiva a las demandas laborales imprevistas y puede tener dificultades de colaboración constructiva en equipos de trabajo.';
-      } else if (theta < 0.5) {
-        return 'Demuestra una adaptabilidad emocional aceptable. Trabaja bien bajo supervisión regular y posee características de extroversión y responsabilidad adecuadas para tareas con niveles normales de presión.';
-      } else if (theta < 1.5) {
-        return 'Posee un excelente perfil de autorregulación y madurez profesional. Muestra resiliencia ante el estrés, es perseverante, estructurado en sus actividades y demuestra una alta orientación a la calidad de su trabajo.';
-      } else {
-        return 'Sobresaliente proactividad y liderazgo adaptativo. Altamente colaborativo, estratega e inspirador para los demás, con una tolerancia al fracaso sobresaliente que le permite manejar la incertidumbre con calma.';
-      }
-    }
-
-    if (testId === 'IT2_AC10') {
-      if (theta < -1.5) {
-        return 'Presenta tiempos de aprendizaje más prolongados de lo habitual. Requiere guías claras, estructuradas paso a paso y supervisión cercana para consolidar nuevos conocimientos conceptuales.';
-      } else if (theta < 0.5) {
-        return 'Posee una capacidad razonamiento general en el promedio de la población laboral. Resuelve problemas cotidianos con efectividad y puede asimilar instrucciones operativas de mediana complejidad.';
-      } else if (theta < 1.5) {
-        return 'Muestra agilidad mental y un excelente potencial de aprendizaje. Capta y procesa información compleja de manera rápida, estructurando soluciones lógicas a problemas abstractos de forma autónoma.';
-      } else {
-        return 'Extraordinaria aptitud cognitiva y analítica. Domina tareas de muy alta complejidad técnica y estratégica, asimilando conceptos avanzados con el mínimo entrenamiento previo y destacando por su visión innovadora.';
-      }
-    }
-
-    // Default or Competencies (IT2_CB10)
-    if (theta < -1.5) {
-      return 'Muestra escasa iniciativa para orientar a otros. Prefiere realizar tareas de forma individual y no demuestra competencias clave asociadas a la delegación de responsabilidades o coaching.';
-    } else if (theta < 0.5) {
-      return 'Demuestra habilidades básicas de liderazgo técnico. Logra coordinar actividades rutinarias, pero le falta afianzar la comunicación de visiones compartidas o el empoderamiento de su equipo.';
-    } else if (theta < 1.5) {
-      return 'Lidera equipos de forma asertiva y motivadora. Sabe delegar, promueve el crecimiento continuo de sus colaboradores directos y se orienta firmemente a la consecución de resultados grupales.';
-    } else {
-      return 'Liderazgo visionario e inspirador de alto impacto. Transforma organizaciones mediante la articulación de estrategias claras, el fomento de culturas innovadoras y el desarrollo del talento a niveles del más alto estándar.';
-    }
+    return EvaluationBusinessRules.narrativeParagraph(testId, theta);
   }
 }

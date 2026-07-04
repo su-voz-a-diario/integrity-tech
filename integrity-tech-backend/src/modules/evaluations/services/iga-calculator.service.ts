@@ -4,6 +4,7 @@ import { ThetaCalculatorService } from './theta-calculator.service';
 import { PersonFitService } from './person-fit.service';
 import { ScientificTraceService } from '../../psychometric-governance/services/scientific-trace.service';
 import { EvaluationGovernanceResolverService } from '../../psychometric-governance/services/evaluation-governance-resolver.service';
+import { EvaluationBusinessRules } from './evaluation-business-rules';
 
 export interface IgaCalculationResult {
   iga: number;
@@ -14,15 +15,6 @@ export interface IgaCalculationResult {
 @Injectable()
 export class IgaCalculatorService {
   private readonly logger = new Logger(IgaCalculatorService.name);
-
-  private readonly UMBRAL_VERDE = 75.0;
-  private readonly UMBRAL_AMARILLO = 50.0;
-
-  private readonly ALERTAS_UMBRALES = {
-    'IT2_I': 20.0,
-    'IT2_AC10': 15.0,
-    'IT2_CB10': 20.0,
-  };
 
   constructor(
     private readonly prisma: PrismaService,
@@ -261,25 +253,13 @@ export class IgaCalculatorService {
     iga = Math.round(iga * 10) / 10; // Redondear a 1 decimal
 
     // 7. Determinar recomendación basada en semáforo
-    let recomendacion = 'No recomendado';
-    if (iga >= this.UMBRAL_VERDE) {
-      recomendacion = 'Recomendado';
-    } else if (iga >= this.UMBRAL_AMARILLO) {
-      recomendacion = 'Aceptable con observaciones';
-    }
+    const recomendacion = EvaluationBusinessRules.recommendationForIga(iga);
 
     // 8. Generar alertas por percentiles críticos
     const alertas: string[] = [];
-    for (const [tId, umbral] of Object.entries(this.ALERTAS_UMBRALES)) {
-      if (percentiles[tId] !== undefined && percentiles[tId] < umbral) {
-        if (tId === 'IT2_I') {
-          alertas.push('Riesgo ético elevado');
-        } else if (tId === 'IT2_AC10') {
-          alertas.push('Capacidad cognitiva muy limitada para el puesto');
-        } else if (tId === 'IT2_CB10') {
-          alertas.push('Competencias blandas insuficientes');
-        }
-      }
+    for (const [tId, percentil] of Object.entries(percentiles)) {
+      const alerta = EvaluationBusinessRules.alertForTestPercentile(tId, percentil);
+      if (alerta) alertas.push(alerta);
     }
 
     // 9. Guardar/Actualizar en caché (resultados_globales)

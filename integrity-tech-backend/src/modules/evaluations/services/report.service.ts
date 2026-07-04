@@ -8,6 +8,7 @@ import { ReportRepository } from '../repositories/report.repository';
 import { IgaCalculatorService } from './iga-calculator.service';
 import { ScientificTraceService } from '../../psychometric-governance/services/scientific-trace.service';
 import { MetricsService } from '../../../shared/observability/metrics.service';
+import { EvaluationBusinessRules } from './evaluation-business-rules';
 
 @Injectable()
 export class ReportService {
@@ -135,17 +136,10 @@ export class ReportService {
         if (cut) {
           categoria = cut.categoria;
         } else {
-          if (thetaVal < -1.5) categoria = 'Básico';
-          else if (thetaVal < 0.5) categoria = 'En desarrollo';
-          else if (thetaVal < 1.5) categoria = 'Competente';
-          else categoria = 'Sobresaliente';
+          categoria = EvaluationBusinessRules.categoryForTheta(thetaVal);
         }
       } else if (r.percentil !== null && r.percentil !== undefined) {
-        const pctVal = Number(r.percentil);
-        if (pctVal < 25) categoria = 'Básico';
-        else if (pctVal < 75) categoria = 'En desarrollo';
-        else if (pctVal < 90) categoria = 'Competente';
-        else categoria = 'Sobresaliente';
+        categoria = EvaluationBusinessRules.categoryForPercentile(Number(r.percentil));
       }
 
       testResults[r.testId] = {
@@ -206,23 +200,10 @@ export class ReportService {
   }
 
   private getDimensionDescription(dimName: string): string {
-    const desc: Record<string, string> = {
-      'INTEGRIDAD': 'Indica apego a las normas éticas y baja propensión a justificar actos deshonestos.',
-      'SOCIABILIDAD': 'Mide el nivel de empatía e integración del candidato en equipos de trabajo.',
-      'LEALTAD': 'Mide la coincidencia con los valores corporativos y la confidencialidad organizacional.',
-      'GENERAL': 'Puntuación analítica consolidada general del reactivo.',
-    };
-    return desc[dimName] || 'Dimensión psicométrica de perfil conductual.';
+    return EvaluationBusinessRules.dimensionDescription(dimName);
   }
 
   private getLogMessage(eventType: string): string {
-    const msg: Record<string, string> = {
-      'tab_focus_lost': 'Pérdida de foco: Estudiante sale de la ventana del examen (cambio de pestaña/app).',
-      'tab_focus_gained': 'Foco restablecido: El estudiante regresa a la interfaz de toma del reactivo.',
-      'student_idle': 'Inactividad prolongada detectada en el cliente.',
-      'suspicious_behavior_detected': 'COMPORTAMIENTO SOSPECHOSO: Alerta por excesiva pérdida de foco.',
-      'identity_snapshot': 'CAPTURA DE IDENTIDAD: Captura periódica por webcam registrada.',
-    };
-    return msg[eventType] || 'Evento de telemetría de sesión registrado.';
+    return EvaluationBusinessRules.proctoringLogMessage(eventType);
   }
 }

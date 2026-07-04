@@ -6,10 +6,10 @@ interface UseProctoringProps {
   idleTimeoutMs?: number; // Tiempo límite de inactividad (ej: 60 segundos)
 }
 
-// Simulación de Web Crypto API para firma HMAC-SHA256 ligera y no bloqueante en el cliente
-async function generateLocalSignature(message: string, secret: string): Promise<string> {
+async function generateLocalSignature(message: string, secret: string): Promise<string | null> {
   if (typeof window === 'undefined' || !window.crypto || !window.crypto.subtle) {
-    return 'sig-mock-ssr';
+    console.error('[Crypto] WebCrypto no está disponible; el evento de proctoring se registrará sin firma.');
+    return null;
   }
   try {
     const encoder = new TextEncoder();
@@ -29,7 +29,7 @@ async function generateLocalSignature(message: string, secret: string): Promise<
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
   } catch (error) {
     console.error('[Crypto] Error firmando evento:', error);
-    return 'sig-error-fallback';
+    return null;
   }
 }
 
@@ -58,7 +58,8 @@ export function useProctoring({ idleTimeoutMs = 60000 }: UseProctoringProps = {}
       metadata: {
         ...metadata,
         sequence: sequenceRef.current,
-        signature, // Cadena de verificación HMAC
+        signature,
+        signatureStatus: signature ? 'SIGNED' : 'UNAVAILABLE',
         screenResolution: typeof window !== 'undefined' ? `${window.screen.width}x${window.screen.height}` : 'unknown',
         url: typeof window !== 'undefined' ? window.location.href : 'unknown',
       },
