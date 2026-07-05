@@ -6,6 +6,7 @@ import { useSecureTimer } from '../../../hooks/useSecureTimer';
 import { useProctoring } from '../../../hooks/useProctoring';
 import { syncEngine } from '../../../services/sync-engine';
 import { analyticsService } from '../../../services/analytics';
+import { TopNavigation } from '../../../components/navigation/TopNavigation';
 import { QuestionRenderer } from '../../../components/exam/QuestionRenderer';
 import { ProctoringMonitor } from '../../../components/exam/ProctoringMonitor';
 import { FeedbackLayer } from '../../../components/exam/FeedbackLayer';
@@ -174,6 +175,7 @@ export default function ExamTakingPage({ params }: { params: { attemptId: string
   if (isLoadingSession) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center font-sans">
+        <TopNavigation />
         <div className="text-sm text-slate-500 font-medium">Cargando evaluación asignada...</div>
       </div>
     );
@@ -181,7 +183,8 @@ export default function ExamTakingPage({ params }: { params: { attemptId: string
 
   if (!consentAccepted && !examSession) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center font-sans p-6">
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center font-sans p-6 pt-20">
+        <TopNavigation />
         <div className="max-w-2xl bg-slate-900 border border-slate-800 rounded-xl p-6">
           <h1 className="text-lg font-bold text-white">Consentimiento informado</h1>
           <div className="mt-4 space-y-3 text-sm text-slate-300 leading-relaxed">
@@ -218,7 +221,8 @@ export default function ExamTakingPage({ params }: { params: { attemptId: string
 
   if (sessionError || !examSession) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center font-sans p-6">
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center font-sans p-6 pt-20">
+        <TopNavigation />
         <div className="max-w-md text-center bg-slate-900 border border-slate-800 rounded-xl p-6">
           <h1 className="text-lg font-bold text-white">No se pudo abrir la evaluación</h1>
           <p className="text-sm text-slate-400 mt-2">{sessionError || 'La sesión no está disponible.'}</p>

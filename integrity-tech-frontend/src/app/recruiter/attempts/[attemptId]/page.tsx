@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { TopNavigation } from '../../../../components/navigation/TopNavigation';
 import { apiClient } from '../../../../services/api-client';
 import type { AttemptReportResponse, AttemptResultadosResponse, PerfilPuesto } from '../../../../generated/api/types';
 
@@ -71,6 +72,7 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center">
+        <TopNavigation />
         <div className="text-sm text-slate-500 font-medium">Cargando reporte de evaluación...</div>
       </div>
     );
@@ -78,7 +80,8 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
 
   if (!report) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6 pt-20">
+        <TopNavigation />
         <div className="max-w-md bg-slate-900 border border-slate-800 rounded-xl p-6 text-center">
           <h1 className="text-lg font-bold text-white">Reporte no disponible</h1>
           <p className="text-sm text-slate-400 mt-2">No hay datos reales disponibles para este intento o tu sesión no tiene permisos.</p>
@@ -110,7 +113,8 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
   const reportProctoringLogs = report.proctoringLogs || [];
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-8">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-8 pt-20">
+      <TopNavigation />
       <div className="max-w-6xl mx-auto flex flex-col gap-8">
         
         {/* ENCABEZADO DE NAVEGACION */}

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { TopNavigation } from '../../../components/navigation/TopNavigation';
 import { apiClient, ApiClientError } from '../../../services/api-client';
 import type {
   ClaimInvitationRequest,
@@ -25,6 +26,7 @@ export default function CandidateLoginPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center font-sans">
+        <TopNavigation />
         <span className="w-8 h-8 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
       </div>
     }>
@@ -114,7 +116,8 @@ function CandidateLoginForm() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6 text-center font-sans gap-8">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-6 pt-20 text-center font-sans gap-8">
+      <TopNavigation />
       
       {/* HEADER LOGO */}
       <div className="flex flex-col items-center gap-3">

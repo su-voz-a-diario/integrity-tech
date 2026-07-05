@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { TopNavigation } from '../../../components/navigation/TopNavigation';
 import { apiClient, ApiClientError } from '../../../services/api-client';
 import type { AttemptListItem, CreateInvitationRequest, CreateInvitationResponse } from '../../../generated/api/types';
 
@@ -111,7 +112,8 @@ export default function RecruiterDashboard() {
   });
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4 md:p-8">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4 pt-20 md:p-8 md:pt-20">
+      <TopNavigation />
       <div className="max-w-6xl mx-auto flex flex-col gap-6 md:gap-8">
         
         {/* ENCABEZADO - Responsivo para Móvil/Escritorio */}
