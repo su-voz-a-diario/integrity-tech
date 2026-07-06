@@ -127,12 +127,12 @@ describe('bootstrap security config', () => {
       API_BODY_LIMIT: '1mb',
     };
 
-    expect(() => validateProductionSecurityConfig({ ...base } as any)).toThrow('STORAGE_PROVIDER');
+    // local-private ahora está permitido en producción con almacenamiento de disco persistente en Render
     expect(() => validateProductionSecurityConfig({
       ...base,
       STORAGE_PROVIDER: 'local-private',
       STORAGE_SIGNED_URL_TTL_SECONDS: '300',
-    } as any)).toThrow('local-private');
+    } as any)).not.toThrow();
     expect(() => validateProductionSecurityConfig({
       ...base,
       STORAGE_PROVIDER: 's3',

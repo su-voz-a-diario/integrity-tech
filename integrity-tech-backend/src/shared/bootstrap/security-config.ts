@@ -64,10 +64,10 @@ function validateProductionStorageConfig(env: NodeJS.ProcessEnv): void {
     throw new Error('Configuración insegura: STORAGE_PROVIDER es obligatorio en producción.');
   }
   if (env.STORAGE_PROVIDER === 'local-private') {
-    throw new Error('Configuración insegura: local-private no está permitido para storage en producción.');
+    return;
   }
   if (env.STORAGE_PROVIDER !== 's3') {
-    throw new Error('Configuración insegura: STORAGE_PROVIDER debe ser s3 en producción.');
+    throw new Error('Configuración insegura: STORAGE_PROVIDER debe ser s3 o local-private en producción.');
   }
   const required = [
     'STORAGE_S3_BUCKET',

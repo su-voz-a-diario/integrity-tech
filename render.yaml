@@ -1,0 +1,136 @@
+services:
+  # 1. API Web Service (NestJS REST API)
+  - type: web
+    name: integrity-tech-api
+    env: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npx prisma migrate deploy && npm run start:prod
+    rootDir: integrity-tech-backend
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: DATABASE_URL
+        fromDatabase:
+          name: integrity-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: integrity-redis
+          property: connectionString
+      - key: REDIS_HOST
+        fromService:
+          type: redis
+          name: integrity-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: redis
+          name: integrity-redis
+          property: port
+      - key: REDIS_PASSWORD
+        fromService:
+          type: redis
+          name: integrity-redis
+          property: password
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ACCESS_TOKEN_TTL_SECONDS
+        value: 900
+      - key: REFRESH_TOKEN_TTL_DAYS
+        value: 30
+      - key: CORS_ORIGINS
+        value: https://integrity-tech-eight.vercel.app
+      - key: SHOW_SWAGGER
+        value: "false"
+      - key: ENABLE_DEV_AUTH
+        value: "false"
+      - key: API_BODY_LIMIT
+        value: 1mb
+      - key: STORAGE_PROVIDER
+        value: local-private
+      - key: STORAGE_LOCAL_PRIVATE_PATH
+        value: /app/.private-storage
+      - key: STORAGE_SIGNED_URL_TTL_SECONDS
+        value: 300
+      - key: STORAGE_MAX_FILE_BYTES
+        value: 2097152
+      - key: RATE_LIMIT_STORE
+        value: redis
+      - key: RATE_LIMIT_REDIS_REQUIRED
+        value: "true"
+    disk:
+      name: private-storage-api
+      mountPath: /app/.private-storage
+      sizeGB: 1
+
+  # 2. Background Worker Service (BullMQ Processor)
+  - type: worker
+    name: integrity-tech-worker
+    env: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: node dist/main-worker
+    rootDir: integrity-tech-backend
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: integrity-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: integrity-redis
+          property: connectionString
+      - key: REDIS_HOST
+        fromService:
+          type: redis
+          name: integrity-redis
+          property: host
+      - key: REDIS_PORT
+        fromService:
+          type: redis
+          name: integrity-redis
+          property: port
+      - key: REDIS_PASSWORD
+        fromService:
+          type: redis
+          name: integrity-redis
+          property: password
+      - key: JWT_SECRET
+        fromService:
+          type: web
+          name: integrity-tech-api
+          property: JWT_SECRET
+      - key: ACCESS_TOKEN_TTL_SECONDS
+        value: 900
+      - key: REFRESH_TOKEN_TTL_DAYS
+        value: 30
+      - key: STORAGE_PROVIDER
+        value: local-private
+      - key: STORAGE_LOCAL_PRIVATE_PATH
+        value: /app/.private-storage
+      - key: STORAGE_SIGNED_URL_TTL_SECONDS
+        value: 300
+      - key: STORAGE_MAX_FILE_BYTES
+        value: 2097152
+    disk:
+      name: private-storage-worker
+      mountPath: /app/.private-storage
+      sizeGB: 1
+
+  # 3. Redis Instance (Colas y Rate Limiting)
+  - type: redis
+    name: integrity-redis
+    plan: free
+    ipAllowList: [] # Solo accesible desde el clúster interno de Render
+
+databases:
+  # 4. PostgreSQL Database
+  - name: integrity-db
+    plan: free

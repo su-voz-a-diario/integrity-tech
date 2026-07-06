@@ -27,9 +27,7 @@ export function assertStorageConfig(env: NodeJS.ProcessEnv = process.env) {
     throw new Error('STORAGE_PROVIDER debe ser local-private o s3.');
   }
 
-  if (env.NODE_ENV === 'production' && provider === 'local-private') {
-    throw new Error('STORAGE_PROVIDER=local-private no está permitido en producción.');
-  }
+
 
   if (provider === 'local-private') {
     const path = getLocalPrivateStoragePath(env);
