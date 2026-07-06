@@ -201,9 +201,21 @@ export class PsychometricVersioningService {
     data: Record<string, unknown>;
   }) {
     const current = await this.assertVersionMutable(input.model, input.id, input.organizationId);
+    const data = { ...input.data };
+    if (input.model === 'assessmentVersion' && data.blueprintJson) {
+      data.contentHash = this.hash(data.blueprintJson);
+    }
+    if (input.model === 'itemVersion' && (data.stemJson || data.scoringKeyJson || data.tags)) {
+      data.contentHash = this.hash({
+        stemJson: data.stemJson || current.stemJson,
+        scoringKeyJson: data.scoringKeyJson === undefined ? current.scoringKeyJson || null : data.scoringKeyJson,
+        tags: data.tags === undefined ? current.tags || null : data.tags,
+        language: data.language || current.language || 'es',
+      });
+    }
     return (this.prisma as any)[input.model].update({
       where: { id: current.id },
-      data: input.data,
+      data,
     });
   }
 

@@ -84,6 +84,47 @@ describe('Evaluation SessionService consent gate', () => {
     );
   });
 
+
+  it('randomizes Integrity Laboral questions deterministically per attempt', async () => {
+    consentService.hasConsent.mockResolvedValue(true);
+    governanceResolver.findGovernedSessionItems.mockResolvedValue([
+      {
+        itemVersionId: '00000000-0000-7000-8000-000000000901',
+        weight: 1,
+        itemVersion: {
+          stemJson: { type: 'LIKERT', content: { assessmentCode: 'EVALUACION_INTEGRIDAD_LABORAL', text: 'A', dimension: 'Sinceridad' } },
+          item: { id: 'item-1', itemCode: 'EIL-1' },
+        },
+      },
+      {
+        itemVersionId: '00000000-0000-7000-8000-000000000902',
+        weight: 1,
+        itemVersion: {
+          stemJson: { type: 'LIKERT', content: { assessmentCode: 'EVALUACION_INTEGRIDAD_LABORAL', text: 'B', dimension: 'Justicia' } },
+          item: { id: 'item-2', itemCode: 'EIL-2' },
+        },
+      },
+      {
+        itemVersionId: '00000000-0000-7000-8000-000000000903',
+        weight: 1,
+        itemVersion: {
+          stemJson: { type: 'LIKERT', content: { assessmentCode: 'EVALUACION_INTEGRIDAD_LABORAL', text: 'C', dimension: 'Modestia' } },
+          item: { id: 'item-3', itemCode: 'EIL-3' },
+        },
+      },
+    ]);
+
+    const first = await service.getAttemptSession(attempt.id, user);
+    const second = await service.getAttemptSession(attempt.id, user);
+
+    expect(first.questions.map((question: any) => question.id)).toEqual(second.questions.map((question: any) => question.id));
+    expect(first.questions.map((question: any) => question.id)).not.toEqual([
+      '00000000-0000-7000-8000-000000000901',
+      '00000000-0000-7000-8000-000000000902',
+      '00000000-0000-7000-8000-000000000903',
+    ]);
+  });
+
   it('loads questions from AssessmentVersionItem when attempt is governed', async () => {
     consentService.hasConsent.mockResolvedValue(true);
     attempts.findAttemptInTenant.mockResolvedValue({

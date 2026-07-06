@@ -1,5 +1,13 @@
 import { PrismaClient } from '@prisma/client';
-import { pbkdf2Sync, randomBytes } from 'crypto';
+import { createHash, pbkdf2Sync, randomBytes } from 'crypto';
+import {
+  INTEGRITY_LABORAL_ASSESSMENT_CODE,
+  INTEGRITY_LABORAL_DIMENSIONS,
+  INTEGRITY_LABORAL_ITEMS,
+  INTEGRITY_LABORAL_LIKERT_OPTIONS,
+  INTEGRITY_LABORAL_MODEL,
+  likertWeights,
+} from '../src/modules/evaluations/integrity-laboral/integrity-laboral.definition';
 
 const prisma = new PrismaClient();
 
@@ -8,6 +16,334 @@ function hashPassword(password: string): string {
   const salt = randomBytes(16).toString('base64url');
   const hash = pbkdf2Sync(password, salt, iterations, 32, 'sha256').toString('base64url');
   return `pbkdf2$${iterations}$${salt}$${hash}`;
+}
+
+
+function hashPayload(payload: unknown): string {
+  return createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+}
+
+function taxonomyCode(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .toUpperCase()
+    .slice(0, 80);
+}
+
+async function ensureTaxonomy(organizationId: string) {
+  const category = await (prisma as any).psychometricCategory.upsert({
+    where: { organizationId_code: { organizationId, code: 'INTEGRIDAD_LABORAL' } },
+    update: {
+      name: 'Integridad Laboral',
+      description: 'Reactivos oficiales de integridad laboral basados en Honestidad-Humildad.',
+    },
+    create: {
+      organizationId,
+      code: 'INTEGRIDAD_LABORAL',
+      name: 'Integridad Laboral',
+      description: 'Reactivos oficiales de integridad laboral basados en Honestidad-Humildad.',
+    },
+  });
+
+  const competencies = new Map<string, any>();
+  for (const dimension of INTEGRITY_LABORAL_DIMENSIONS) {
+    const competency = await (prisma as any).competency.upsert({
+      where: { organizationId_code: { organizationId, code: dimension.key } },
+      update: { name: dimension.name, description: dimension.description },
+      create: { organizationId, code: dimension.key, name: dimension.name, description: dimension.description },
+    });
+    competencies.set(dimension.key, competency);
+  }
+
+  const scale = await (prisma as any).psychometricScale.upsert({
+    where: { organizationId_code: { organizationId, code: 'HONESTIDAD_HUMILDAD' } },
+    update: {
+      name: 'Honestidad-Humildad',
+      description: 'Factor H del modelo HEXACO de Lee & Ashton.',
+    },
+    create: {
+      organizationId,
+      code: 'HONESTIDAD_HUMILDAD',
+      name: 'Honestidad-Humildad',
+      description: 'Factor H del modelo HEXACO de Lee & Ashton.',
+    },
+  });
+
+  const subscales = new Map<string, any>();
+  for (const dimension of INTEGRITY_LABORAL_DIMENSIONS) {
+    const subscale = await (prisma as any).psychometricSubscale.upsert({
+      where: { scaleId_code: { scaleId: scale.id, code: dimension.key } },
+      update: { name: dimension.name, description: dimension.description },
+      create: { scaleId: scale.id, code: dimension.key, name: dimension.name, description: dimension.description },
+    });
+    subscales.set(dimension.key, subscale);
+  }
+
+  return { category, competencies, scale, subscales };
+}
+
+async function ensureOfficialIntegrityLaboralAssessment(organizationId: string, adminId: string) {
+  const taxonomy = await ensureTaxonomy(organizationId);
+  const assessment = await (prisma as any).assessment.upsert({
+    where: { organizationId_code: { organizationId, code: INTEGRITY_LABORAL_ASSESSMENT_CODE } },
+    update: {
+      name: 'Evaluación de Integridad Laboral',
+      description: 'Evaluación oficial basada en el factor Honestidad-Humildad (H) del modelo HEXACO de Lee & Ashton.',
+      status: 'PUBLISHED',
+      createdByUserId: adminId,
+    },
+    create: {
+      organizationId,
+      code: INTEGRITY_LABORAL_ASSESSMENT_CODE,
+      name: 'Evaluación de Integridad Laboral',
+      description: 'Evaluación oficial basada en el factor Honestidad-Humildad (H) del modelo HEXACO de Lee & Ashton.',
+      status: 'PUBLISHED',
+      createdByUserId: adminId,
+    },
+  });
+
+  const blueprintJson = {
+    source: 'official_seed',
+    assessmentCode: INTEGRITY_LABORAL_ASSESSMENT_CODE,
+    title: 'Evaluación de Integridad Laboral',
+    scientificModel: INTEGRITY_LABORAL_MODEL,
+    dimensions: INTEGRITY_LABORAL_DIMENSIONS,
+    responseType: 'LIKERT_5',
+    randomizeItems: true,
+    scoring: 'sum_by_dimension_and_global_without_norms',
+  };
+
+  const assessmentVersion = await (prisma as any).assessmentVersion.upsert({
+    where: { assessmentId_version: { assessmentId: assessment.id, version: '1.0.0' } },
+    update: {
+      organizationId,
+      status: 'PUBLISHED',
+      title: 'Evaluación de Integridad Laboral',
+      description: 'Primera versión oficial de la evaluación de integridad laboral.',
+      blueprintJson,
+      contentHash: hashPayload(blueprintJson),
+      publishedAt: new Date(),
+      createdByUserId: adminId,
+      approvedByUserId: adminId,
+    },
+    create: {
+      assessmentId: assessment.id,
+      organizationId,
+      version: '1.0.0',
+      status: 'PUBLISHED',
+      title: 'Evaluación de Integridad Laboral',
+      description: 'Primera versión oficial de la evaluación de integridad laboral.',
+      blueprintJson,
+      contentHash: hashPayload(blueprintJson),
+      publishedAt: new Date(),
+      createdByUserId: adminId,
+      approvedByUserId: adminId,
+    },
+  });
+
+  for (const itemDefinition of INTEGRITY_LABORAL_ITEMS) {
+    const dimension = INTEGRITY_LABORAL_DIMENSIONS.find((entry) => entry.key === itemDefinition.dimensionKey)!;
+    const itemCode = `EIL_${String(itemDefinition.order).padStart(2, '0')}_${taxonomyCode(dimension.name)}`;
+    const item = await (prisma as any).item.upsert({
+      where: { organizationId_itemCode: { organizationId, itemCode } },
+      update: {
+        status: 'ACTIVE',
+        categoryId: taxonomy.category.id,
+        competencyId: taxonomy.competencies.get(itemDefinition.dimensionKey)?.id || null,
+        scaleId: taxonomy.scale.id,
+        subscaleId: taxonomy.subscales.get(itemDefinition.dimensionKey)?.id || null,
+        createdByUserId: adminId,
+      },
+      create: {
+        organizationId,
+        itemCode,
+        status: 'ACTIVE',
+        categoryId: taxonomy.category.id,
+        competencyId: taxonomy.competencies.get(itemDefinition.dimensionKey)?.id || null,
+        scaleId: taxonomy.scale.id,
+        subscaleId: taxonomy.subscales.get(itemDefinition.dimensionKey)?.id || null,
+        createdByUserId: adminId,
+      },
+    });
+
+    const stemJson = {
+      type: 'LIKERT',
+      defaultPoints: 1,
+      content: {
+        assessmentCode: INTEGRITY_LABORAL_ASSESSMENT_CODE,
+        dimension: dimension.name,
+        dimensionKey: itemDefinition.dimensionKey,
+        text: itemDefinition.text,
+        prompt: itemDefinition.text,
+        questionType: 'LIKERT',
+        responseScale: INTEGRITY_LABORAL_LIKERT_OPTIONS,
+        internalOrder: itemDefinition.order,
+        reverseScored: itemDefinition.reverseScored,
+        instructions: 'Indica qué tan de acuerdo estás con cada afirmación.',
+      },
+    };
+    const scoringKeyJson = {
+      scoring: 'LIKERT_SUM',
+      assessmentCode: INTEGRITY_LABORAL_ASSESSMENT_CODE,
+      dimensionKey: itemDefinition.dimensionKey,
+      dimension: dimension.name,
+      reverseScored: itemDefinition.reverseScored,
+      weights: likertWeights(itemDefinition.reverseScored),
+    };
+
+    const itemVersion = await (prisma as any).itemVersion.upsert({
+      where: { itemId_version: { itemId: item.id, version: '1.0.0' } },
+      update: {
+        status: 'PUBLISHED',
+        language: 'es',
+        stemJson,
+        scoringKeyJson,
+        tags: { assessmentCode: INTEGRITY_LABORAL_ASSESSMENT_CODE, dimension: dimension.name, official: true },
+        difficulty: null,
+        discrimination: null,
+        expectedTimeSeconds: 45,
+        contentHash: hashPayload({ stemJson, scoringKeyJson }),
+        publishedAt: new Date(),
+        createdByUserId: adminId,
+        approvedByUserId: adminId,
+      },
+      create: {
+        itemId: item.id,
+        version: '1.0.0',
+        status: 'PUBLISHED',
+        language: 'es',
+        stemJson,
+        scoringKeyJson,
+        tags: { assessmentCode: INTEGRITY_LABORAL_ASSESSMENT_CODE, dimension: dimension.name, official: true },
+        difficulty: null,
+        discrimination: null,
+        expectedTimeSeconds: 45,
+        contentHash: hashPayload({ stemJson, scoringKeyJson }),
+        publishedAt: new Date(),
+        createdByUserId: adminId,
+        approvedByUserId: adminId,
+      },
+    });
+
+    await (prisma as any).assessmentVersionItem.upsert({
+      where: {
+        assessmentVersionId_itemVersionId: {
+          assessmentVersionId: assessmentVersion.id,
+          itemVersionId: itemVersion.id,
+        },
+      },
+      update: { sortOrder: itemDefinition.order - 1, weight: 1, role: 'SCORED' },
+      create: {
+        assessmentVersionId: assessmentVersion.id,
+        itemVersionId: itemVersion.id,
+        sortOrder: itemDefinition.order - 1,
+        weight: 1,
+        role: 'SCORED',
+      },
+    });
+  }
+
+  await (prisma as any).exam.upsert({
+    where: { id: assessment.id },
+    update: {
+      organizationId,
+      title: 'Evaluación de Integridad Laboral',
+      description: 'Evaluación oficial de integridad laboral basada en Honestidad-Humildad (HEXACO).',
+      durationMinutes: 20,
+      isPublished: true,
+      createdBy: adminId,
+    },
+    create: {
+      id: assessment.id,
+      organizationId,
+      title: 'Evaluación de Integridad Laboral',
+      description: 'Evaluación oficial de integridad laboral basada en Honestidad-Humildad (HEXACO).',
+      durationMinutes: 20,
+      isPublished: true,
+      createdBy: adminId,
+    },
+  });
+
+  const scoringModel = await (prisma as any).scoringModel.upsert({
+    where: { organizationId_code: { organizationId, code: `${INTEGRITY_LABORAL_ASSESSMENT_CODE}_SCORING` } },
+    update: {
+      assessmentVersionId: assessmentVersion.id,
+      name: 'Scoring sumatorio Integridad Laboral',
+      modelType: 'LIKERT_SUM_BY_DIMENSION',
+    },
+    create: {
+      organizationId,
+      assessmentVersionId: assessmentVersion.id,
+      code: `${INTEGRITY_LABORAL_ASSESSMENT_CODE}_SCORING`,
+      name: 'Scoring sumatorio Integridad Laboral',
+      modelType: 'LIKERT_SUM_BY_DIMENSION',
+    },
+  });
+
+  await (prisma as any).scoringModelVersion.upsert({
+    where: { scoringModelId_version: { scoringModelId: scoringModel.id, version: '1.0.0' } },
+    update: {
+      status: 'PUBLISHED',
+      algorithmKey: 'integrity-laboral-likert-sum',
+      parametersJson: { usesNorms: false, usesPercentiles: false, dimensions: INTEGRITY_LABORAL_DIMENSIONS },
+      contentHash: hashPayload({ scoring: INTEGRITY_LABORAL_ASSESSMENT_CODE, version: '1.0.0' }),
+      effectiveFrom: new Date(),
+      createdByUserId: adminId,
+      approvedByUserId: adminId,
+    },
+    create: {
+      scoringModelId: scoringModel.id,
+      version: '1.0.0',
+      status: 'PUBLISHED',
+      algorithmKey: 'integrity-laboral-likert-sum',
+      parametersJson: { usesNorms: false, usesPercentiles: false, dimensions: INTEGRITY_LABORAL_DIMENSIONS },
+      contentHash: hashPayload({ scoring: INTEGRITY_LABORAL_ASSESSMENT_CODE, version: '1.0.0' }),
+      effectiveFrom: new Date(),
+      createdByUserId: adminId,
+      approvedByUserId: adminId,
+    },
+  });
+
+  const reportTemplate = await (prisma as any).reportTemplate.upsert({
+    where: { organizationId_code: { organizationId, code: `${INTEGRITY_LABORAL_ASSESSMENT_CODE}_REPORT` } },
+    update: {
+      assessmentVersionId: assessmentVersion.id,
+      name: 'Reporte Integridad Laboral',
+    },
+    create: {
+      organizationId,
+      assessmentVersionId: assessmentVersion.id,
+      code: `${INTEGRITY_LABORAL_ASSESSMENT_CODE}_REPORT`,
+      name: 'Reporte Integridad Laboral',
+    },
+  });
+
+  await (prisma as any).reportTemplateVersion.upsert({
+    where: { reportTemplateId_version: { reportTemplateId: reportTemplate.id, version: '1.0.0' } },
+    update: {
+      status: 'PUBLISHED',
+      templateJson: { sections: ['integrity_laboral_profile'], usesNorms: false, usesPercentiles: false },
+      contentHash: hashPayload({ report: INTEGRITY_LABORAL_ASSESSMENT_CODE, version: '1.0.0' }),
+      effectiveFrom: new Date(),
+      createdByUserId: adminId,
+      approvedByUserId: adminId,
+    },
+    create: {
+      reportTemplateId: reportTemplate.id,
+      version: '1.0.0',
+      status: 'PUBLISHED',
+      templateJson: { sections: ['integrity_laboral_profile'], usesNorms: false, usesPercentiles: false },
+      contentHash: hashPayload({ report: INTEGRITY_LABORAL_ASSESSMENT_CODE, version: '1.0.0' }),
+      effectiveFrom: new Date(),
+      createdByUserId: adminId,
+      approvedByUserId: adminId,
+    },
+  });
+
+  return { assessment, assessmentVersion };
 }
 
 async function main() {
@@ -358,11 +694,15 @@ async function main() {
     },
   });
 
+
+  const integrityLaboral = await ensureOfficialIntegrityLaboralAssessment(organization.id, admin.id);
+
   console.log('Seed demo completado.');
   console.log('Organizacion:', organization.slug);
   console.log('Admin demo:', admin.email);
   console.log('Recruiter demo:', recruiter.email);
   console.log('Examen demo:', exam.id);
+  console.log('Evaluación oficial:', integrityLaboral.assessment.id);
 }
 
 main()

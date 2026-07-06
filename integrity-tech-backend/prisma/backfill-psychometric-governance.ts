@@ -41,18 +41,16 @@ async function main() {
   for (const exam of exams) {
     const assessment = await (prisma as any).assessment.upsert({
       where: {
-        organizationId_code: {
-          organizationId: exam.organizationId,
-          code: `EXAM_${exam.id}`,
-        },
+        id: exam.id,
       },
       update: {
         name: exam.title,
         description: exam.description,
       },
       create: {
+        id: exam.id,
         organizationId: exam.organizationId,
-        code: `EXAM_${exam.id}`,
+        code: exam.id,
         name: exam.title,
         description: exam.description,
         status: exam.isPublished ? 'PUBLISHED' : 'DRAFT',
@@ -66,7 +64,7 @@ async function main() {
     }
 
     const blueprintJson = {
-      legacyExamId: exam.id,
+      examId: exam.id,
       title: exam.title,
       durationMinutes: exam.durationMinutes,
       maxAttempts: exam.maxAttempts,
@@ -125,15 +123,13 @@ async function main() {
 
       const item = await (prisma as any).item.upsert({
         where: {
-          organizationId_itemCode: {
-            organizationId: exam.organizationId,
-            itemCode: `QUESTION_${question.id}`,
-          },
+          id: question.id,
         },
         update: {},
         create: {
+          id: question.id,
           organizationId: exam.organizationId,
-          itemCode: `QUESTION_${question.id}`,
+          itemCode: question.id,
           categoryId: category.id,
           status: 'ACTIVE',
         },
@@ -141,7 +137,7 @@ async function main() {
       itemCount++;
 
       const stemJson = {
-        legacyQuestionId: question.id,
+        questionId: question.id,
         type: question.type,
         content: stripCorrectConfig(content),
         defaultPoints: Number(question.defaultPoints),

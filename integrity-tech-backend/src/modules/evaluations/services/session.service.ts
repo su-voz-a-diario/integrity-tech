@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../shared/database/prisma.service';
 import { AUDIT_ACTIONS, AuditRequestMetadata } from '../../audit/audit-event.types';
@@ -5,6 +6,7 @@ import { AuditService } from '../../audit/services/audit.service';
 import { EvaluationGovernanceResolverService } from '../../psychometric-governance/services/evaluation-governance-resolver.service';
 import { AttemptRepository } from '../repositories/attempt.repository';
 import { CandidateConsentService } from './candidate-consent.service';
+import { INTEGRITY_LABORAL_ASSESSMENT_CODE } from '../integrity-laboral/integrity-laboral.definition';
 
 @Injectable()
 export class SessionService {
@@ -45,7 +47,7 @@ export class SessionService {
       throw new BadRequestException('El intento no tiene una versión psicométrica publicada asociada.');
     }
 
-    const safeQuestions = await this.getGovernedQuestions(attempt.assessmentVersionId);
+    const safeQuestions = await this.getGovernedQuestions(attempt.assessmentVersionId, attempt.id);
 
     await this.auditService.record({
       organizationId,
@@ -78,15 +80,29 @@ export class SessionService {
     };
   }
 
+  private shuffleForAttempt(items: any[], attemptId: string) {
+    return [...items].sort((a, b) => {
+      const hashA = createHash('sha256').update(`${attemptId}:${a.itemVersionId}`).digest('hex');
+      const hashB = createHash('sha256').update(`${attemptId}:${b.itemVersionId}`).digest('hex');
+      return hashA.localeCompare(hashB);
+    });
+  }
+
   private stripCorrectConfig(content: any): any {
     if (!content || typeof content !== 'object') return content;
     const { correctConfig, correctAnswer, correctAnswers, ...safeContent } = content;
     return safeContent;
   }
 
-  private async getGovernedQuestions(assessmentVersionId: string) {
+  private async getGovernedQuestions(assessmentVersionId: string, attemptId: string) {
     const governedItems = await this.governanceResolver.findGovernedSessionItems(assessmentVersionId);
-    return governedItems.map((link) => {
+    const shouldRandomize = governedItems.some((link) => {
+      const stem = link.itemVersion.stemJson as any;
+      const content = stem?.content || stem || {};
+      return content?.assessmentCode === INTEGRITY_LABORAL_ASSESSMENT_CODE;
+    });
+    const orderedItems = shouldRandomize ? this.shuffleForAttempt(governedItems, attemptId) : governedItems;
+    return orderedItems.map((link) => {
       const stem = link.itemVersion.stemJson as any;
       return {
         id: link.itemVersionId,

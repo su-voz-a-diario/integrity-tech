@@ -211,7 +211,7 @@ async function ensurePsychometricGovernance(input: {
   reportVersionId: string;
   title: string;
 }) {
-  const assessmentCode = `E2E_ASSESSMENT_${input.examId}`;
+  const assessmentCode = input.examId;
   const assessment = await (prisma as any).assessment.upsert({
     where: { id: input.examId },
     update: {
@@ -264,7 +264,7 @@ async function ensurePsychometricGovernance(input: {
   });
 
   for (const [index, question] of input.questions.entries()) {
-    const itemCode = `E2E_ITEM_${question.itemId}`;
+    const itemCode = question.itemId;
     const item = await (prisma as any).item.findUnique({
       where: { organizationId_itemCode: { organizationId: input.organizationId, itemCode } },
     }) || await (prisma as any).item.create({

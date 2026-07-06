@@ -15,6 +15,7 @@ type AdminShellProps = {
 const navigation = [
   { label: 'Dashboard', href: '/staff/admin' },
   { label: 'Evaluaciones', href: '/staff/admin/evaluations' },
+  { label: 'Test Builder', href: '/staff/admin/test-builder' },
   { label: 'Banco de Reactivos', href: '/staff/admin/item-bank' },
   { label: 'Publicaciones', href: '/staff/admin/publications' },
   { label: 'Usuarios', href: '/staff/admin/users' },

@@ -139,7 +139,19 @@ describe('EditorialConsoleService', () => {
     expect(versioning.createItemVersion).toHaveBeenCalledWith(expect.objectContaining({
       organizationId: user.organizationId,
       itemId: 'item-1',
-      stemJson: { prompt: 'Pregunta', type: 'LIKERT' },
+      stemJson: expect.objectContaining({
+        prompt: 'Pregunta',
+        type: 'LIKERT',
+        responseType: 'LIKERT_5_AGREEMENT',
+        factor: 'Integridad laboral',
+        facet: 'Consistencia',
+        isReverseScored: false,
+      }),
+      scoringKeyJson: expect.objectContaining({
+        scoring: 'CONFIGURED_IN_TEST_BUILDER',
+        responseType: 'LIKERT_5_AGREEMENT',
+        isReverseScored: false,
+      }),
     }));
     expect(result.itemVersion.id).toBe('iv-1');
   });

@@ -110,6 +110,7 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
 
   const allAlerts = [...(report?.alerts || []), ...(igaData?.iga?.alertas || [])];
   const reportDimensions = report.dimensions || [];
+  const integrityProfile = (report as any).integrityProfile;
   const reportProctoringLogs = report.proctoringLogs || [];
 
   return (
@@ -205,6 +206,78 @@ export default function CandidateAttemptReport({ params }: { params: { attemptId
                     <span>{alert}</span>
                   </div>
                 ))}
+              </div>
+            )}
+
+
+            {integrityProfile && (
+              <div className="bg-slate-900 border border-slate-900 p-6 rounded-xl flex flex-col gap-6 shadow-md">
+                <div>
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Perfil de Integridad Laboral</h3>
+                  <p className="text-xs text-slate-500 mt-1">Puntajes sumatorios por dimensión. No utiliza percentiles ni baremos.</p>
+                </div>
+
+                <div className="rounded-xl border border-indigo-900/40 bg-indigo-950/20 p-4">
+                  <div className="flex justify-between items-center text-sm font-semibold">
+                    <span className="text-slate-200">{integrityProfile.global.name}</span>
+                    <span className="font-mono text-indigo-300">{integrityProfile.global.score}/{integrityProfile.global.maxScore}</span>
+                  </div>
+                  <div className="mt-3 h-3 w-full overflow-hidden rounded-full border border-slate-900/50 bg-slate-950">
+                    <div className="h-full bg-indigo-500 transition-all duration-500" style={{ width: `${integrityProfile.global.percentage}%` }} />
+                  </div>
+                  <p className="mt-3 text-xs leading-relaxed text-slate-400">{integrityProfile.global.description}</p>
+                </div>
+
+                <div className="space-y-5">
+                  {integrityProfile.dimensions.map((dimension: any) => (
+                    <div key={dimension.key} className="flex flex-col gap-2">
+                      <div className="flex justify-between items-center text-sm font-semibold">
+                        <span className="text-slate-200 tracking-wide">{dimension.name}</span>
+                        <span className="text-slate-100 font-mono">{dimension.score}/{dimension.maxScore}</span>
+                      </div>
+                      <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-slate-900/50">
+                        <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${dimension.percentage}%` }} />
+                      </div>
+                      <p className="text-xs text-slate-400 leading-relaxed mt-1 font-light">{dimension.description}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-300">Fortalezas observadas</h4>
+                    {integrityProfile.strengths.length === 0 ? (
+                      <p className="mt-3 text-xs text-slate-400">No hay dimensiones en rango alto; revisar el patrón completo.</p>
+                    ) : (
+                      <ul className="mt-3 list-disc space-y-2 pl-4 text-xs text-slate-300">
+                        {integrityProfile.strengths.map((strength: string) => <li key={strength}>{strength}</li>)}
+                      </ul>
+                    )}
+                  </div>
+                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-4">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-amber-300">Áreas que requieren exploración</h4>
+                    {integrityProfile.explorationAreas.length === 0 ? (
+                      <p className="mt-3 text-xs text-slate-400">No se detectaron dimensiones en rango bajo.</p>
+                    ) : (
+                      <ul className="mt-3 list-disc space-y-2 pl-4 text-xs text-slate-300">
+                        {integrityProfile.explorationAreas.map((area: string) => <li key={area}>{area}</li>)}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+
+                {integrityProfile.interviewQuestions.length > 0 && (
+                  <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Preguntas sugeridas para entrevista</h4>
+                    <div className="mt-3 flex flex-col gap-3">
+                      {integrityProfile.interviewQuestions.map((entry: any) => (
+                        <div key={entry.dimension} className="text-xs leading-relaxed text-slate-300">
+                          <span className="font-bold text-slate-100">{entry.dimension}: </span>{entry.question}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

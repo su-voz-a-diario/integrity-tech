@@ -6,6 +6,11 @@ import { PrismaService } from '../../../shared/database/prisma.service';
 import { GradingStrategyFactory } from './grading-strategy';
 import { EvaluationGovernanceResolverService } from '../../psychometric-governance/services/evaluation-governance-resolver.service';
 import { MetricsService } from '../../../shared/observability/metrics.service';
+import {
+  INTEGRITY_LABORAL_ASSESSMENT_CODE,
+  INTEGRITY_LABORAL_DIMENSIONS,
+  dimensionByKey,
+} from '../integrity-laboral/integrity-laboral.definition';
 import { RequestContextService } from '../../../shared/observability/request-context.service';
 
 @Processor('answers-queue')
@@ -137,12 +142,19 @@ export class AnswersQueueProcessor {
       const itemVersionIds = submissions.map((s) => s.itemVersionId || s.questionId);
       const itemVersions = await (tx as any).itemVersion.findMany({
         where: { id: { in: itemVersionIds } },
-        select: { id: true, stemJson: true },
+        select: { id: true, stemJson: true, scoringKeyJson: true },
       });
 
       // 3. AGRUPACIÓN Y CÁLCULO POR DIMENSIONES PSICOMÉTRICAS
       const itemVersionsMap = new Map<string, any>(itemVersions.map((item: any) => [item.id, item]));
-      const dimensionsMap: Record<string, { earned: number; max: number }> = {};
+      const isIntegrityLaboralAttempt = itemVersions.some((item: any) => {
+        const stem = item.stemJson as any;
+        const content = stem?.content || stem || {};
+        const scoring = item.scoringKeyJson || {};
+        return content?.assessmentCode === INTEGRITY_LABORAL_ASSESSMENT_CODE || scoring?.assessmentCode === INTEGRITY_LABORAL_ASSESSMENT_CODE;
+      });
+
+      const dimensionsMap: Record<string, { earned: number; max: number; label?: string }> = {};
       let totalScore = 0;
 
       for (const sub of submissions) {
@@ -151,27 +163,42 @@ export class AnswersQueueProcessor {
 
         const stem = itemVersion.stemJson as any;
         const content = stem?.content || stem || {};
+        const scoring = itemVersion.scoringKeyJson || {};
         const points = Number(sub.pointsEarned);
-        const maxPoints = Number(stem?.defaultPoints || 1);
+        const maxPoints = isIntegrityLaboralAttempt ? 5 : Number(stem?.defaultPoints || 1);
         totalScore += points;
 
-        // Obtener la dimensión declarada en el ItemVersion (por defecto 'GENERAL')
-        const dimension = content?.dimension || stem?.dimension || 'GENERAL';
+        const dimensionKey = scoring?.dimensionKey || content?.dimensionKey || content?.dimension || stem?.dimension || 'GENERAL';
+        const dimensionLabel = scoring?.dimension || content?.dimension || dimensionByKey(dimensionKey)?.name || dimensionKey;
 
-        if (!dimensionsMap[dimension]) {
-          dimensionsMap[dimension] = { earned: 0, max: 0 };
+        if (!dimensionsMap[dimensionKey]) {
+          dimensionsMap[dimensionKey] = { earned: 0, max: 0, label: dimensionLabel };
         }
-        dimensionsMap[dimension].earned += points;
-        dimensionsMap[dimension].max += maxPoints;
+        dimensionsMap[dimensionKey].earned += points;
+        dimensionsMap[dimensionKey].max += maxPoints;
       }
 
-      // Estructurar el perfil psicométrico detallado para el reporte de RRHH
-      const scoreDetails: Record<string, { earned: number; max: number; percentage: number }> = {};
+      const scoreDetails: Record<string, any> = {};
       for (const [dim, data] of Object.entries(dimensionsMap)) {
         scoreDetails[dim] = {
+          name: data.label || dim,
           earned: Number(data.earned.toFixed(2)),
           max: Number(data.max.toFixed(2)),
           percentage: data.max > 0 ? Number(((data.earned / data.max) * 100).toFixed(1)) : 0,
+        };
+      }
+
+      if (isIntegrityLaboralAttempt) {
+        const maxGlobal = INTEGRITY_LABORAL_DIMENSIONS.length * 25;
+        scoreDetails.integrityLaboral = {
+          assessmentCode: INTEGRITY_LABORAL_ASSESSMENT_CODE,
+          title: 'Perfil de Integridad Laboral',
+          global: {
+            name: 'Integridad Global',
+            earned: Number(totalScore.toFixed(2)),
+            max: maxGlobal,
+            percentage: Number(((totalScore / maxGlobal) * 100).toFixed(1)),
+          },
         };
       }
 

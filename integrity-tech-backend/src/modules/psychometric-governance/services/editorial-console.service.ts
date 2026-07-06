@@ -26,12 +26,38 @@ export class EditorialConsoleService {
     const name = dto.name.trim();
     if (!code || !name) throw new BadRequestException('Código y nombre de evaluación son obligatorios.');
 
+    const scientificDescription = dto.scientificDescription?.trim() || dto.description?.trim() || undefined;
+    const blueprintJson = {
+      source: 'test_builder',
+      assessmentCode: code,
+      shortName: dto.shortName?.trim() || undefined,
+      scientificDescription,
+      constructObjective: dto.constructObjective?.trim() || undefined,
+      candidateInstructions: dto.candidateInstructions?.trim() || undefined,
+      estimatedTimeMinutes: dto.estimatedTimeMinutes || undefined,
+      author: dto.author?.trim() || undefined,
+      scientificReferences: dto.scientificReferences || undefined,
+      language: dto.language?.trim() || 'es',
+      factors: dto.factors || [],
+      facets: dto.facets || [],
+      responseTypes: dto.responseTypes || [],
+      scoringConfig: dto.scoringConfig || {
+        facetScore: 'sum',
+        globalScore: 'sum',
+        randomizeItems: false,
+        randomizeFacets: false,
+        cutScores: [],
+      },
+      normingConfig: dto.normingConfig || { enabled: false, status: 'not_configured' },
+      reportConfig: dto.reportConfig || { sections: [] },
+    };
+
     const assessment = await (this.prisma as any).assessment.create({
       data: {
         organizationId: user.organizationId,
         code,
         name,
-        description: dto.description?.trim() || null,
+        description: scientificDescription || null,
         status: 'DRAFT',
         createdByUserId: user.userId,
       },
@@ -42,11 +68,8 @@ export class EditorialConsoleService {
       assessmentId: assessment.id,
       version: '1.0.0',
       title: name,
-      description: dto.description?.trim() || undefined,
-      blueprintJson: {
-        source: 'staff_editorial_console',
-        assessmentCode: code,
-      },
+      description: scientificDescription,
+      blueprintJson,
       createdByUserId: user.userId,
     });
 
@@ -86,14 +109,58 @@ export class EditorialConsoleService {
       },
     });
 
+    const responseType = dto.responseType?.trim() || (dto.stemJson?.responseType as string | undefined) || 'LIKERT_5_AGREEMENT';
+    const stemJson = {
+      ...dto.stemJson,
+      type: (dto.stemJson?.type as string | undefined) || responseType,
+      responseType,
+      prompt: dto.text?.trim() || (dto.stemJson?.prompt as string | undefined) || (dto.stemJson?.text as string | undefined),
+      text: dto.text?.trim() || (dto.stemJson?.text as string | undefined) || (dto.stemJson?.prompt as string | undefined),
+      factor: dto.scale?.trim() || (dto.stemJson?.factor as string | undefined),
+      facet: dto.subscale?.trim() || (dto.stemJson?.facet as string | undefined),
+      isReverseScored: dto.isReverseScored ?? (dto.stemJson?.isReverseScored as boolean | undefined) ?? false,
+      order: dto.order ?? (dto.stemJson?.order as number | undefined),
+      authorNotes: dto.authorNotes?.trim() || (dto.stemJson?.authorNotes as string | undefined),
+      scientificMetadata: {
+        constructMeasured: dto.constructMeasured?.trim() || undefined,
+        observableBehavior: dto.observableBehavior?.trim() || undefined,
+        itemHypothesis: dto.itemHypothesis?.trim() || undefined,
+        scientificSource: dto.scientificSource?.trim() || undefined,
+        bibliographyReference: dto.bibliographyReference?.trim() || undefined,
+        doi: dto.doi?.trim() || undefined,
+        ...(typeof dto.stemJson?.scientificMetadata === 'object' && dto.stemJson.scientificMetadata ? dto.stemJson.scientificMetadata : {}),
+      },
+      futureMetrics: {
+        discrimination: dto.discrimination ?? null,
+        difficulty: dto.difficulty ?? null,
+        alphaIfDeleted: null,
+        irtParameters: null,
+        dif: null,
+        calibratedAt: null,
+        ...(typeof dto.stemJson?.futureMetrics === 'object' && dto.stemJson.futureMetrics ? dto.stemJson.futureMetrics : {}),
+      },
+    };
+    const scoringKeyJson = dto.scoringKeyJson || {
+      scoring: 'CONFIGURED_IN_TEST_BUILDER',
+      responseType,
+      isReverseScored: stemJson.isReverseScored,
+    };
+    const tags = {
+      ...(dto.tags || {}),
+      factor: dto.scale?.trim() || undefined,
+      facet: dto.subscale?.trim() || undefined,
+      constructMeasured: dto.constructMeasured?.trim() || undefined,
+      source: 'test_builder',
+    };
+
     const itemVersion = await this.versioning.createItemVersion({
       organizationId: user.organizationId,
       itemId: item.id,
       version: dto.version?.trim() || '1.0.0',
       language: dto.language?.trim() || 'es',
-      stemJson: dto.stemJson,
-      scoringKeyJson: dto.scoringKeyJson,
-      tags: dto.tags,
+      stemJson,
+      scoringKeyJson,
+      tags,
       difficulty: dto.difficulty,
       discrimination: dto.discrimination,
       expectedTimeSeconds: dto.expectedTimeSeconds,
@@ -275,8 +342,11 @@ export class EditorialConsoleService {
             version: true,
             status: true,
             language: true,
+            stemJson: true,
+            tags: true,
             difficulty: true,
             discrimination: true,
+            expectedTimeSeconds: true,
             exposureRate: true,
             publishedAt: true,
             retiredAt: true,
@@ -663,6 +733,47 @@ export class EditorialConsoleService {
     const warnings: string[] = [];
     if (version.itemLinks.length === 0) {
       blockingIssues.push('La prueba no tiene reactivos vinculados.');
+    }
+
+    const blueprint = (version.blueprintJson || {}) as any;
+    if (blueprint.source === 'test_builder') {
+      const factors = Array.isArray(blueprint.factors) ? blueprint.factors.filter((factor: any) => factor?.active !== false) : [];
+      const facets = Array.isArray(blueprint.facets) ? blueprint.facets.filter((facet: any) => facet?.active !== false) : [];
+      const factorCodes = new Set<string>();
+      const facetCodes = new Set<string>();
+      for (const factor of factors) {
+        if (!factor?.name || !factor?.code) blockingIssues.push('Todos los factores deben tener nombre y código.');
+        if (factorCodes.has(factor.code)) blockingIssues.push(`Código de factor duplicado: ${factor.code}.`);
+        if (factor.code) factorCodes.add(factor.code);
+      }
+      for (const facet of facets) {
+        if (!facet?.name || !facet?.code) blockingIssues.push('Todas las facetas deben tener nombre y código.');
+        if (facetCodes.has(facet.code)) blockingIssues.push(`Código de faceta duplicado: ${facet.code}.`);
+        if (facet.code) facetCodes.add(facet.code);
+      }
+      if (factors.length === 0) blockingIssues.push('La versión debe tener al menos un factor activo.');
+      if (facets.length === 0) blockingIssues.push('La versión debe tener al menos una faceta activa.');
+      if (!blueprint.candidateInstructions) blockingIssues.push('La versión debe tener instrucciones para el candidato.');
+      if (!blueprint.scoringConfig || typeof blueprint.scoringConfig !== 'object') blockingIssues.push('La versión debe tener configuración de corrección.');
+      const interpretations = blueprint.interpretations;
+      const hasInterpretations = interpretations && typeof interpretations === 'object' && Object.values(interpretations).some((ranges: any) => Array.isArray(ranges) && ranges.length > 0);
+      if (!hasInterpretations) blockingIssues.push('La versión debe tener interpretaciones configuradas por faceta.');
+      const activeFacetCodes = new Set(facets.map((facet: any) => facet.code).filter(Boolean));
+      for (const facet of facets) {
+        const linkedCount = version.itemLinks.filter((link: any) => {
+          const stem = link.itemVersion?.stemJson || {};
+          const tags = link.itemVersion?.tags || {};
+          return stem.facet === facet.name || stem.facetCode === facet.code || tags.facet === facet.name || tags.facetCode === facet.code;
+        }).length;
+        if (linkedCount === 0) blockingIssues.push(`La faceta ${facet.name || facet.code} no tiene reactivos vinculados.`);
+      }
+      for (const link of version.itemLinks) {
+        const stem = link.itemVersion?.stemJson || {};
+        if (!stem.responseType && !stem.type) blockingIssues.push(`El reactivo ${link.itemVersion?.item?.itemCode || link.itemVersionId} no tiene tipo de respuesta.`);
+        if (link.sortOrder === null || link.sortOrder === undefined) blockingIssues.push(`El reactivo ${link.itemVersion?.item?.itemCode || link.itemVersionId} no tiene orden.`);
+        const facetCode = stem.facetCode || link.itemVersion?.tags?.facetCode;
+        if (facetCode && !activeFacetCodes.has(facetCode)) warnings.push(`El reactivo ${link.itemVersion?.item?.itemCode || link.itemVersionId} referencia una faceta no activa.`);
+      }
     }
 
     for (const link of version.itemLinks) {

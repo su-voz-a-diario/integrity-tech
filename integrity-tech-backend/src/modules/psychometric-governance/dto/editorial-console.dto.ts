@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayMaxSize, IsArray, IsEnum, IsInt, IsNumber, IsObject, IsOptional, IsString, IsUUID, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsEnum, IsInt, IsNumber, IsObject, IsOptional, IsString, IsUUID, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { MaxJsonSize } from '../../../shared/validators/json-size.validator';
 
@@ -29,6 +29,72 @@ export class CreateItemDto {
   @MinLength(2)
   @MaxLength(120)
   itemCode: string;
+
+
+  @ApiPropertyOptional({ description: 'Texto visible del reactivo', maxLength: 2000 })
+  @IsString()
+  @MaxLength(2000)
+  @IsOptional()
+  text?: string;
+
+  @ApiPropertyOptional({ description: 'Tipo de respuesta reutilizable', example: 'LIKERT_5_AGREEMENT', maxLength: 80 })
+  @IsString()
+  @MaxLength(80)
+  @IsOptional()
+  responseType?: string;
+
+  @ApiPropertyOptional({ description: 'Indica si el reactivo invierte la escala' })
+  @IsBoolean()
+  @IsOptional()
+  isReverseScored?: boolean;
+
+  @ApiPropertyOptional({ description: 'Orden sugerido en el banco', minimum: 0 })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  order?: number;
+
+  @ApiPropertyOptional({ description: 'Notas del autor del reactivo', maxLength: 2000 })
+  @IsString()
+  @MaxLength(2000)
+  @IsOptional()
+  authorNotes?: string;
+
+  @ApiPropertyOptional({ description: 'Constructo medido', maxLength: 255 })
+  @IsString()
+  @MaxLength(255)
+  @IsOptional()
+  constructMeasured?: string;
+
+  @ApiPropertyOptional({ description: 'Conducta observable asociada', maxLength: 1000 })
+  @IsString()
+  @MaxLength(1000)
+  @IsOptional()
+  observableBehavior?: string;
+
+  @ApiPropertyOptional({ description: 'Hipótesis científica del reactivo', maxLength: 1000 })
+  @IsString()
+  @MaxLength(1000)
+  @IsOptional()
+  itemHypothesis?: string;
+
+  @ApiPropertyOptional({ description: 'Fuente científica', maxLength: 1000 })
+  @IsString()
+  @MaxLength(1000)
+  @IsOptional()
+  scientificSource?: string;
+
+  @ApiPropertyOptional({ description: 'Referencia bibliográfica', maxLength: 1000 })
+  @IsString()
+  @MaxLength(1000)
+  @IsOptional()
+  bibliographyReference?: string;
+
+  @ApiPropertyOptional({ description: 'DOI opcional', maxLength: 255 })
+  @IsString()
+  @MaxLength(255)
+  @IsOptional()
+  doi?: string;
 
   @ApiPropertyOptional({ description: 'Versión inicial del reactivo', example: '1.0.0', maxLength: 50 })
   @IsString()
@@ -119,6 +185,91 @@ export class CreateAssessmentDto {
   @MaxLength(1000)
   @IsOptional()
   description?: string;
+
+  @ApiPropertyOptional({ description: 'Nombre corto para navegación y reportes', maxLength: 120 })
+  @IsString()
+  @MaxLength(120)
+  @IsOptional()
+  shortName?: string;
+
+  @ApiPropertyOptional({ description: 'Descripción científica completa', maxLength: 4000 })
+  @IsString()
+  @MaxLength(4000)
+  @IsOptional()
+  scientificDescription?: string;
+
+  @ApiPropertyOptional({ description: 'Objetivo del constructo evaluado', maxLength: 2000 })
+  @IsString()
+  @MaxLength(2000)
+  @IsOptional()
+  constructObjective?: string;
+
+  @ApiPropertyOptional({ description: 'Instrucciones para el candidato', maxLength: 4000 })
+  @IsString()
+  @MaxLength(4000)
+  @IsOptional()
+  candidateInstructions?: string;
+
+  @ApiPropertyOptional({ description: 'Tiempo estimado en minutos', minimum: 1 })
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  estimatedTimeMinutes?: number;
+
+  @ApiPropertyOptional({ description: 'Autor científico o responsable', maxLength: 255 })
+  @IsString()
+  @MaxLength(255)
+  @IsOptional()
+  author?: string;
+
+  @ApiPropertyOptional({ description: 'Referencias científicas estructuradas' })
+  @IsObject()
+  @IsOptional()
+  @MaxJsonSize(4096)
+  scientificReferences?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ description: 'Idioma principal', maxLength: 10 })
+  @IsString()
+  @MaxLength(10)
+  @IsOptional()
+  language?: string;
+
+  @ApiPropertyOptional({ description: 'Factores científicos de la evaluación' })
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsOptional()
+  factors?: Array<Record<string, unknown>>;
+
+  @ApiPropertyOptional({ description: 'Facetas científicas de la evaluación' })
+  @IsArray()
+  @ArrayMaxSize(300)
+  @IsOptional()
+  facets?: Array<Record<string, unknown>>;
+
+  @ApiPropertyOptional({ description: 'Catálogo de tipos de respuesta usado por la evaluación' })
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsOptional()
+  responseTypes?: Array<Record<string, unknown>>;
+
+  @ApiPropertyOptional({ description: 'Configuración de corrección, aleatorización y cortes' })
+  @IsObject()
+  @IsOptional()
+  @MaxJsonSize(8192)
+  scoringConfig?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ description: 'Configuración de reportes' })
+  @IsObject()
+  @IsOptional()
+  @MaxJsonSize(8192)
+  reportConfig?: Record<string, unknown>;
+
+  @ApiPropertyOptional({ description: 'Configuración futura de normas y baremos' })
+  @IsObject()
+  @IsOptional()
+  @MaxJsonSize(8192)
+  normingConfig?: Record<string, unknown>;
+
 }
 
 export class AssessmentVersionItemLinkDto {

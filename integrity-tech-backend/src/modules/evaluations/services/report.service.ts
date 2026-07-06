@@ -9,6 +9,10 @@ import { IgaCalculatorService } from './iga-calculator.service';
 import { ScientificTraceService } from '../../psychometric-governance/services/scientific-trace.service';
 import { MetricsService } from '../../../shared/observability/metrics.service';
 import { EvaluationBusinessRules } from './evaluation-business-rules';
+import {
+  INTEGRITY_LABORAL_ASSESSMENT_CODE,
+  INTEGRITY_LABORAL_DIMENSIONS,
+} from '../integrity-laboral/integrity-laboral.definition';
 
 @Injectable()
 export class ReportService {
@@ -47,8 +51,10 @@ export class ReportService {
       : await this.scientificTrace.buildAttemptTrace(organizationId, att.id);
 
     const dimensions = [];
+    let integrityProfile = null;
     if (att.scoreDetails) {
       const details = att.scoreDetails as any;
+      integrityProfile = this.buildIntegrityLaboralProfile(details);
       for (const [dimName, val] of Object.entries(details)) {
         const dimVal = val as any;
         dimensions.push({
@@ -98,6 +104,7 @@ export class ReportService {
       sessionHmac: att.ltiMapping ? `lti-${att.ltiMapping.id}` : null,
       governanceTrace,
       dimensions,
+      integrityProfile,
       proctoringLogs: logsMapped,
     };
   }
@@ -197,6 +204,88 @@ export class ReportService {
 
   getPerfiles(organizationId: string) {
     return this.reports.findPerfiles(organizationId);
+  }
+
+
+  private buildIntegrityLaboralProfile(details: any) {
+    if (details?.integrityLaboral?.assessmentCode !== INTEGRITY_LABORAL_ASSESSMENT_CODE) return null;
+
+    const global = details.integrityLaboral.global || null;
+    const dimensions = INTEGRITY_LABORAL_DIMENSIONS.map((definition) => {
+      const score = details[definition.key] || {};
+      const percentage = Number(score.percentage || 0);
+      return {
+        key: definition.key,
+        name: definition.name,
+        score: Number(score.earned || 0),
+        maxScore: Number(score.max || 25),
+        percentage,
+        description: this.integrityDimensionInterpretation(definition.name, percentage),
+      };
+    });
+
+    const highDimensions = dimensions.filter((dimension) => dimension.percentage >= 80);
+    const lowDimensions = dimensions.filter((dimension) => dimension.percentage < 60);
+
+    return {
+      title: 'Perfil de Integridad Laboral',
+      global: {
+        name: 'Integridad Global',
+        score: Number(global?.earned || 0),
+        maxScore: Number(global?.max || 100),
+        percentage: Number(global?.percentage || 0),
+        description: this.integrityGlobalInterpretation(Number(global?.percentage || 0)),
+      },
+      dimensions,
+      strengths: highDimensions.map((dimension) => this.integrityStrengthText(dimension.name)),
+      explorationAreas: lowDimensions.map((dimension) => this.integrityExplorationText(dimension.name)),
+      interviewQuestions: lowDimensions.map((dimension) => ({
+        dimension: dimension.name,
+        question: this.integrityInterviewQuestion(dimension.key),
+      })),
+    };
+  }
+
+  private integrityGlobalInterpretation(percentage: number) {
+    if (percentage >= 80) return 'Perfil global alto de integridad laboral en la evaluación aplicada.';
+    if (percentage >= 60) return 'Perfil global medio; conviene revisar dimensiones específicas durante entrevista.';
+    return 'Perfil global bajo; requiere exploración cuidadosa en entrevista estructurada.';
+  }
+
+  private integrityDimensionInterpretation(name: string, percentage: number) {
+    if (percentage >= 80) return `${name} aparece como fortaleza observable en esta evaluación.`;
+    if (percentage >= 60) return `${name} se ubica en un rango medio y puede explorarse con evidencia conductual.`;
+    return `${name} requiere exploración adicional mediante entrevista y referencias laborales.`;
+  }
+
+  private integrityStrengthText(name: string) {
+    const texts: Record<string, string> = {
+      Sinceridad: 'Comunicación directa y menor tendencia a manipular la impresión interpersonal.',
+      Justicia: 'Rechazo consistente a prácticas injustas, fraude o uso indebido de recursos.',
+      Modestia: 'Apertura a retroalimentación y reconocimiento equilibrado del propio desempeño.',
+      'Ausencia de Avaricia': 'Motivación laboral menos centrada en estatus, lujos o ganancia inmediata.',
+    };
+    return texts[name] || `${name} aparece como fortaleza observable.`;
+  }
+
+  private integrityExplorationText(name: string) {
+    const texts: Record<string, string> = {
+      Sinceridad: 'Explorar situaciones donde haya tenido que admitir errores o comunicar información incómoda.',
+      Justicia: 'Explorar criterios éticos ante recursos, favoritismos o ventajas personales.',
+      Modestia: 'Explorar reacción ante crítica, reconocimiento de otros y aprendizaje desde posiciones iniciales.',
+      'Ausencia de Avaricia': 'Explorar motivadores laborales, expectativas económicas y relación con estatus.',
+    };
+    return texts[name] || `Explorar con mayor detalle la dimensión ${name}.`;
+  }
+
+  private integrityInterviewQuestion(key: string) {
+    const questions: Record<string, string> = {
+      JUSTICIA: 'Cuénteme una situación donde observó una práctica poco ética en una organización. ¿Qué hizo usted?',
+      MODESTIA: 'Hábleme de una ocasión en la que recibió una crítica importante. ¿Cómo reaccionó?',
+      SINCERIDAD: 'Describa una ocasión en la que tuvo que admitir un error importante.',
+      AUSENCIA_AVARICIA: '¿Qué factores considera más importantes al aceptar una oferta laboral?',
+    };
+    return questions[key] || 'Comparta un ejemplo conductual reciente relacionado con esta dimensión.';
   }
 
   private getDimensionDescription(dimName: string): string {
