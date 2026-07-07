@@ -4,6 +4,7 @@ import { tmpdir } from 'os';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { LocalPrivateStorageProvider } from './providers/local-private-storage.provider';
 import { S3StorageProvider } from './providers/s3-storage.provider';
+import { GcsStorageProvider } from './providers/gcs-storage.provider';
 import { StorageService } from './storage.service';
 
 describe('StorageService private evidence storage', () => {
@@ -46,6 +47,7 @@ describe('StorageService private evidence storage', () => {
       organizationContext,
       new LocalPrivateStorageProvider(),
       {} as S3StorageProvider,
+      {} as GcsStorageProvider,
     );
   });
 

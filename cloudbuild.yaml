@@ -1,0 +1,65 @@
+steps:
+  # 1. Build y tag para la imagen de la API
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/integrity-tech-api:$COMMIT_SHA'
+      - '-t'
+      - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/integrity-tech-api:latest'
+      - '-f'
+      - 'integrity-tech-backend/Dockerfile'
+      - 'integrity-tech-backend'
+    id: 'build-api'
+
+  # 2. Build y tag para la imagen del Worker
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/integrity-tech-worker:$COMMIT_SHA'
+      - '-t'
+      - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/integrity-tech-worker:latest'
+      - '-f'
+      - 'integrity-tech-backend/Dockerfile'
+      - 'integrity-tech-backend'
+    id: 'build-worker'
+
+  # 3. Push de las imágenes de la API a Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/integrity-tech-api:$COMMIT_SHA'
+    id: 'push-api-sha'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/integrity-tech-api:latest'
+    id: 'push-api-latest'
+
+  # 4. Push de las imágenes del Worker a Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/integrity-tech-worker:$COMMIT_SHA'
+    id: 'push-worker-sha'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/integrity-tech-worker:latest'
+    id: 'push-worker-latest'
+
+images:
+  - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/integrity-tech-api:$COMMIT_SHA'
+  - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/integrity-tech-api:latest'
+  - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/integrity-tech-worker:$COMMIT_SHA'
+  - '$_LOCATION-docker.pkg.dev/$PROJECT_ID/$_REPOSITORY/integrity-tech-worker:latest'
+
+substitutions:
+  _LOCATION: 'us-central1'
+  _REPOSITORY: 'integrity-tech'
+
+options:
+  logging: CLOUD_LOGGING

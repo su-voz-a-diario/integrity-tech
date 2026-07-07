@@ -66,18 +66,27 @@ function validateProductionStorageConfig(env: NodeJS.ProcessEnv): void {
   if (env.STORAGE_PROVIDER === 'local-private') {
     return;
   }
-  if (env.STORAGE_PROVIDER !== 's3') {
-    throw new Error('Configuración insegura: STORAGE_PROVIDER debe ser s3 o local-private en producción.');
+  if (!['s3', 'gcs'].includes(env.STORAGE_PROVIDER)) {
+    throw new Error('Configuración insegura: STORAGE_PROVIDER debe ser s3, gcs o local-private en producción.');
   }
-  const required = [
-    'STORAGE_S3_BUCKET',
-    'STORAGE_S3_REGION',
-    'STORAGE_S3_ACCESS_KEY_ID',
-    'STORAGE_S3_SECRET_ACCESS_KEY',
-  ];
-  const missing = required.filter((key) => !env[key]);
-  if (missing.length > 0) {
-    throw new Error(`Configuración insegura: faltan variables S3 (${missing.join(', ')}).`);
+  if (env.STORAGE_PROVIDER === 's3') {
+    const required = [
+      'STORAGE_S3_BUCKET',
+      'STORAGE_S3_REGION',
+      'STORAGE_S3_ACCESS_KEY_ID',
+      'STORAGE_S3_SECRET_ACCESS_KEY',
+    ];
+    const missing = required.filter((key) => !env[key]);
+    if (missing.length > 0) {
+      throw new Error(`Configuración insegura: faltan variables S3 (${missing.join(', ')}).`);
+    }
+  }
+  if (env.STORAGE_PROVIDER === 'gcs') {
+    const required = ['STORAGE_GCS_BUCKET'];
+    const missing = required.filter((key) => !env[key]);
+    if (missing.length > 0) {
+      throw new Error(`Configuración insegura: faltan variables GCS (${missing.join(', ')}).`);
+    }
   }
   if (!env.STORAGE_SIGNED_URL_TTL_SECONDS || Number(env.STORAGE_SIGNED_URL_TTL_SECONDS) > 900) {
     throw new Error('Configuración insegura: STORAGE_SIGNED_URL_TTL_SECONDS debe existir y ser <= 900.');

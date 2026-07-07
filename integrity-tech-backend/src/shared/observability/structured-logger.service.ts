@@ -41,6 +41,12 @@ export class StructuredLoggerService implements LoggerService {
 
   private write(severity: LogSeverity, message: any, module?: string, extra: Record<string, unknown> = {}) {
     const ctx = this.context.get();
+    const gcpSeverities: Record<LogSeverity, string> = {
+      debug: 'DEBUG',
+      info: 'INFO',
+      warn: 'WARNING',
+      error: 'ERROR',
+    };
     const payload = {
       timestamp: new Date().toISOString(),
       traceId: ctx?.traceId || null,
@@ -49,7 +55,7 @@ export class StructuredLoggerService implements LoggerService {
       userId: (extra.userId as string) || ctx?.userId || null,
       module: module || (extra.module as string) || 'Application',
       action: (extra.action as string) || 'log',
-      severity,
+      severity: gcpSeverities[severity],
       message: this.redact(message),
       metadata: this.redactObject((extra.metadata as Record<string, unknown>) || {}),
     };

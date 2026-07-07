@@ -13,6 +13,7 @@ import {
 } from './storage.config';
 import { LocalPrivateStorageProvider } from './providers/local-private-storage.provider';
 import { S3StorageProvider } from './providers/s3-storage.provider';
+import { GcsStorageProvider } from './providers/gcs-storage.provider';
 import { StorageProvider } from './storage-provider.interface';
 
 type StorePrivateFileInput = {
@@ -35,6 +36,7 @@ export class StorageService {
     private readonly organizationContext: OrganizationContextService,
     private readonly localProvider: LocalPrivateStorageProvider,
     private readonly s3Provider: S3StorageProvider,
+    private readonly gcsProvider: GcsStorageProvider,
   ) {
     assertStorageConfig(process.env);
   }
@@ -214,6 +216,7 @@ export class StorageService {
 
   private resolveProvider(name = getStorageProviderName()): StorageProvider {
     if (name === 's3') return this.s3Provider;
+    if (name === 'gcs') return this.gcsProvider;
     return this.localProvider;
   }
 

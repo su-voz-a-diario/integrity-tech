@@ -23,11 +23,9 @@ export function assertStorageConfig(env: NodeJS.ProcessEnv = process.env) {
   if (!provider) {
     throw new Error('STORAGE_PROVIDER es obligatorio en producción.');
   }
-  if (!['local-private', 's3'].includes(provider)) {
-    throw new Error('STORAGE_PROVIDER debe ser local-private o s3.');
+  if (!['local-private', 's3', 'gcs'].includes(provider)) {
+    throw new Error('STORAGE_PROVIDER debe ser local-private, s3 o gcs.');
   }
-
-
 
   if (provider === 'local-private') {
     const path = getLocalPrivateStoragePath(env);
@@ -41,6 +39,14 @@ export function assertStorageConfig(env: NodeJS.ProcessEnv = process.env) {
     const missing = required.filter((key) => !env[key]);
     if (missing.length > 0) {
       throw new Error(`Faltan variables de storage S3: ${missing.join(', ')}`);
+    }
+  }
+
+  if (provider === 'gcs') {
+    const required = ['STORAGE_GCS_BUCKET'];
+    const missing = required.filter((key) => !env[key]);
+    if (missing.length > 0) {
+      throw new Error(`Faltan variables de storage GCS: ${missing.join(', ')}`);
     }
   }
 }

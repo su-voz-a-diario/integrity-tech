@@ -131,6 +131,17 @@ export class HealthService {
           },
         });
         await client.send(new HeadBucketCommand({ Bucket: process.env.STORAGE_S3_BUCKET }));
+      } else if (provider === 'gcs') {
+        const { Storage } = require('@google-cloud/storage');
+        const storage = new Storage({
+          projectId: process.env.STORAGE_GCS_PROJECT_ID || undefined,
+          keyFilename: process.env.STORAGE_GCS_KEY_FILE || undefined,
+        });
+        const bucket = storage.bucket(process.env.STORAGE_GCS_BUCKET || '');
+        const [exists] = await bucket.exists();
+        if (!exists) {
+          throw new Error(`Bucket ${process.env.STORAGE_GCS_BUCKET} no existe.`);
+        }
       }
       this.metrics.setDependencyHealth('storage', true);
       return { name: 'storage', status: 'up' };

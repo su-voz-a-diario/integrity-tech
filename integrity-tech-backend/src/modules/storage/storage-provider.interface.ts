@@ -1,6 +1,6 @@
 import { Readable } from 'stream';
 
-export type StorageProviderName = 'local-private' | 's3';
+export type StorageProviderName = 'local-private' | 's3' | 'gcs';
 
 export type PutPrivateObjectInput = {
   objectKey: string;
