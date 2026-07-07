@@ -146,7 +146,83 @@ Para inicializar perfiles y usuarios clave en la base de datos de GCP:
 
 ---
 
-## 7. Estrategia de Rollback y Escalamiento
+## 7. Aprovisionamiento detallado y comandos de despliegue en GCP
+
+### A. Creación de Secretos en Secret Manager
+Ejecuta los siguientes comandos para registrar los secretos de producción:
+```bash
+# 1. Base de datos
+gcloud secrets create INTEGRITY_DATABASE_URL --replication-policy="automatic"
+echo -n "postgresql://postgres:PASSWORD@127.0.0.1:5432/integrity_db?schema=public&connection_limit=10" | gcloud secrets versions add INTEGRITY_DATABASE_URL --data-file=-
+
+# 2. JWT Secret
+gcloud secrets create INTEGRITY_JWT_SECRET --replication-policy="automatic"
+echo -n "CLAVE_SECRET_FUERTE_DE_32_CARACTERES" | gcloud secrets versions add INTEGRITY_JWT_SECRET --data-file=-
+
+# 3. Redis URL
+gcloud secrets create INTEGRITY_REDIS_URL --replication-policy="automatic"
+echo -n "redis://10.0.0.3:6379" | gcloud secrets versions add INTEGRITY_REDIS_URL --data-file=-
+```
+
+### B. Configuración de VPC Serverless Access Connector
+Para conectar Cloud Run de forma segura a Cloud SQL y Memorystore Redis en la IP privada, debes crear un VPC Connector en tu red:
+```bash
+gcloud compute networks vpc-access connectors create integrity-vpc-connector \
+    --region=us-central1 \
+    --range=10.8.0.0/28 \
+    --network=default
+```
+
+### C. Despliegue del Servicio Web API (`integrity-tech-api`)
+Ejecuta el siguiente comando para desplegar el servidor backend expuesto a la red pública:
+```bash
+gcloud run deploy integrity-tech-api \
+    --image=us-central1-docker.pkg.dev/PROJECT_ID/integrity-tech/integrity-tech-api:latest \
+    --region=us-central1 \
+    --port=3001 \
+    --min-instances=1 \
+    --max-instances=10 \
+    --cpu=2 \
+    --memory=2Gi \
+    --concurrency=80 \
+    --vpc-connector=projects/PROJECT_ID/locations/us-central1/connectors/integrity-vpc-connector \
+    --service-account=integrity-run-sa@PROJECT_ID.iam.gserviceaccount.com \
+    --set-env-vars="PORT=3001,NODE_ENV=production,CORS_ORIGINS=https://integrity-tech-eight.vercel.app,STORAGE_PROVIDER=gcs,STORAGE_GCS_BUCKET=PROJECT_ID-integrity-private-storage,RATE_LIMIT_STORE=redis,RATE_LIMIT_REDIS_REQUIRED=true,OTEL_ENABLED=false" \
+    --set-secrets="DATABASE_URL=INTEGRITY_DATABASE_URL:latest,JWT_SECRET=INTEGRITY_JWT_SECRET:latest,REDIS_URL=INTEGRITY_REDIS_URL:latest" \
+    --allow-unauthenticated
+```
+
+### D. Despliegue del Background Worker (`integrity-tech-worker`)
+Ejecuta el siguiente comando para desplegar el worker asíncrono BullMQ (sin acceso de red público / headless):
+```bash
+gcloud run deploy integrity-tech-worker \
+    --image=us-central1-docker.pkg.dev/PROJECT_ID/integrity-tech/integrity-tech-worker:latest \
+    --region=us-central1 \
+    --command="node,dist/main-worker.js" \
+    --no-cpu-throttling \
+    --min-instances=1 \
+    --max-instances=5 \
+    --cpu=1 \
+    --memory=1Gi \
+    --vpc-connector=projects/PROJECT_ID/locations/us-central1/connectors/integrity-vpc-connector \
+    --service-account=integrity-run-sa@PROJECT_ID.iam.gserviceaccount.com \
+    --set-env-vars="NODE_ENV=production,STORAGE_PROVIDER=gcs,STORAGE_GCS_BUCKET=PROJECT_ID-integrity-private-storage" \
+    --set-secrets="DATABASE_URL=INTEGRITY_DATABASE_URL:latest,JWT_SECRET=INTEGRITY_JWT_SECRET:latest,REDIS_URL=INTEGRITY_REDIS_URL:latest" \
+    --no-allow-unauthenticated
+```
+
+---
+
+## 8. Configuración del Frontend en Vercel
+
+Una vez que `integrity-tech-api` esté desplegado en Cloud Run, copia su URL HTTPS pública y configúrala en el panel del proyecto de **Vercel** (`integrity-tech-eight`):
+
+1.  **`BACKEND_URL`**: `https://integrity-tech-api-xxxxx-uc.a.run.app` (URL de Cloud Run sin el prefijo `/api` para compatibilidad con rewrites de Next.js).
+2.  **`NEXT_PUBLIC_API_BASE_URL`**: `https://integrity-tech-api-xxxxx-uc.a.run.app/api`.
+
+---
+
+## 9. Estrategia de Rollback y Escalamiento
 
 ### Rollback (Retorno a Versión Anterior)
 Si se detecta un fallo en producción tras un despliegue:
@@ -156,5 +232,6 @@ Si se detecta un fallo en producción tras un despliegue:
 4.  Esto revertirá instantáneamente los contenedores y el tráfico sin requerir una nueva compilación de Docker.
 
 ### Escalamiento Horizontal
-*   **CPU y Memoria:** Se recomienda asignar al menos 2 vCPUs y 2 GB de RAM por contenedor en producción para mitigar la latencia de cómputo de la calibración theta.
+*   **CPU y Memoria:** Se recomienda asignar al menos 2 vCPUs y 2 GB de RAM por contenedor en la API de producción para mitigar la latencia de cómputo de la calibración theta.
 *   **Límites de Conexión en Base de Datos:** Prisma está limitado mediante `connection_limit=10` en la cadena de conexión. Con un pool máximo de 10 contenedores en Cloud Run, el número total de conexiones simultáneas a Cloud SQL será de 100, lo cual es fácilmente soportado por una instancia micro de Cloud SQL.
+

@@ -40,6 +40,7 @@ export class GcsStorageProvider implements StorageProvider {
     const bucket = this.storage.bucket(this.bucketName);
     const file = bucket.file(objectKey);
     const [url] = await file.getSignedUrl({
+      version: 'v4',
       action: 'read',
       expires: Date.now() + ttlSeconds * 1000,
     });
